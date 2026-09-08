@@ -3,7 +3,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearCredentials } from '../store/authSlice';
-import { HiUserCircle, HiLogout, HiHome } from 'react-icons/hi';
+import { HiLogout, HiHome } from 'react-icons/hi';
 
 const Navbar = () => {
   const dispatch = useDispatch();

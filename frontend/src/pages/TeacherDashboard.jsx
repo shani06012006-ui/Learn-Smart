@@ -1,6 +1,6 @@
 // frontend/src/pages/TeacherDashboard.jsx
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useGetClassesQuery, useCreateClassMutation } from '../api/apiSlice';
 import toast from 'react-hot-toast';

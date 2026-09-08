@@ -1,6 +1,5 @@
 // frontend/src/pages/TestPage.jsx
 
-import React from 'react';
 
 const TestPage = () => {
   return (

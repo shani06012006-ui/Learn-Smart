@@ -1,6 +1,6 @@
 // frontend/src/pages/teacher/ClassManagement.jsx
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useGetClassesQuery, useCreateClassMutation } from '../../api/apiSlice';
 import toast from 'react-hot-toast';
 import { PlusIcon, MagnifyingGlassIcon, UserGroupIcon, AcademicCapIcon, BookOpenIcon } from '@heroicons/react/24/outline';
