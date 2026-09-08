@@ -20,28 +20,16 @@ class WebSocketService {
 
     this.socket.on('connect', () => {
       console.log('WebSocket connected');
-      this.emit('user_online', { user_id: userId });
     });
 
     this.socket.on('disconnect', () => {
       console.log('WebSocket disconnected');
     });
 
-    this.socket.on('message', (data) => {
-      if (this.listeners.message) {
-        this.listeners.message(data);
-      }
-    });
-
-    this.socket.on('notification', (data) => {
-      if (this.listeners.notification) {
-        this.listeners.notification(data);
-      }
-    });
-
-    this.socket.on('typing', (data) => {
-      if (this.listeners.typing) {
-        this.listeners.typing(data);
+    // Forward events to listeners
+    this.socket.onAny((event, data) => {
+      if (this.listeners[event]) {
+        this.listeners[event](data);
       }
     });
   }
@@ -68,7 +56,7 @@ class WebSocketService {
   }
 
   sendMessage(roomId, message) {
-    this.emit('chat_message', {
+    this.emit('message', {
       room_id: roomId,
       message: message,
     });

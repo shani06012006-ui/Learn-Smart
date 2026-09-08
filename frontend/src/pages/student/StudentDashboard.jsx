@@ -1,10 +1,10 @@
 // frontend/src/pages/student/StudentDashboard.jsx
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useGetClassesQuery, useJoinClassMutation } from '../../api/apiSlice';
-import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   AcademicCapIcon,
   BookOpenIcon,
@@ -17,6 +17,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+
 
 const StudentDashboard = () => {
   const { user } = useSelector((state) => state.auth);
@@ -52,14 +53,14 @@ const StudentDashboard = () => {
   const totalStudents = classes.reduce((acc, cls) => acc + (cls.student_count || 0), 0);
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner text="Loading your dashboard..." />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
+      {/* Welcome Section */}
       <div className="bg-gradient-to-r from-secondary-500 to-secondary-700 rounded-2xl p-6 text-white">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">
               Welcome back, {user?.first_name || user?.username}! 🎓
@@ -79,7 +80,7 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="flex items-center justify-between">

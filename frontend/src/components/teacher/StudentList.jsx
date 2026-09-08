@@ -1,7 +1,7 @@
 // frontend/src/components/teacher/StudentList.jsx
 
 import { useState } from 'react';
-import { UserCircleIcon, CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { UserCircleIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const StudentList = ({ students, onBlock, onViewProfile }) => {
   const [searchTerm, setSearchTerm] = useState('');

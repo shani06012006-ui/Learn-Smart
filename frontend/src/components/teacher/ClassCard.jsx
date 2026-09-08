@@ -1,7 +1,7 @@
 // frontend/src/components/teacher/ClassCard.jsx
 
 import { Link } from 'react-router-dom';
-import { UserGroupIcon, AcademicCapIcon, ClipboardDocumentListIcon } from '@heroicons/react/24/outline';
+import { UserGroupIcon } from '@heroicons/react/24/outline';
 import Card from '../common/Card';
 
 const ClassCard = ({ classData }) => {

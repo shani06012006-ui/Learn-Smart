@@ -32,6 +32,8 @@ import StudentPerformance from './pages/student/StudentPerformance';
 import PrivateRoute from './components/common/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import LoadingScreen from './components/common/LoadingScreen';
+import ExamResults from './pages/student/ExamResults';
+import Chat from './components/Chat/Chat';
 
 // Authentication
 import { getProfile, clearCredentials } from './store/slices/authSlice';
@@ -116,6 +118,9 @@ function App() {
           <Route path="/student/exam/:id" element={<StudentExam />} />
           <Route path="/student/materials" element={<StudentMaterials />} />
           <Route path="/student/performance" element={<StudentPerformance />} />
+          <Route path="/student/exam/results/:attemptId" element={<ExamResults />}/>
+          <Route path="/chat/:roomId" element={<Chat />} />
+
         </Route>
       </Routes>
     </HelmetProvider>
