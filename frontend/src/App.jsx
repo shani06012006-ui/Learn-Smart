@@ -25,6 +25,7 @@ import TeacherAnalytics from './pages/teacher/Analytics';
 import StudentDashboard from './pages/student/StudentDashboard';
 import StudentClasses from './pages/student/StudentClasses';
 import StudentExam from './pages/student/StudentExam';
+import ExamResults from './pages/student/ExamResults';
 import StudentMaterials from './pages/student/StudentMaterials';
 import StudentPerformance from './pages/student/StudentPerformance';
 
@@ -32,14 +33,9 @@ import StudentPerformance from './pages/student/StudentPerformance';
 import PrivateRoute from './components/common/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import LoadingScreen from './components/common/LoadingScreen';
-import ExamResults from './pages/student/ExamResults';
-import Chat from './components/Chat/Chat';
 
 // Authentication
 import { getProfile, clearCredentials } from './store/slices/authSlice';
-
-// WebSocket
-import { wsService } from './api/websocket';
 
 function App() {
   const dispatch = useDispatch();
@@ -53,25 +49,6 @@ function App() {
       });
     }
   }, [token, user, isAuthenticated, dispatch]);
-
-  // WebSocket connection
-  useEffect(() => {
-    if (user && token && isAuthenticated) {
-      try {
-        wsService.connect(user.id);
-      } catch (error) {
-        console.warn('WebSocket connection failed:', error);
-      }
-      
-      return () => {
-        try {
-          wsService.disconnect();
-        } catch (error) {
-          console.warn('WebSocket disconnect failed:', error);
-        }
-      };
-    }
-  }, [user, token, isAuthenticated]);
 
   // Loading state
   if (isLoading) {
@@ -89,25 +66,13 @@ function App() {
             color: '#fff',
             borderRadius: '8px',
           },
-          success: {
-            iconTheme: {
-              primary: '#22c55e',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
         }}
       />
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/" element={<Navigate to="/login" />} />
 
         {/* Protected Routes */}
         <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
@@ -118,7 +83,6 @@ function App() {
           {/* Teacher Routes */}
           <Route path="/teacher/classes" element={<ClassManagement />} />
           <Route path="/teacher/classes/:id" element={<ClassDetail />} />
-          <Route path="/teacher/classes/:id/materials" element={<MaterialManagement />} />
           <Route path="/teacher/exams" element={<ExamManagement />} />
           <Route path="/teacher/exams/:id" element={<ExamDetail />} />
           <Route path="/teacher/materials" element={<MaterialManagement />} />
@@ -128,12 +92,9 @@ function App() {
           <Route path="/student/dashboard" element={<StudentDashboard />} />
           <Route path="/student/classes" element={<StudentClasses />} />
           <Route path="/student/exam/:id" element={<StudentExam />} />
+          <Route path="/student/exam/results/:attemptId" element={<ExamResults />} />
           <Route path="/student/materials" element={<StudentMaterials />} />
-          <Route path="/student/classes/:id/materials" element={<StudentMaterials />} />
           <Route path="/student/performance" element={<StudentPerformance />} />
-          <Route path="/student/exam/results/:attemptId" element={<ExamResults />}/>
-          <Route path="/chat/:roomId" element={<Chat />} />
-
         </Route>
       </Routes>
     </HelmetProvider>
