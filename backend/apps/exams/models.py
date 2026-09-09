@@ -61,7 +61,7 @@ class Exam(models.Model):
     
     @property
     def total_attempts(self):
-        return self.attempts.filter(is_completed=True).count()
+        return self.attempts.filter(status='completed').count()
 
 
 class Question(models.Model):

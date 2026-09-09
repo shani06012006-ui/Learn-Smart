@@ -9,13 +9,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import JSONParser
 
-from .models import Exam, Question, ExamAttempt, StudentAnswer
-from .serializers import (
-    ExamSerializer, ExamDetailSerializer, QuestionSerializer,
-    ExamAttemptSerializer, StudentAnswerSerializer,
-    SubmitAnswerSerializer, GradeAnswerSerializer
-)
 from apps.classes.models import Class
+
+from .models import Exam, ExamAttempt, Question, StudentAnswer
+from .serializers import (
+    ExamDetailSerializer,
+    ExamSerializer,
+    ExamAttemptSerializer,
+    QuestionSerializer,
+    StudentAnswerSerializer,
+    SubmitAnswerSerializer,
+    GradeAnswerSerializer,
+)
 
 
 class IsTeacherOrReadOnly(permissions.BasePermission):
@@ -44,6 +49,7 @@ class ExamListCreateView(generics.ListCreateAPIView):
         
         queryset = Exam.objects.filter(class_obj_id=class_id)
         
+        # Students can only see published exams
         if user.user_type == 'student':
             queryset = queryset.filter(is_published=True)
         
@@ -87,18 +93,21 @@ class StartExamView(APIView):
     def post(self, request, exam_id):
         exam = get_object_or_404(Exam, id=exam_id)
         
+        # Only students can start exams
         if request.user.user_type != 'student':
             return Response(
                 {'error': 'Only students can start exams'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Check if exam is published
         if not exam.is_published:
             return Response(
                 {'error': 'Exam is not published yet'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if exam is within time window
         now = timezone.now()
         if now < exam.start_time:
             return Response(
@@ -111,6 +120,7 @@ class StartExamView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Check if student has already attempted
         existing_attempt = ExamAttempt.objects.filter(
             student=request.user,
             exam=exam,
@@ -125,17 +135,20 @@ class StartExamView(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             else:
+                # Return existing in-progress attempt
                 return Response({
                     'attempt_id': str(existing_attempt.id),
                     'message': 'Resuming existing attempt'
                 })
         
+        # Create new attempt
         attempt = ExamAttempt.objects.create(
             student=request.user,
             exam=exam,
             status='in_progress'
         )
         
+        # Create empty answer records for all questions
         questions = exam.questions.all()
         for question in questions:
             StudentAnswer.objects.create(
@@ -157,12 +170,14 @@ class SubmitAnswerView(APIView):
     def post(self, request, attempt_id):
         attempt = get_object_or_404(ExamAttempt, id=attempt_id)
         
+        # Verify the student owns this attempt
         if request.user != attempt.student:
             return Response(
                 {'error': 'Permission denied'},
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Check if exam is still active
         now = timezone.now()
         if now > attempt.exam.end_time:
             attempt.status = 'expired'
@@ -181,22 +196,36 @@ class SubmitAnswerView(APIView):
         selected_option = serializer.validated_data.get('selected_option')
         time_taken = serializer.validated_data.get('time_taken', 0)
         
+        # Get the student answer
         student_answer = get_object_or_404(
             StudentAnswer,
             attempt=attempt,
             question_id=question_id
         )
         
+        # Update the answer
         student_answer.answer_text = answer_text
         student_answer.selected_option = selected_option
         student_answer.time_taken_seconds = time_taken
         
+        # Auto-grade MCQ and True/False questions
         question = student_answer.question
         if question.question_type in ['mcq', 'true_false']:
             if selected_option is not None:
-                correct_option = question.correct_answer
-                if isinstance(correct_option, str) and correct_option.isdigit():
-                    correct_option = int(correct_option)
+                correct_answer = question.correct_answer
+                # If correct_answer is a string that looks like an option index
+                if isinstance(correct_answer, str) and correct_answer.isdigit():
+                    correct_option = int(correct_answer)
+                else:
+                    # Try to match by value
+                    if isinstance(question.options, list):
+                        try:
+                            correct_option = question.options.index(correct_answer)
+                        except ValueError:
+                            correct_option = None
+                    else:
+                        correct_option = correct_answer
+                
                 student_answer.is_correct = (selected_option == correct_option)
                 student_answer.marks_obtained = question.marks if student_answer.is_correct else 0
         
@@ -216,6 +245,7 @@ class SubmitExamView(APIView):
     def post(self, request, attempt_id):
         attempt = get_object_or_404(ExamAttempt, id=attempt_id)
         
+        # Verify the student owns this attempt
         if request.user != attempt.student:
             return Response(
                 {'error': 'Permission denied'},
@@ -228,6 +258,7 @@ class SubmitExamView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Calculate results
         answers = attempt.answers.all()
         total_correct = answers.filter(is_correct=True).count()
         total_wrong = answers.filter(is_correct=False).count()
@@ -236,6 +267,7 @@ class SubmitExamView(APIView):
         ).count()
         total_marks = sum(a.marks_obtained for a in answers)
         
+        # Update attempt
         attempt.total_correct = total_correct
         attempt.total_wrong = total_wrong
         attempt.total_unanswered = total_unanswered
@@ -265,10 +297,12 @@ class ExamResultsView(generics.RetrieveAPIView):
     def get_queryset(self):
         user = self.request.user
         if user.user_type == 'teacher':
+            # Teachers can see all attempts for their exams
             return ExamAttempt.objects.filter(
                 exam__created_by=user
             )
         else:
+            # Students can only see their own attempts
             return ExamAttempt.objects.filter(
                 student=user
             )
@@ -278,6 +312,7 @@ class ExamResultsView(generics.RetrieveAPIView):
         serializer = self.get_serializer(instance)
         data = serializer.data
         
+        # Add answers to the response
         answers = StudentAnswer.objects.filter(attempt=instance)
         data['answers'] = StudentAnswerSerializer(answers, many=True).data
         
