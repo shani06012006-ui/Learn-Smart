@@ -10,20 +10,33 @@ class WebSocketService {
 
   connect(userId) {
     const token = localStorage.getItem('token');
-    if (!token) return;
+    if (!token) {
+      console.warn('No token found, WebSocket connection skipped');
+      return;
+    }
 
-    this.socket = io(import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws', {
-      path: '/ws/',
+    // Use the Vite proxy URL
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:5173';
+
+    this.socket = io(wsUrl, {
+      path: '/ws',
       query: { token },
       transports: ['websocket'],
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
     });
 
     this.socket.on('connect', () => {
       console.log('WebSocket connected');
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('WebSocket disconnected');
+    this.socket.on('connect_error', (error) => {
+      console.warn('WebSocket connection error:', error.message);
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('WebSocket disconnected:', reason);
     });
 
     // Forward events to listeners

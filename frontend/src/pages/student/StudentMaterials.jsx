@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetMaterialsQuery, useGetAnnouncementsQuery, useGetClassDetailQuery } from '../../api/apiSlice';
+import {
+  useGetMaterialsQuery,
+  useGetAnnouncementsQuery,
+  useGetClassDetailQuery,
+} from '../../api/apiSlice';
 import {
   DocumentIcon,
   VideoCameraIcon,
@@ -15,6 +19,8 @@ import {
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+
+// ... rest of the component code remains the same
 
 const StudentMaterials = () => {
   const { id } = useParams();

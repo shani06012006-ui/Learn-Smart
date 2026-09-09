@@ -2,11 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGetExamDetailQuery, useStartExamMutation, useSubmitAnswerMutation, useSubmitExamMutation } from '../../api/apiSlice';
+import {
+  useGetExamDetailQuery,
+  useStartExamMutation,
+  useSubmitAnswerMutation,
+  useSubmitExamMutation,
+} from '../../api/apiSlice';
 import toast from 'react-hot-toast';
 import { ClockIcon, ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import Button from '../../components/common/Button';
+
+// ... rest of the component code remains the same
 
 const StudentExam = () => {
   const { id } = useParams();

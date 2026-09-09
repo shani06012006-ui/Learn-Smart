@@ -1,6 +1,6 @@
 // frontend/src/pages/teacher/ExamManagement.jsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useGetExamsQuery,
@@ -23,6 +23,8 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+
+// ... rest of the component code remains the same
 
 
 const ExamManagement = () => {

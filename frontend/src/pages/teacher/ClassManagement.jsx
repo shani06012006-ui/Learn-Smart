@@ -1,6 +1,6 @@
 // frontend/src/pages/teacher/ClassManagement.jsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useGetClassesQuery, useCreateClassMutation } from '../../api/apiSlice';
 import toast from 'react-hot-toast';
 import { PlusIcon, MagnifyingGlassIcon, UserGroupIcon, AcademicCapIcon, BookOpenIcon } from '@heroicons/react/24/outline';
@@ -10,6 +10,8 @@ import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ClassCard from '../../components/teacher/ClassCard';
+
+// ... rest of the component code remains the same
 
 const ClassManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);

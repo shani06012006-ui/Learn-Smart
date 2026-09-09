@@ -30,6 +30,8 @@ import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
+// ... rest of the component code remains the same
+
 const MaterialManagement = () => {
   const { id } = useParams();
   const navigate = useNavigate();
