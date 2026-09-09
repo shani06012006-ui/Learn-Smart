@@ -9,7 +9,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.accounts.urls')),
     path('api/', include('apps.classes.urls')),
-    path('api/', include('apps.materials.urls')), 
+    path('api/', include('apps.materials.urls')),
+    path('api/', include('apps.exams.urls')),
 ]
 
 # Serve media files in development
