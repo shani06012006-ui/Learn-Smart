@@ -45,13 +45,11 @@ class StudyMaterial(models.Model):
     description = models.TextField(blank=True, null=True)
     material_type = models.CharField(max_length=20, choices=MATERIAL_TYPES)
     
-    # Content fields (only one will be used based on type)
     content = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='materials/%Y/%m/%d/', null=True, blank=True)
     link_url = models.URLField(blank=True, null=True)
     thumbnail = models.ImageField(upload_to='thumbnails/%Y/%m/%d/', null=True, blank=True)
     
-    # Metadata
     is_published = models.BooleanField(default=True)
     is_pinned = models.BooleanField(default=False)
     view_count = models.IntegerField(default=0)
@@ -86,7 +84,6 @@ class Announcement(models.Model):
     
     is_published = models.BooleanField(default=True)
     is_pinned = models.BooleanField(default=False)
-    
     expires_at = models.DateTimeField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -97,19 +94,3 @@ class Announcement(models.Model):
     
     def __str__(self):
         return self.title
-
-
-class MaterialComment(models.Model):
-    """Comments on study materials"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    material = models.ForeignKey(StudyMaterial, on_delete=models.CASCADE, related_name='comments')
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    content = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        ordering = ['created_at']
-    
-    def __str__(self):
-        return f"{self.user.email} - {self.material.title}"

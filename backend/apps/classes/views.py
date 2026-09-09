@@ -27,7 +27,7 @@ class ClassListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        if user.is_teacher:
+        if user.user_type == 'teacher':
             return Class.objects.filter(teacher=user)
         else:
             enrolled_class_ids = Enrollment.objects.filter(
@@ -37,7 +37,7 @@ class ClassListCreateView(generics.ListCreateAPIView):
             return Class.objects.filter(id__in=enrolled_class_ids)
     
     def perform_create(self, serializer):
-        if not self.request.user.is_teacher:
+        if self.request.user.user_type != 'teacher':
             raise PermissionError("Only teachers can create classes")
         serializer.save(teacher=self.request.user)
 
@@ -52,7 +52,7 @@ class ClassDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        if user.is_teacher:
+        if user.user_type == 'teacher':
             return Class.objects.filter(teacher=user)
         else:
             enrolled_class_ids = Enrollment.objects.filter(
@@ -83,7 +83,7 @@ class JoinClassView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        if not request.user.is_student:
+        if request.user.user_type != 'student':
             return Response(
                 {'error': 'Only students can join classes.'},
                 status=status.HTTP_403_FORBIDDEN
@@ -121,7 +121,7 @@ class LeaveClassView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, class_id):
-        if not request.user.is_student:
+        if request.user.user_type != 'student':
             return Response(
                 {'error': 'Only students can leave classes.'},
                 status=status.HTTP_403_FORBIDDEN

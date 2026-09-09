@@ -55,7 +55,6 @@ export const register = createAsyncThunk(
   }
 );
 
-// ✅ Make sure getProfile is exported
 export const getProfile = createAsyncThunk(
   'auth/getProfile',
   async (_, { getState, rejectWithValue }) => {
@@ -95,8 +94,7 @@ export const logoutUser = createAsyncThunk(
         });
       }
       return true;
-    } catch  {
-      // Even if logout fails on server, clear local state
+    } catch (error) {
       return true;
     }
   }
@@ -195,7 +193,6 @@ const authSlice = createSlice({
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload || 'Failed to get profile';
-        // If token is invalid, clear credentials
         if (action.payload === 'Session expired. Please login again.' || 
             action.payload === 'No token found') {
           state.user = null;
@@ -223,7 +220,6 @@ const authSlice = createSlice({
         toast.success('Logged out successfully');
       })
       .addCase(logoutUser.rejected, (state) => {
-        // Even if logout fails on server, clear local state
         state.user = null;
         state.token = null;
         state.isAuthenticated = false;
@@ -249,8 +245,8 @@ export const {
 export const selectCurrentUser = (state) => state.auth.user;
 export const selectToken = (state) => state.auth.token;
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
-export const selectIsTeacher = (state) => state.auth.user?.role === 'teacher' || state.auth.user?.user_type === 'teacher';
-export const selectIsStudent = (state) => state.auth.user?.role === 'student' || state.auth.user?.user_type === 'student';
+export const selectIsTeacher = (state) => state.auth.user?.user_type === 'teacher';
+export const selectIsStudent = (state) => state.auth.user?.user_type === 'student';
 export const selectAuthLoading = (state) => state.auth.isLoading;
 export const selectAuthError = (state) => state.auth.error;
 

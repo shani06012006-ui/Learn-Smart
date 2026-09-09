@@ -1,11 +1,12 @@
 # backend/apps/exams/models.py
 
 import uuid
+
+from django.conf import settings
 from django.db import models
-from django.contrib.auth import get_user_model
+
 from apps.classes.models import Class
 
-User = get_user_model()
 
 class Exam(models.Model):
     """Exam/Quiz model"""
@@ -24,23 +25,20 @@ class Exam(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     class_obj = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='exams')
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     exam_type = models.CharField(max_length=20, choices=EXAM_TYPES)
     difficulty = models.CharField(max_length=10, choices=DIFFICULTY_LEVELS, default='medium')
     
-    # Grading
     total_marks = models.IntegerField()
     passing_percentage = models.FloatField(default=40)
     
-    # Timing
     duration_minutes = models.IntegerField()
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     
-    # Settings
     is_published = models.BooleanField(default=False)
     allow_retake = models.BooleanField(default=False)
     max_attempts = models.IntegerField(default=1)
@@ -48,7 +46,6 @@ class Exam(models.Model):
     show_result_immediately = models.BooleanField(default=False)
     instructions = models.TextField(blank=True, null=True)
     
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -65,6 +62,7 @@ class Exam(models.Model):
     @property
     def total_attempts(self):
         return self.attempts.filter(is_completed=True).count()
+
 
 class Question(models.Model):
     """Question model for exams"""
@@ -85,7 +83,6 @@ class Question(models.Model):
     marks = models.IntegerField()
     difficulty = models.CharField(max_length=10, choices=Exam.DIFFICULTY_LEVELS, default='medium')
     
-    # For MCQ questions
     options = models.JSONField(default=list, blank=True)
     correct_answer = models.TextField()
     explanation = models.TextField(blank=True, null=True)
@@ -101,6 +98,7 @@ class Question(models.Model):
     def __str__(self):
         return f"Q{self.order}: {self.question_text[:50]}"
 
+
 class ExamAttempt(models.Model):
     """Student attempt at an exam"""
     STATUS_CHOICES = (
@@ -111,7 +109,12 @@ class ExamAttempt(models.Model):
     )
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exam_attempts', limit_choices_to={'role': 'student'})
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='exam_attempts',
+        limit_choices_to={'user_type': 'student'}
+    )
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='attempts')
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in_progress')
@@ -119,13 +122,11 @@ class ExamAttempt(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
     
-    # Results
     total_marks_obtained = models.FloatField(default=0)
     total_correct = models.IntegerField(default=0)
     total_wrong = models.IntegerField(default=0)
     total_unanswered = models.IntegerField(default=0)
     
-    # Feedback
     teacher_feedback = models.TextField(blank=True, null=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
@@ -138,6 +139,7 @@ class ExamAttempt(models.Model):
     def __str__(self):
         return f"{self.student.email} - {self.exam.title}"
 
+
 class StudentAnswer(models.Model):
     """Individual answer for each question in an exam attempt"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -145,12 +147,11 @@ class StudentAnswer(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     
     answer_text = models.TextField(blank=True, null=True)
-    selected_option = models.IntegerField(null=True, blank=True)  # For MCQ
+    selected_option = models.IntegerField(null=True, blank=True)
     
     is_correct = models.BooleanField(null=True, blank=True)
     marks_obtained = models.FloatField(default=0)
     
-    # For AI grading of descriptive answers
     ai_feedback = models.TextField(blank=True, null=True)
     ai_confidence = models.FloatField(null=True, blank=True)
     
