@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 
             'email', 
             'username', 
-            'role', 
+            'user_type',
             'first_name', 
             'last_name',
             'phone',
@@ -50,7 +50,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             'username',
             'password',
             'password2',
-            'role',
+            'user_type',
             'first_name',
             'last_name',
         )
@@ -73,7 +73,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             username=validated_data['username'],
             password=validated_data['password'],
-            role=validated_data.get('role', User.Role.STUDENT),
+            user_type=validated_data.get('user_type', User.Role.STUDENT),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
         )

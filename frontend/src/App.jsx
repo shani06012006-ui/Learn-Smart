@@ -107,6 +107,7 @@ function App() {
           {/* Teacher Routes */}
           <Route path="/teacher/classes" element={<ClassManagement />} />
           <Route path="/teacher/classes/:id" element={<ClassDetail />} />
+          <Route path="/teacher/classes/:id/materials" element={<MaterialManagement />} />
           <Route path="/teacher/exams" element={<ExamManagement />} />
           <Route path="/teacher/exams/:id" element={<ExamDetail />} />
           <Route path="/teacher/materials" element={<MaterialManagement />} />
@@ -117,6 +118,7 @@ function App() {
           <Route path="/student/classes" element={<StudentClasses />} />
           <Route path="/student/exam/:id" element={<StudentExam />} />
           <Route path="/student/materials" element={<StudentMaterials />} />
+          <Route path="/student/classes/:id/materials" element={<StudentMaterials />} />
           <Route path="/student/performance" element={<StudentPerformance />} />
           <Route path="/student/exam/results/:attemptId" element={<ExamResults />}/>
           <Route path="/chat/:roomId" element={<Chat />} />

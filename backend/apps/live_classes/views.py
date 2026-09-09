@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from apps.classes.models import Class
 
 from .models import LiveClass, LiveClassAttendance
-from .serializers import LiveClassAttendanceSerializer, LiveClassSerializer
+from .serializers import LiveClassSerializer
 
 
 class LiveClassListCreateView(generics.ListCreateAPIView):
@@ -26,7 +26,7 @@ class LiveClassListCreateView(generics.ListCreateAPIView):
         
         queryset = LiveClass.objects.filter(class_obj_id=class_id)
         
-        if user.is_student:
+        if user.user_type == 'student':
             from datetime import timedelta
             queryset = queryset.filter(
                 start_time__gte=timezone.now() - timedelta(hours=1)
@@ -37,7 +37,7 @@ class LiveClassListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         class_obj = get_object_or_404(Class, id=self.kwargs['class_id'])
         
-        if not self.request.user.is_teacher:
+        if self.request.user.user_type != 'teacher':
             raise permissions.PermissionDenied("Only teachers can create live classes")
         
         meeting_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
@@ -72,7 +72,7 @@ class JoinLiveClassView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if request.user.is_student:
+        if request.user.user_type == 'student':
             is_enrolled = request.user.enrollments.filter(
                 class_obj=live_class.class_obj,
                 is_active=True

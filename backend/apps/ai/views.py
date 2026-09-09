@@ -28,7 +28,7 @@ class GenerateQuestionsView(APIView):
     parser_classes = [MultiPartParser, FormParser]
     
     def post(self, request):
-        if not request.user.is_teacher:
+        if request.user.user_type != 'teacher':
             return Response(
                 {'error': 'Only teachers can generate questions'},
                 status=status.HTTP_403_FORBIDDEN
@@ -36,7 +36,6 @@ class GenerateQuestionsView(APIView):
         
         text = request.data.get('text', '')
         file = request.FILES.get('file')
-        # link is not used - removed
         
         if file:
             if file.name.endswith('.pdf'):
@@ -50,7 +49,7 @@ class GenerateQuestionsView(APIView):
                 try:
                     text += file.read().decode('utf-8')
                 except Exception:
-                    pass  # Log this in production
+                    pass
         
         if not text:
             return Response(
@@ -80,7 +79,7 @@ class GradeAnswerView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request, question_id):
-        if not request.user.is_teacher:
+        if request.user.user_type != 'teacher':
             return Response(
                 {'error': 'Only teachers can grade answers'},
                 status=status.HTTP_403_FORBIDDEN
@@ -110,7 +109,7 @@ class AnalyzePerformanceView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request, student_id):
-        if not request.user.is_teacher:
+        if request.user.user_type != 'teacher':
             return Response(
                 {'error': 'Only teachers can analyze performance'},
                 status=status.HTTP_403_FORBIDDEN
@@ -156,7 +155,7 @@ class GeneratePracticeQuestionsView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        if not request.user.is_teacher:
+        if request.user.user_type != 'teacher':
             return Response(
                 {'error': 'Only teachers can generate practice questions'},
                 status=status.HTTP_403_FORBIDDEN

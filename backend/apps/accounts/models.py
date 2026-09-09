@@ -35,7 +35,6 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Fix: Remove mutable default (blank=True instead)
     groups = models.ManyToManyField(
         Group,
         related_name='custom_user_set',
@@ -109,7 +108,6 @@ class TeacherProfile(models.Model):
     specialization = models.CharField(max_length=255, blank=True, null=True)
     years_of_experience = models.IntegerField(default=0)
     bio = models.TextField(blank=True, null=True)
-    # Fix: Use default=dict instead of mutable default
     office_hours = models.JSONField(default=dict, blank=True)
 
     def __str__(self):
