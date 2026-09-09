@@ -18,9 +18,9 @@ const baseQuery = fetchBaseQuery({
 export const apiSlice = createApi({
   reducerPath: 'api',
   baseQuery: baseQuery,
-  tagTypes: ['Class', 'Enrollment', 'Material', 'Announcement'],
+  tagTypes: ['Class', 'Enrollment', 'Material', 'Announcement', 'Exam', 'Question'],
   endpoints: (builder) => ({
-    // Auth endpoints
+    // ============ AUTH ENDPOINTS ============
     login: builder.mutation({
       query: (credentials) => ({
         url: '/auth/login/',
@@ -38,8 +38,15 @@ export const apiSlice = createApi({
     getProfile: builder.query({
       query: () => '/auth/profile/',
     }),
+    updateProfile: builder.mutation({
+      query: (data) => ({
+        url: '/auth/profile/',
+        method: 'PUT',
+        body: data,
+      }),
+    }),
 
-    // Class endpoints
+    // ============ CLASS ENDPOINTS ============
     getClasses: builder.query({
       query: () => '/classes/',
       providesTags: ['Class'],
@@ -53,6 +60,21 @@ export const apiSlice = createApi({
         url: '/classes/',
         method: 'POST',
         body: data,
+      }),
+      invalidatesTags: ['Class'],
+    }),
+    updateClass: builder.mutation({
+      query: ({ id, ...data }) => ({
+        url: `/classes/${id}/`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['Class'],
+    }),
+    deleteClass: builder.mutation({
+      query: (id) => ({
+        url: `/classes/${id}/`,
+        method: 'DELETE',
       }),
       invalidatesTags: ['Class'],
     }),
@@ -72,7 +94,23 @@ export const apiSlice = createApi({
       invalidatesTags: ['Class', 'Enrollment'],
     }),
 
-    // Material endpoints
+    // ============ STUDENT MANAGEMENT ============
+    getClassStudents: builder.query({
+      query: (classId) => `/classes/${classId}/students/`,
+      providesTags: ['Student'],
+    }),
+    getStudentStatus: builder.query({
+      query: (classId) => `/classes/${classId}/students/status/`,
+    }),
+    blockStudent: builder.mutation({
+      query: ({ classId, studentId }) => ({
+        url: `/classes/${classId}/students/${studentId}/block/`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Student'],
+    }),
+
+    // ============ MATERIAL ENDPOINTS ============
     getMaterials: builder.query({
       query: (classId) => `/classes/${classId}/materials/`,
       providesTags: ['Material'],
@@ -81,15 +119,11 @@ export const apiSlice = createApi({
       query: (id) => `/materials/${id}/`,
     }),
     createMaterial: builder.mutation({
-      query: ({ classId, ...data }) => {
-        // If data is FormData, use it directly
-        const body = data instanceof FormData ? data : data;
-        return {
-          url: `/classes/${classId}/materials/`,
-          method: 'POST',
-          body: body,
-        };
-      },
+      query: ({ classId, ...data }) => ({
+        url: `/classes/${classId}/materials/`,
+        method: 'POST',
+        body: data,
+      }),
       invalidatesTags: ['Material'],
     }),
     deleteMaterial: builder.mutation({
@@ -100,7 +134,7 @@ export const apiSlice = createApi({
       invalidatesTags: ['Material'],
     }),
 
-    // Announcement endpoints
+    // ============ ANNOUNCEMENT ENDPOINTS ============
     getAnnouncements: builder.query({
       query: (classId) => `/classes/${classId}/announcements/`,
       providesTags: ['Announcement'],
@@ -120,23 +154,209 @@ export const apiSlice = createApi({
       }),
       invalidatesTags: ['Announcement'],
     }),
+
+    // ============ EXAM ENDPOINTS ============
+    getExams: builder.query({
+      query: (classId) => `/classes/${classId}/exams/`,
+      providesTags: ['Exam'],
+    }),
+    getExamDetail: builder.query({
+      query: (id) => `/exams/${id}/`,
+      providesTags: ['Exam'],
+    }),
+    createExam: builder.mutation({
+      query: ({ classId, ...data }) => ({
+        url: `/classes/${classId}/exams/`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Exam'],
+    }),
+    updateExam: builder.mutation({
+      query: ({ id, ...data }) => ({
+        url: `/exams/${id}/`,
+        method: 'PUT',
+        body: data,
+      }),
+      invalidatesTags: ['Exam'],
+    }),
+    deleteExam: builder.mutation({
+      query: (id) => ({
+        url: `/exams/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Exam'],
+    }),
+
+    // ============ QUESTION ENDPOINTS ============
+    getQuestions: builder.query({
+      query: (examId) => `/exams/${examId}/questions/`,
+      providesTags: ['Question'],
+    }),
+    createQuestion: builder.mutation({
+      query: ({ examId, ...data }) => ({
+        url: `/exams/${examId}/questions/`,
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['Question'],
+    }),
+    deleteQuestion: builder.mutation({
+      query: (questionId) => ({
+        url: `/questions/${questionId}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Question'],
+    }),
+
+    // ============ EXAM TAKING ============
+    startExam: builder.mutation({
+      query: (examId) => ({
+        url: `/exams/${examId}/start/`,
+        method: 'POST',
+      }),
+    }),
+    submitAnswer: builder.mutation({
+      query: ({ attemptId, data }) => ({
+        url: `/attempts/${attemptId}/answer/`,
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    submitExam: builder.mutation({
+      query: (attemptId) => ({
+        url: `/attempts/${attemptId}/submit/`,
+        method: 'POST',
+      }),
+    }),
+    getExamResults: builder.query({
+      query: (attemptId) => `/attempts/${attemptId}/results/`,
+    }),
+
+    // ============ AI ENDPOINTS ============
+    generateQuestions: builder.mutation({
+      query: (data) => ({
+        url: '/ai/generate-questions/',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    gradeAnswer: builder.mutation({
+      query: ({ questionId, data }) => ({
+        url: `/ai/grade/${questionId}/`,
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    analyzePerformance: builder.query({
+      query: (studentId) => `/ai/analyze/${studentId}/`,
+    }),
+    generatePractice: builder.mutation({
+      query: (data) => ({
+        url: '/ai/practice-questions/',
+        method: 'POST',
+        body: data,
+      }),
+    }),
+
+    // ============ ANALYTICS ENDPOINTS ============
+    getClassAnalytics: builder.query({
+      query: (classId) => `/analytics/class/${classId}/`,
+    }),
+    getTeacherAnalytics: builder.query({
+      query: () => '/analytics/teacher/dashboard/',
+    }),
+
+    // ============ LIVE CLASS ENDPOINTS ============
+    getLiveClasses: builder.query({
+      query: (classId) => `/classes/${classId}/live-classes/`,
+    }),
+    createLiveClass: builder.mutation({
+      query: ({ classId, ...data }) => ({
+        url: `/classes/${classId}/live-classes/`,
+        method: 'POST',
+        body: data,
+      }),
+    }),
+    joinLiveClass: builder.mutation({
+      query: (classId) => ({
+        url: `/live-classes/${classId}/join/`,
+        method: 'POST',
+      }),
+    }),
+    leaveLiveClass: builder.mutation({
+      query: (classId) => ({
+        url: `/live-classes/${classId}/leave/`,
+        method: 'POST',
+      }),
+    }),
   }),
 });
 
+// ============ EXPORT ALL HOOKS ============
 export const {
+  // Auth
   useLoginMutation,
   useRegisterMutation,
   useGetProfileQuery,
+  useUpdateProfileMutation,
+
+  // Classes
   useGetClassesQuery,
   useGetClassDetailQuery,
   useCreateClassMutation,
+  useUpdateClassMutation,
+  useDeleteClassMutation,
   useJoinClassMutation,
   useLeaveClassMutation,
+
+  // Students
+  useGetClassStudentsQuery,
+  useGetStudentStatusQuery,
+  useBlockStudentMutation,
+
+  // Materials
   useGetMaterialsQuery,
   useGetMaterialDetailQuery,
   useCreateMaterialMutation,
   useDeleteMaterialMutation,
+
+  // Announcements
   useGetAnnouncementsQuery,
   useCreateAnnouncementMutation,
   useDeleteAnnouncementMutation,
+
+  // Exams
+  useGetExamsQuery,
+  useGetExamDetailQuery,
+  useCreateExamMutation,
+  useUpdateExamMutation,
+  useDeleteExamMutation,
+
+  // Questions
+  useGetQuestionsQuery,
+  useCreateQuestionMutation,
+  useDeleteQuestionMutation,
+
+  // Exam Taking
+  useStartExamMutation,
+  useSubmitAnswerMutation,
+  useSubmitExamMutation,
+  useGetExamResultsQuery,
+
+  // AI
+  useGenerateQuestionsMutation,
+  useGradeAnswerMutation,
+  useAnalyzePerformanceQuery,
+  useGeneratePracticeMutation,
+
+  // Analytics
+  useGetClassAnalyticsQuery,
+  useGetTeacherAnalyticsQuery,
+
+  // Live Classes
+  useGetLiveClassesQuery,
+  useCreateLiveClassMutation,
+  useJoinLiveClassMutation,
+  useLeaveLiveClassMutation,
 } = apiSlice;

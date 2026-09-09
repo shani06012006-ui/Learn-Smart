@@ -56,11 +56,22 @@ function App() {
 
   // WebSocket connection
   useEffect(() => {
-    if (user && token) {
-      wsService.connect(user.id);
-      return () => wsService.disconnect();
+    if (user && token && isAuthenticated) {
+      try {
+        wsService.connect(user.id);
+      } catch (error) {
+        console.warn('WebSocket connection failed:', error);
+      }
+      
+      return () => {
+        try {
+          wsService.disconnect();
+        } catch (error) {
+          console.warn('WebSocket disconnect failed:', error);
+        }
+      };
     }
-  }, [user, token]);
+  }, [user, token, isAuthenticated]);
 
   // Loading state
   if (isLoading) {
