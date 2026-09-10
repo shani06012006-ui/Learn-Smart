@@ -11,7 +11,6 @@ import Input from '../../components/common/Input';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ClassCard from '../../components/teacher/ClassCard';
 
-// ... rest of the component code remains the same
 
 const ClassManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);

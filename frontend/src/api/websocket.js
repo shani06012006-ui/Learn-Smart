@@ -1,63 +1,118 @@
 // frontend/src/api/websocket.js
 
-import { io } from 'socket.io-client';
+
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 
 class WebSocketService {
   constructor() {
-    this.socket = null;
+    this.chatSocket = null;
+    this.notificationSocket = null;
     this.listeners = {};
+    this.currentRoomId = null;
   }
 
-  connect(userId) {
-    const token = localStorage.getItem('token');
+  _getToken() {
+    // Match whatever key authSlice actually stores the access token under.
+    return localStorage.getItem('access') || localStorage.getItem('token');
+  }
+
+  _emitToListeners(event, data) {
+    if (this.listeners[event]) {
+      this.listeners[event](data);
+    }
+  }
+
+  connectChat(roomId) {
+    const token = this._getToken();
     if (!token) {
-      console.warn('No token found, WebSocket connection skipped');
+      console.warn('No auth token found, chat WebSocket connection skipped');
       return;
     }
+    if (this.chatSocket) {
+      this.chatSocket.close();
+    }
 
-    // Use the Vite proxy URL
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:5173';
+    this.currentRoomId = roomId;
+    this.chatSocket = new WebSocket(
+      `${WS_BASE_URL}/ws/chat/${roomId}/?token=${token}`
+    );
 
-    this.socket = io(wsUrl, {
-      path: '/ws',
-      query: { token },
-      transports: ['websocket'],
-      reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 1000,
-    });
+    this.chatSocket.onopen = () => {
+      console.log('Chat WebSocket connected');
+      this._emitToListeners('chat_connected', { roomId });
+    };
 
-    this.socket.on('connect', () => {
-      console.log('WebSocket connected');
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.warn('WebSocket connection error:', error.message);
-    });
-
-    this.socket.on('disconnect', (reason) => {
-      console.log('WebSocket disconnected:', reason);
-    });
-
-    // Forward events to listeners
-    this.socket.onAny((event, data) => {
-      if (this.listeners[event]) {
-        this.listeners[event](data);
+    this.chatSocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'message') {
+        this._emitToListeners('message', data);
+      } else if (data.type === 'typing') {
+        this._emitToListeners('typing', data);
       }
-    });
+    };
+
+    this.chatSocket.onerror = (error) => {
+      console.warn('Chat WebSocket error:', error);
+    };
+
+    this.chatSocket.onclose = () => {
+      console.log('Chat WebSocket disconnected');
+      this._emitToListeners('chat_disconnected', { roomId });
+    };
+  }
+
+  connectNotifications(userId) {
+    const token = this._getToken();
+    if (!token) {
+      console.warn('No auth token found, notification WebSocket connection skipped');
+      return;
+    }
+    if (this.notificationSocket) {
+      this.notificationSocket.close();
+    }
+
+    this.notificationSocket = new WebSocket(
+      `${WS_BASE_URL}/ws/notifications/${userId}/?token=${token}`
+    );
+
+    this.notificationSocket.onopen = () => {
+      console.log('Notification WebSocket connected');
+    };
+
+    this.notificationSocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'notification') {
+        this._emitToListeners('notification', data.notification);
+      }
+    };
+
+    this.notificationSocket.onerror = (error) => {
+      console.warn('Notification WebSocket error:', error);
+    };
+
+    this.notificationSocket.onclose = () => {
+      console.log('Notification WebSocket disconnected');
+    };
+  }
+
+  disconnectChat() {
+    if (this.chatSocket) {
+      this.chatSocket.close();
+      this.chatSocket = null;
+      this.currentRoomId = null;
+    }
+  }
+
+  disconnectNotifications() {
+    if (this.notificationSocket) {
+      this.notificationSocket.close();
+      this.notificationSocket = null;
+    }
   }
 
   disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
-  }
-
-  emit(event, data) {
-    if (this.socket) {
-      this.socket.emit(event, data);
-    }
+    this.disconnectChat();
+    this.disconnectNotifications();
   }
 
   on(event, callback) {
@@ -68,26 +123,26 @@ class WebSocketService {
     delete this.listeners[event];
   }
 
-  sendMessage(roomId, message) {
-    this.emit('message', {
-      room_id: roomId,
-      message: message,
-    });
+  sendMessage(message) {
+    if (this.chatSocket && this.chatSocket.readyState === WebSocket.OPEN) {
+      this.chatSocket.send(JSON.stringify({ type: 'message', message }));
+    } else {
+      console.warn('Chat WebSocket is not open, message not sent');
+    }
   }
 
-  sendTyping(roomId, isTyping) {
-    this.emit('typing', {
-      room_id: roomId,
-      is_typing: isTyping,
-    });
+  sendTyping(isTyping) {
+    if (this.chatSocket && this.chatSocket.readyState === WebSocket.OPEN) {
+      this.chatSocket.send(JSON.stringify({ type: 'typing', is_typing: isTyping }));
+    }
   }
 
-  joinRoom(roomId) {
-    this.emit('join_room', { room_id: roomId });
-  }
-
-  leaveRoom(roomId) {
-    this.emit('leave_room', { room_id: roomId });
+  markNotificationRead(notificationId) {
+    if (this.notificationSocket && this.notificationSocket.readyState === WebSocket.OPEN) {
+      this.notificationSocket.send(
+        JSON.stringify({ type: 'mark_read', notification_id: notificationId })
+      );
+    }
   }
 }
 
