@@ -6,6 +6,9 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import reactRefreshPlugin from 'eslint-plugin-react-refresh';
 
 export default [
+  {
+    ignores: ['dist/**', 'node_modules/**', 'build/**', 'coverage/**'],
+  },
   js.configs.recommended,
   {
     files: ['**/*.{js,jsx}'],

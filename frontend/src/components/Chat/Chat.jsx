@@ -28,7 +28,7 @@ const Chat = ({ roomId, participants, isGroup = false }) => {
   useEffect(() => {
     if (!roomId) return;
 
-    wsService.joinRoom(roomId);
+    wsService.connectChat(roomId);
 
     // Handle incoming messages
     const handleMessage = (data) => {
@@ -64,7 +64,7 @@ const Chat = ({ roomId, participants, isGroup = false }) => {
     wsService.on('typing', handleTyping);
 
     return () => {
-      wsService.leaveRoom(roomId);
+      wsService.disconnectChat();
       wsService.off('message');
       wsService.off('typing');
     };
@@ -75,7 +75,7 @@ const Chat = ({ roomId, participants, isGroup = false }) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    wsService.sendMessage(roomId, newMessage.trim());
+    wsService.sendMessage(newMessage.trim());
     setNewMessage('');
     setIsTyping(false);
   };
@@ -84,13 +84,13 @@ const Chat = ({ roomId, participants, isGroup = false }) => {
   const handleTypingStart = () => {
     if (!isTyping) {
       setIsTyping(true);
-      wsService.sendTyping(roomId, true);
+      wsService.sendTyping(true);
     }
 
     clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      wsService.sendTyping(roomId, false);
+      wsService.sendTyping(false);
     }, 2000);
   };
 

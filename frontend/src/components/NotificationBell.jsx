@@ -1,16 +1,23 @@
 // frontend/src/components/NotificationBell.jsx
 
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { BellIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { wsService } from '../api/websocket';
+import { selectCurrentUser } from '../store/slices/authSlice';
 
 const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const user = useSelector(selectCurrentUser);
 
   useEffect(() => {
-    // Listen for notifications via WebSocket
+
+    if (!user?.id) return;
+
+    wsService.connectNotifications(user.id);
+
     const handleNotification = (data) => {
       setNotifications(prev => [data, ...prev]);
       toast(data.content || 'New notification');
@@ -20,8 +27,9 @@ const NotificationBell = () => {
 
     return () => {
       wsService.off('notification');
+      wsService.disconnectNotifications();
     };
-  }, []);
+  }, [user?.id]);
 
   const clearAll = () => {
     setNotifications([]);
