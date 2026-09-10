@@ -9,6 +9,7 @@ import { HelmetProvider } from 'react-helmet-async';
 // Import pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import StudentLogin from './pages/auth/StudentLogin';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
@@ -72,6 +73,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/student-login" element={<StudentLogin />} />
         <Route path="/" element={<Navigate to="/login" />} />
 
         {/* Protected Routes */}
