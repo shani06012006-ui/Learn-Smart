@@ -1,14 +1,7 @@
-import os
+from django.contrib import admin
+from django.urls import include, path
 
-from celery import Celery
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")
-
-app = Celery("autolearn")
-app.config_from_object("django.conf:settings", namespace="CELERY")
-app.autodiscover_tasks()
-
-
-@app.task(bind=True)
-def debug_task(self):
-    print(f"Request: {self.request!r}")
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("classes.urls")),
+]
