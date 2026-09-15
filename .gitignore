@@ -47,3 +47,8 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local backup / temporary copies
+backend/Learn-Smart-backup/
+backend/Learn-Smart-check/
+backend/Learn-Smart-clean/
