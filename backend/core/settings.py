@@ -28,18 +28,17 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-%jmkvr2_odmx=%=g&2^gw
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
 
-
-# Application definition
+ 
 INSTALLED_APPS = [
-    'daphne',
+    # Django contrib apps FIRST
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
+
+    # Third-party
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
@@ -48,8 +47,9 @@ INSTALLED_APPS = [
     'django_filters',
     'ckeditor',
     'import_export',
-    
-    # Local apps
+
+    'daphne',
+
     'apps.accounts',
     'apps.classes',
     'apps.materials',
@@ -100,7 +100,6 @@ DATABASES = {
     }
 }
 
-# ✅ Channels - Use in-memory for development (no Redis required)
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer',
