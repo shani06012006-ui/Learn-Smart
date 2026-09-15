@@ -36,3 +36,12 @@ celerybeat.pid
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Local environment
+.env
+db.sqlite3
+
+# Python cache
+__pycache__/
+*.py[cod]
+
