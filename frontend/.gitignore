@@ -298,3 +298,11 @@ $RECYCLE.BIN/
 # Linux
 .directory
 *~
+
+node_modules/
+dist/
+.env
+.env.local
+*.local
+.DS_Store
+npm-debug.log*
