@@ -1,106 +1,38 @@
-// frontend/src/App.jsx
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { Toaster } from 'react-hot-toast';
-import { HelmetProvider } from 'react-helmet-async';
+import LoginPage from "./features/auth/LoginPage";
+import RegisterPage from "./features/auth/RegisterPage";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import RoleRoute from "./routes/RoleRoute";
+import TeacherLayout from "./components/layout/TeacherLayout";
+import StudentLayout from "./components/layout/StudentLayout";
+import TeacherDashboardPage from "./features/teacher/dashboard/TeacherDashboardPage";
+import StudentDashboardPage from "./features/student/dashboard/StudentDashboardPage";
 
-// Import pages
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import StudentLogin from './pages/auth/StudentLogin';
-import Dashboard from './pages/Dashboard';
-import Profile from './pages/Profile';
-import Settings from './pages/Settings';
-
-// Teacher Pages
-import ClassManagement from './pages/teacher/ClassManagement';
-import ClassDetail from './pages/teacher/ClassDetail';
-import ExamManagement from './pages/teacher/ExamManagement';
-import ExamDetail from './pages/teacher/ExamDetail';
-import MaterialManagement from './pages/teacher/MaterialManagement';
-import TeacherAnalytics from './pages/teacher/Analytics';
-
-// Student Pages
-import StudentDashboard from './pages/student/StudentDashboard';
-import StudentClasses from './pages/student/StudentClasses';
-import StudentExam from './pages/student/StudentExam';
-import ExamResults from './pages/student/ExamResults';
-import StudentMaterials from './pages/student/StudentMaterials';
-import StudentPerformance from './pages/student/StudentPerformance';
-
-// Components
-import PrivateRoute from './components/common/ProtectedRoute';
-import Layout from './components/layout/Layout';
-import LoadingScreen from './components/common/LoadingScreen';
-
-// Authentication
-import { getProfile, clearCredentials } from './store/slices/authSlice';
-
-function App() {
-  const dispatch = useDispatch();
-  const { user, token, isLoading, isAuthenticated } = useSelector((state) => state.auth);
-
-  // Load user profile if token exists but user doesn't
-  useEffect(() => {
-    if (token && !user && isAuthenticated) {
-      dispatch(getProfile()).unwrap().catch(() => {
-        dispatch(clearCredentials());
-      });
-    }
-  }, [token, user, isAuthenticated, dispatch]);
-
-  // Loading state
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
+export default function App() {
   return (
-    <HelmetProvider>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-            borderRadius: '8px',
-          },
-        }}
-      />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/student-login" element={<StudentLogin />} />
-        <Route path="/" element={<Navigate to="/login" />} />
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-        {/* Protected Routes */}
-        <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/settings" element={<Settings />} />
-
-          {/* Teacher Routes */}
-          <Route path="/teacher/classes" element={<ClassManagement />} />
-          <Route path="/teacher/classes/:id" element={<ClassDetail />} />
-          <Route path="/teacher/exams" element={<ExamManagement />} />
-          <Route path="/teacher/exams/:id" element={<ExamDetail />} />
-          <Route path="/teacher/materials" element={<MaterialManagement />} />
-          <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
-
-          {/* Student Routes */}
-          <Route path="/student/dashboard" element={<StudentDashboard />} />
-          <Route path="/student/classes" element={<StudentClasses />} />
-          <Route path="/student/exam/:id" element={<StudentExam />} />
-          <Route path="/student/exam/results/:attemptId" element={<ExamResults />} />
-          <Route path="/student/materials" element={<StudentMaterials />} />
-          <Route path="/student/performance" element={<StudentPerformance />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<RoleRoute allow={["teacher", "admin"]} />}>
+          <Route path="/teacher" element={<TeacherLayout />}>
+            <Route index element={<TeacherDashboardPage />} />
+            {/* /teacher/classes, /materials, /analytics, etc. are added
+                as their modules are built -- see Sidebar.jsx for the map. */}
+          </Route>
         </Route>
-      </Routes>
-    </HelmetProvider>
+
+        <Route element={<RoleRoute allow={["student"]} />}>
+          <Route path="/student" element={<StudentLayout />}>
+            <Route index element={<StudentDashboardPage />} />
+          </Route>
+        </Route>
+      </Route>
+
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }
-
-export default App;
