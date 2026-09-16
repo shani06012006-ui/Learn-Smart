@@ -1,46 +1,35 @@
-// frontend/src/main.jsx
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { Provider } from "react-redux";
+import { BrowserRouter } from "react-router-dom";
 
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { Provider } from 'react-redux';
-import { BrowserRouter } from 'react-router-dom';
-import { HelmetProvider } from 'react-helmet-async';
-import { Toaster } from 'react-hot-toast';
-import App from './App.jsx';
-import './index.css';
-import { store } from './store';
+import App from "./App.jsx";
+import { store } from "./app/store.js";
+import ErrorBoundary from "./components/feedback/ErrorBoundary.jsx";
+import "./index.css";
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <HelmetProvider>
-        <BrowserRouter>
-          <App />
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-                borderRadius: '8px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#22c55e',
-                  secondary: '#fff',
-                },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
-                },
-              },
-            }}
-          />
-        </BrowserRouter>
-      </HelmetProvider>
-    </Provider>
-  </React.StrictMode>
-);
+// The ONLY place VITE_USE_MOCKS is read. Everything else (RTK Query slices,
+// components) is written exactly as it will be against the real backend --
+// this function is the single seam that gets removed later.
+async function enableMocksIfNeeded() {
+  if (import.meta.env.VITE_USE_MOCKS !== "true") return;
+
+  const { worker } = await import("./mocks/browser.js");
+  await worker.start({
+    onUnhandledRequest: "bypass", // let non-API requests (fonts, vite HMR) through untouched
+  });
+}
+
+enableMocksIfNeeded().then(() => {
+  createRoot(document.getElementById("root")).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <Provider store={store}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </Provider>
+      </ErrorBoundary>
+    </StrictMode>
+  );
+});

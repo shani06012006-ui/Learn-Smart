@@ -1,121 +1,93 @@
-// frontend/src/components/layout/Sidebar.jsx
-
-import { Link, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { NavLink } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import clsx from "clsx";
 import {
-  HomeIcon,
-  UsersIcon,
-  BookOpenIcon,
-  AcademicCapIcon,
-  ChatBubbleLeftIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  ClipboardDocumentListIcon,
-  VideoCameraIcon,
-} from '@heroicons/react/24/outline';
+  LayoutDashboard,
+  BookOpen,
+  FileText,
+  BarChart3,
+  MessageSquare,
+  Video,
+  Trophy,
+} from "lucide-react";
 
-const Sidebar = ({ open, setOpen }) => {
-  const location = useLocation();
-  const { user } = useSelector((state) => state.auth);
+import { sidebarClosed } from "../../store/slices/uiSlice";
 
-  const teacherMenu = [
-    { name: 'Dashboard', path: '/dashboard', icon: HomeIcon },
-    { name: 'My Classes', path: '/teacher/classes', icon: UsersIcon },
-    { name: 'Exams', path: '/teacher/exams', icon: ClipboardDocumentListIcon },
-    { name: 'Materials', path: '/teacher/materials', icon: BookOpenIcon },
-    { name: 'Analytics', path: '/teacher/analytics', icon: ChartBarIcon },
-    { name: 'Live Classes', path: '/teacher/live', icon: VideoCameraIcon },
-    { name: 'Messages', path: '/messages', icon: ChatBubbleLeftIcon },
-    { name: 'Settings', path: '/settings', icon: Cog6ToothIcon },
-  ];
+const TEACHER_ITEMS = [
+  { label: "Dashboard", to: "/teacher", icon: LayoutDashboard, enabled: true },
+  { label: "Classes", to: "/teacher/classes", icon: BookOpen, enabled: false, note: "Module B" },
+  { label: "Materials", to: "/teacher/materials", icon: FileText, enabled: false, note: "Module B" },
+  { label: "AI Insights", to: "/teacher/analytics", icon: BarChart3, enabled: false, note: "Module E" },
+  { label: "Live Classes", to: "/teacher/live-classes", icon: Video, enabled: false, note: "Module H" },
+  { label: "Messages", to: "/teacher/chat", icon: MessageSquare, enabled: false, note: "Module F" },
+];
 
-  const studentMenu = [
-    { name: 'Dashboard', path: '/student/dashboard', icon: HomeIcon },
-    { name: 'My Classes', path: '/student/classes', icon: AcademicCapIcon },
-    { name: 'Exams', path: '/student/exams', icon: ClipboardDocumentListIcon },
-    { name: 'Materials', path: '/student/materials', icon: BookOpenIcon },
-    { name: 'Performance', path: '/student/performance', icon: ChartBarIcon },
-    { name: 'Live Classes', path: '/student/live', icon: VideoCameraIcon },
-    { name: 'Messages', path: '/messages', icon: ChatBubbleLeftIcon },
-    { name: 'Settings', path: '/settings', icon: Cog6ToothIcon },
-  ];
+const STUDENT_ITEMS = [
+  { label: "Dashboard", to: "/student", icon: LayoutDashboard, enabled: true },
+  { label: "My Classes", to: "/student/classes", icon: BookOpen, enabled: false, note: "Module C" },
+  { label: "Materials", to: "/student/materials", icon: FileText, enabled: false, note: "Module C" },
+  { label: "Performance", to: "/student/performance", icon: Trophy, enabled: false, note: "Module I" },
+  { label: "Live Classes", to: "/student/live-classes", icon: Video, enabled: false, note: "Module H" },
+  { label: "Messages", to: "/student/chat", icon: MessageSquare, enabled: false, note: "Module F" },
+];
 
-  const menuItems = user?.user_type === 'teacher' ? teacherMenu : studentMenu;
+export default function Sidebar({ role }) {
+  const items = role === "teacher" ? TEACHER_ITEMS : STUDENT_ITEMS;
+  const sidebarOpen = useSelector((s) => s.ui.sidebarOpen);
+  const dispatch = useDispatch();
 
   return (
     <>
-      {/* Mobile overlay */}
-      <div
-        className={`fixed inset-0 z-40 bg-gray-900 bg-opacity-50 transition-opacity duration-300 lg:hidden ${
-          open ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setOpen(false)}
-      />
-
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 lg:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-ink-900/50 md:hidden"
+          onClick={() => dispatch(sidebarClosed())}
+        />
+      )}
+      <aside
+        className={clsx(
+          "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-ink-300 bg-white pt-16 transition-transform md:static md:translate-x-0 md:pt-0",
+          sidebarOpen && "translate-x-0"
+        )}
       >
-        <div className="flex items-center h-16 px-4 border-b border-gray-200">
-          <Link to="/dashboard" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">LS</span>
-            </div>
-            <span className="text-xl font-bold text-primary-600">LearnSmart</span>
-          </Link>
-        </div>
-
-        <nav className="mt-4 px-2 space-y-1 overflow-y-auto h-[calc(100vh-4rem)]">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path;
+        <nav className="flex flex-col gap-1 p-3">
+          {items.map((item) => {
+            const Icon = item.icon;
+            if (!item.enabled) {
+              return (
+                <div
+                  key={item.label}
+                  className="flex cursor-not-allowed items-center justify-between rounded-lg px-3 py-2 text-sm text-ink-300"
+                  title={`Coming in ${item.note}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <Icon size={18} />
+                    {item.label}
+                  </span>
+                  <span className="text-xs">{item.note}</span>
+                </div>
+              );
+            }
             return (
-              <Link
-                key={item.name}
-                to={item.path}
-                className={`flex items-center px-4 py-3 rounded-lg transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-primary-50 text-primary-700 shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+              <NavLink
+                key={item.label}
+                to={item.to}
+                end
+                onClick={() => dispatch(sidebarClosed())}
+                className={({ isActive }) =>
+                  clsx(
+                    "focus-ring flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium",
+                    isActive ? "bg-brand-50 text-brand-700" : "text-ink-700 hover:bg-ink-100"
+                  )
+                }
               >
-                <item.icon
-                  className={`h-5 w-5 mr-3 transition-colors ${
-                    isActive ? 'text-primary-600' : 'text-gray-500 group-hover:text-gray-700'
-                  }`}
-                />
-                <span className="font-medium">{item.name}</span>
-                {isActive && (
-                  <div className="ml-auto w-1.5 h-8 bg-primary-600 rounded-full"></div>
-                )}
-              </Link>
+                <Icon size={18} />
+                {item.label}
+              </NavLink>
             );
           })}
-
-          <div className="pt-4 mt-4 border-t border-gray-200">
-            <div className="px-4 py-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600">
-                    {user?.first_name?.[0] || user?.username?.[0] || 'U'}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">
-                    {user?.first_name || user?.username}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate capitalize">
-                    {user?.user_type}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </nav>
-      </div>
+      </aside>
     </>
   );
-};
-
-export default Sidebar;
+}
