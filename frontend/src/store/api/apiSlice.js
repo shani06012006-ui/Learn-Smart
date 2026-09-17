@@ -1,4 +1,4 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+﻿import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import { accessTokenRotated, loggedOut } from "../slices/authSlice";
 
@@ -60,6 +60,6 @@ export const apiSlice = createApi({
   baseQuery: baseQueryWithReauth,
   // Every domain's tag types are declared here as that domain is built,
   // so RTK Query's cache invalidation works uniformly across the app.
-  tagTypes: ["Me", "Class", "Enrollment", "Material", "Announcement"],
+  tagTypes: ["Me", "Class", "Enrollment", "Material", "Announcement", "Analytics"],
   endpoints: () => ({}),
 });
