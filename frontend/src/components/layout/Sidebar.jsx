@@ -1,14 +1,16 @@
-import { NavLink } from "react-router-dom";
+﻿import { NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import clsx from "clsx";
 import {
   LayoutDashboard,
   BookOpen,
   FileText,
+  Megaphone,
   BarChart3,
   MessageSquare,
   Video,
   Trophy,
+  KeyRound,
 } from "lucide-react";
 
 import { sidebarClosed } from "../../store/slices/uiSlice";
@@ -16,15 +18,17 @@ import { sidebarClosed } from "../../store/slices/uiSlice";
 const TEACHER_ITEMS = [
   { label: "Dashboard", to: "/teacher", icon: LayoutDashboard, enabled: true, end: true },
   { label: "Classes", to: "/teacher/classes", icon: BookOpen, enabled: true },
-  { label: "Materials", to: "/teacher/materials", icon: FileText, enabled: false, note: "Module B" },
+  { label: "Materials", to: "/teacher/materials", icon: FileText, enabled: true },
+  { label: "Announcements", to: "/teacher/announcements", icon: Megaphone, enabled: true },
   { label: "AI Insights", to: "/teacher/analytics", icon: BarChart3, enabled: false, note: "Module E" },
   { label: "Live Classes", to: "/teacher/live-classes", icon: Video, enabled: false, note: "Module H" },
   { label: "Messages", to: "/teacher/chat", icon: MessageSquare, enabled: false, note: "Module F" },
 ];
 
 const STUDENT_ITEMS = [
-  { label: "Dashboard", to: "/student", icon: LayoutDashboard, enabled: true },
-  { label: "My Classes", to: "/student/classes", icon: BookOpen, enabled: false, note: "Module C" },
+  { label: "Dashboard", to: "/student", icon: LayoutDashboard, enabled: true, end: true },
+  { label: "My Classes", to: "/student/classes", icon: BookOpen, enabled: true },
+  { label: "Join a class", to: "/student/join-class", icon: KeyRound, enabled: true },
   { label: "Materials", to: "/student/materials", icon: FileText, enabled: false, note: "Module C" },
   { label: "Performance", to: "/student/performance", icon: Trophy, enabled: false, note: "Module I" },
   { label: "Live Classes", to: "/student/live-classes", icon: Video, enabled: false, note: "Module H" },

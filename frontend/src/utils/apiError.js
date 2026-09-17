@@ -1,10 +1,5 @@
-/**
- * RTK Query error objects can be:
- *  - { status: 400, data: { error: { detail: { field: ["msg"] }, status_code: 400 } } }
- *  - { status: 401, data: { detail: "message" } }
- *  - { status: 'FETCH_ERROR', error: 'Failed to fetch' } (network-level)
- * This normalizes all of them into a single human-readable string.
- */
+// frontend/src/utils/apiError.js
+
 export function extractErrorMessage(error, fallback = "Something went wrong. Please try again.") {
   if (!error) return fallback;
 
@@ -15,7 +10,9 @@ export function extractErrorMessage(error, fallback = "Something went wrong. Ple
     if (typeof detail === "string") return detail;
     if (typeof detail === "object") {
       const firstField = Object.keys(detail)[0];
-      const firstMessage = Array.isArray(detail[firstField]) ? detail[firstField][0] : detail[firstField];
+      const firstMessage = Array.isArray(detail[firstField])
+        ? detail[firstField][0]
+        : detail[firstField];
       return firstMessage || fallback;
     }
   }
@@ -27,8 +24,6 @@ export function extractErrorMessage(error, fallback = "Something went wrong. Ple
   return fallback;
 }
 
-/** Returns { field: "message" } pairs for inline form errors, or {} if the
- * error isn't a field-validation error. */
 export function extractFieldErrors(error) {
   const detail = error?.data?.error?.detail;
   if (!detail || typeof detail !== "object") return {};

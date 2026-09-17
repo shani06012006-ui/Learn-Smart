@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+﻿import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
@@ -8,6 +8,12 @@ import TeacherLayout from "./components/layout/TeacherLayout";
 import StudentLayout from "./components/layout/StudentLayout";
 import TeacherDashboardPage from "./features/teacher/dashboard/TeacherDashboardPage";
 import StudentDashboardPage from "./features/student/dashboard/StudentDashboardPage";
+import ClassListPage from "./features/teacher/classes/ClassListPage";
+import ClassDetailPage from "./features/teacher/classes/ClassDetailPage";
+import MaterialsPage from "./features/teacher/materials/MaterialsPage";
+import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
+import StudentClassListPage from "./features/student/classes/ClassListPage";
+import JoinClassPage from "./features/student/join-class/JoinClassPage";
 
 export default function App() {
   return (
@@ -19,14 +25,18 @@ export default function App() {
         <Route element={<RoleRoute allow={["teacher", "admin"]} />}>
           <Route path="/teacher" element={<TeacherLayout />}>
             <Route index element={<TeacherDashboardPage />} />
-            {/* /teacher/classes, /materials, /analytics, etc. are added
-                as their modules are built -- see Sidebar.jsx for the map. */}
+            <Route path="classes" element={<ClassListPage />} />
+            <Route path="classes/:classId" element={<ClassDetailPage />} />
+            <Route path="materials" element={<MaterialsPage />} />
+            <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
         </Route>
 
         <Route element={<RoleRoute allow={["student"]} />}>
           <Route path="/student" element={<StudentLayout />}>
             <Route index element={<StudentDashboardPage />} />
+            <Route path="classes" element={<StudentClassListPage />} />
+            <Route path="join-class" element={<JoinClassPage />} />
           </Route>
         </Route>
       </Route>
