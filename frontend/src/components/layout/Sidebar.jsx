@@ -14,8 +14,8 @@ import {
 import { sidebarClosed } from "../../store/slices/uiSlice";
 
 const TEACHER_ITEMS = [
-  { label: "Dashboard", to: "/teacher", icon: LayoutDashboard, enabled: true },
-  { label: "Classes", to: "/teacher/classes", icon: BookOpen, enabled: false, note: "Module B" },
+  { label: "Dashboard", to: "/teacher", icon: LayoutDashboard, enabled: true, end: true },
+  { label: "Classes", to: "/teacher/classes", icon: BookOpen, enabled: true },
   { label: "Materials", to: "/teacher/materials", icon: FileText, enabled: false, note: "Module B" },
   { label: "AI Insights", to: "/teacher/analytics", icon: BarChart3, enabled: false, note: "Module E" },
   { label: "Live Classes", to: "/teacher/live-classes", icon: Video, enabled: false, note: "Module H" },
@@ -72,7 +72,7 @@ export default function Sidebar({ role }) {
               <NavLink
                 key={item.label}
                 to={item.to}
-                end
+                end={!!item.end}
                 onClick={() => dispatch(sidebarClosed())}
                 className={({ isActive }) =>
                   clsx(
