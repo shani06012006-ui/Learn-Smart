@@ -29,7 +29,7 @@ const STUDENT_ITEMS = [
   { label: "Dashboard", to: "/student", icon: LayoutDashboard, enabled: true, end: true },
   { label: "My Classes", to: "/student/classes", icon: BookOpen, enabled: true },
   { label: "Join a class", to: "/student/join-class", icon: KeyRound, enabled: true },
-  { label: "Materials", to: "/student/materials", icon: FileText, enabled: false, note: "Module C" },
+  { label: "Materials", to: "/student/materials", icon: FileText, enabled: true },
   { label: "Performance", to: "/student/performance", icon: Trophy, enabled: false, note: "Module I" },
   { label: "Live Classes", to: "/student/live-classes", icon: Video, enabled: false, note: "Module H" },
   { label: "Messages", to: "/student/chat", icon: MessageSquare, enabled: false, note: "Module F" },

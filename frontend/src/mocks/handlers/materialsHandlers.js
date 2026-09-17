@@ -1,7 +1,7 @@
 ﻿import { http, HttpResponse } from "msw";
 
 import { findUserById } from "../data/users";
-import { findClassById } from "../data/classes";
+import { findClassById, enrollmentsForClass } from "../data/classes";
 import {
   addAnnouncement,
   addMaterial,
@@ -25,6 +25,18 @@ function currentUser(request) {
   return userId ? findUserById(userId) : null;
 }
 
+// Students can only read materials/announcements for a class where they
+// have an ACTIVE enrollment -- mirrors the backend's IsEnrolledStudent
+// permission. Teachers can read their own class only.
+function hasReadAccess(cls, user) {
+  if (!cls || !user) return false;
+  if (cls.teacher_id === user.id) return true;
+  if (user.role !== "student") return false;
+  return enrollmentsForClass(cls.id).some(
+    (e) => e.student_id === user.id && e.status === "active"
+  );
+}
+
 export const materialsHandlers = [
   // GET /classes/:id/materials/
   http.get(`${BASE}/classes/:id/materials/`, ({ request, params }) => {
@@ -33,8 +45,7 @@ export const materialsHandlers = [
 
     const cls = findClassById(params.id);
     if (!cls) return simpleError("Not found.", 404);
-
-    if (cls.teacher_id !== user.id && user.role !== "student") {
+    if (!hasReadAccess(cls, user)) {
       return simpleError("You do not have access to this class.", 403);
     }
 
@@ -115,8 +126,7 @@ export const materialsHandlers = [
 
     const cls = findClassById(params.id);
     if (!cls) return simpleError("Not found.", 404);
-
-    if (cls.teacher_id !== user.id && user.role !== "student") {
+    if (!hasReadAccess(cls, user)) {
       return simpleError("You do not have access to this class.", 403);
     }
 
