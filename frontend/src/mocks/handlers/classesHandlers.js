@@ -1,4 +1,4 @@
-import { http, HttpResponse } from "msw";
+﻿import { http, HttpResponse } from "msw";
 
 import { findUserById, findUserByEmail } from "../data/users";
 import {
@@ -12,6 +12,7 @@ import {
   serializeEnrollment,
   softDeleteClass,
   updateEnrollmentStatus,
+  redeemJoiningCode,
 } from "../data/classes";
 import { getBearerToken, userIdForAccessToken } from "../data/session";
 import { delay, simpleError, unauthorized, validationError } from "../utils";
@@ -25,8 +26,52 @@ function currentUser(request) {
 }
 
 export const classesHandlers = [
+  // POST /enrollments/join/ -- student redeems a joining code.
+  // Mirrors the backend's JoinClassView + join_class_with_code service:
+  //   404 invalid code
+  //   400 code belongs to a different student
+  //   400 blocked/removed
+  //   200 { class_course: {...}, status: "active" } on success
+  http.post(`${BASE}/enrollments/join/`, async ({ request }) => {
+    await delay(400);
+    const user = currentUser(request);
+    if (!user) return unauthorized();
+    if (user.role !== "student") {
+      return simpleError("Only students can join a class with a code.", 403);
+    }
+
+    const body = await request.json();
+    const code = body?.joining_code;
+    if (!code || code.length !== 6) {
+      return validationError({ joining_code: ["Enter the 6-character code your teacher gave you."] });
+    }
+
+    const result = redeemJoiningCode(user.id, code);
+
+    if (!result.ok) {
+      if (result.reason === "not_found") {
+        return simpleError("Invalid joining code.", 404);
+      }
+      if (result.reason === "not_owner") {
+        return simpleError("This joining code does not belong to your account.", 400);
+      }
+      if (result.reason === "blocked") {
+        return simpleError("You have been blocked from this class.", 400);
+      }
+      if (result.reason === "removed") {
+        return simpleError("This enrollment is no longer active. Contact your teacher.", 400);
+      }
+      return simpleError("Could not join this class.", 400);
+    }
+
+    const cls = findClassById(result.enrollment.class_id);
+    return HttpResponse.json({
+      class_course: serializeClass(cls),
+      status: result.enrollment.status,
+    });
+  }),
+
   // GET /classes/ -- teacher sees own classes, student sees active enrollments
-  // POST /classes/ -- teacher-only, creates a class
   http.get(`${BASE}/classes/`, ({ request }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -36,8 +81,6 @@ export const classesHandlers = [
         ? classesForTeacher(user.id)
         : classesForStudent(user.id);
 
-    // Matches DRF's paginated list shape (results + count), same as the
-    // real ListCreateAPIView with default pagination.
     return HttpResponse.json({
       count: list.length,
       next: null,
@@ -64,7 +107,6 @@ export const classesHandlers = [
     return HttpResponse.json(serializeClass(cls), { status: 201 });
   }),
 
-  // GET/PATCH/DELETE /classes/{id}/
   http.get(`${BASE}/classes/:id`, ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -110,11 +152,10 @@ export const classesHandlers = [
       return simpleError("You are not the teacher assigned to this class.", 403);
     }
 
-    softDeleteClass(cls.id); // soft-delete, matching the real backend exactly
+    softDeleteClass(cls.id);
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // GET/POST /classes/{id}/students/
   http.get(`${BASE}/classes/:id/students`, ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -148,9 +189,6 @@ export const classesHandlers = [
     if (!body.last_name) errors.last_name = ["This field is required."];
     if (Object.keys(errors).length > 0) return validationError(errors);
 
-    // Guard against adding an existing TEACHER/admin account as a "student" --
-    // the real backend's get_or_create would otherwise silently attach an
-    // unrelated account's enrollment record to this class.
     const existing = findUserByEmail(body.email);
     if (existing && existing.role !== "student") {
       return validationError({ email: ["An account with this email already exists with a different role."] });
@@ -162,7 +200,6 @@ export const classesHandlers = [
     });
   }),
 
-  // PATCH /classes/{id}/students/{enrollmentId}/ -- block/remove/reactivate
   http.patch(`${BASE}/classes/:id/students/:enrollmentId`, async ({ request, params }) => {
     await delay(250);
     const user = currentUser(request);

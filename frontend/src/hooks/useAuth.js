@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { tokenStorage } from "../utils/tokenStorage";
 
 import { useLazyGetMeQuery, useLoginMutation, useLogoutMutation } from "../store/api/authApi";
 import {
@@ -47,7 +48,7 @@ export function useAuth() {
   };
 
   const logout = async () => {
-    const refresh = localStorage.getItem("autolearn.refresh");
+    const refresh = tokenStorage.getRefresh();
     try {
       await logoutMutation(refresh).unwrap();
     } finally {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 
 import { useAddStudentMutation } from "../../../../store/api/classesApi";
@@ -14,7 +14,7 @@ export default function AddStudentModal({ open, onClose, classId }) {
   const [form, setForm] = useState(initialForm);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState(null);
-  const [result, setResult] = useState(null); // holds the created enrollment (with joining_code)
+  const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -47,6 +47,14 @@ export default function AddStudentModal({ open, onClose, classId }) {
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const handleAddAnother = () => {
+    setForm(initialForm);
+    setFieldErrors({});
+    setFormError(null);
+    setResult(null);
+    setCopied(false);
+  };
+
   return (
     <Modal open={open} onClose={handleClose} title={result ? "Student added" : "Add a student"}>
       {result ? (
@@ -68,7 +76,7 @@ export default function AddStudentModal({ open, onClose, classId }) {
             </button>
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={() => setResult(null)}>
+            <Button variant="secondary" onClick={handleAddAnother}>
               Add another
             </Button>
             <Button onClick={handleClose}>Done</Button>
