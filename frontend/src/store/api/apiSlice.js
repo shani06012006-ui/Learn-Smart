@@ -71,6 +71,9 @@ export const apiSlice = createApi({
     "Announcement",
     "TeacherAnalytics",
     "StudentPerformance",
+    "Quiz",
+    "Question",
+    "Submission",
   ],
   endpoints: () => ({}),
   // Reset every cached query + mutation the moment the user logs out, so
