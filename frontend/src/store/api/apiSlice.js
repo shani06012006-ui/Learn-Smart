@@ -6,23 +6,9 @@ import { localDispatcher } from "../../mocks/dispatcher";
 // MOCK MODE: every endpoint routes through `localDispatcher`, which reads
 // and writes the in-memory stores under `mocks/data/`. No fetch, no MSW,
 // no service worker.
-//
-// TO SWAP TO THE REAL DJANGO BACKEND:
-//   1. Comment out the localDispatcher import.
-//   2. Import fetchBaseQuery from RTK Query.
-//   3. Replace rawBaseQuery below with:
-//        const rawBaseQuery = fetchBaseQuery({ baseUrl, prepareHeaders });
-//   apiSlice's other fields (tagTypes, extraReducers) stay identical.
 
-// RTK Query passes `args` to the baseQuery in one of two shapes:
-//   - a plain string  ("/classes/")              ← most query endpoints
-//   - an object       ({ url, method, body, ... }) ← mutations + custom queries
-// fetchBaseQuery normalizes both internally; the local dispatcher must too.
-// This helper is the single place that knows that fact.
 function normalizeArgs(args) {
-  if (typeof args === "string") {
-    return { url: args, method: "GET" };
-  }
+  if (typeof args === "string") return { url: args, method: "GET" };
   return { method: "GET", ...args };
 }
 
@@ -83,6 +69,7 @@ export const apiSlice = createApi({
     "Question",
     "Submission",
     "Thread",
+    "ThreadMember",
     "Message",
   ],
   endpoints: () => ({}),

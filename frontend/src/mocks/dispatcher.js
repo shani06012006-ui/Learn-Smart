@@ -73,11 +73,13 @@ import {
 import {
   appendMessage,
   canAccessThread,
+  deleteMessage as deleteChatMessage,
   findThreadById,
   markThreadRead,
   messagesForThread,
   serializeMessage,
   serializeThread,
+  serializeThreadMembers,
   threadsForUser,
 } from "./data/chat";
 
@@ -655,6 +657,19 @@ const ROUTES = [
     return { data: messagesForThread(args.params.id).map(serializeMessage) };
   }},
 
+  // GET /chat/threads/:id/members/ -- participant list for Group Info.
+  // Access is gated by canAccessThread: a user can only see members of a
+  // thread they themselves belong to. There is no standalone /users/:id/
+  // endpoint, so this is the ONLY way to enumerate user details.
+  { method: "GET", pattern: "/chat/threads/:id/members/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (!canAccessThread(args.params.id, user.id)) {
+      return { error: simpleError("You do not have access to this thread.", 403) };
+    }
+    return { data: serializeThreadMembers(args.params.id, user.id) };
+  }},
+
   { method: "POST", pattern: "/chat/threads/:id/messages/", handler: (args) => {
     const user = currentUserFromArgs(args);
     if (!user) return { error: unauthorized() };
@@ -673,6 +688,18 @@ const ROUTES = [
     if (!canAccessThread(args.params.id, user.id)) return { error: simpleError("You do not have access to this thread.", 403) };
     const marked = markThreadRead(args.params.id, user.id);
     return { data: { marked } };
+  }},
+
+  { method: "DELETE", pattern: "/chat/messages/:id/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const result = deleteChatMessage(args.params.id, user.id);
+    if (!result.ok) {
+      if (result.reason === "not_found") return { error: simpleError("Not found.", 404) };
+      if (result.reason === "not_owner") return { error: simpleError("You can only delete your own messages.", 403) };
+      return { error: simpleError("Message already deleted.", 400) };
+    }
+    return { data: null };
   }},
 
   { method: "POST", pattern: "/__mock-incoming-message/", handler: (args) => {
@@ -788,4 +815,6 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
+
 

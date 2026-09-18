@@ -20,6 +20,7 @@ import JoinClassPage from "./features/student/join-class/JoinClassPage";
 import StudentQuizListPage from "./features/student/quizzes/QuizListPage";
 import TakeQuizPage from "./features/student/quizzes/TakeQuizPage";
 import ResultReviewPage from "./features/student/quizzes/ResultReviewPage";
+import ChatPage from "./features/chat/ChatPage";
 
 export default function App() {
   return (
@@ -39,6 +40,8 @@ export default function App() {
             />
             <Route path="materials" element={<MaterialsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="chat" element={<ChatPage />} />
+            <Route path="chat/:threadId" element={<ChatPage />} />
           </Route>
         </Route>
 
@@ -52,6 +55,8 @@ export default function App() {
             <Route path="quizzes/:quizId" element={<TakeQuizPage />} />
             <Route path="submissions/:submissionId" element={<ResultReviewPage />} />
             <Route path="performance" element={<PerformancePage />} />
+            <Route path="chat" element={<ChatPage />} />
+            <Route path="chat/:threadId" element={<ChatPage />} />
           </Route>
         </Route>
       </Route>
