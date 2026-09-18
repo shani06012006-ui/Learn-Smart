@@ -79,6 +79,7 @@ import {
   messagesForThread,
   serializeMessage,
   serializeThread,
+  serializeThreadMember,
   serializeThreadMembers,
   threadsForUser,
 } from "./data/chat";
@@ -670,6 +671,23 @@ const ROUTES = [
     return { data: serializeThreadMembers(args.params.id, user.id) };
   }},
 
+  // GET /chat/threads/:id/members/:userId/ -- single member profile.
+  // Same thread-scoped access as the list above, plus a check that the
+  // requested user is actually a participant. Returns 404 if either the
+  // thread or the participant is unknown; 403 if the thread itself isn't
+  // accessible. This ensures a user cannot fetch arbitrary profiles by
+  // guessing IDs.
+  { method: "GET", pattern: "/chat/threads/:id/members/:userId/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (!canAccessThread(args.params.id, user.id)) {
+      return { error: simpleError("You do not have access to this thread.", 403) };
+    }
+    const member = serializeThreadMember(args.params.id, args.params.userId, user.id);
+    if (!member) return { error: simpleError("Member not found in this thread.", 404) };
+    return { data: member };
+  }},
+
   { method: "POST", pattern: "/chat/threads/:id/messages/", handler: (args) => {
     const user = currentUserFromArgs(args);
     if (!user) return { error: unauthorized() };
@@ -815,6 +833,7 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
 
 
 
