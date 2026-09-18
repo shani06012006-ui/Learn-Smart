@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+﻿import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
@@ -8,28 +8,19 @@ import { store } from "./app/store.js";
 import ErrorBoundary from "./components/feedback/ErrorBoundary.jsx";
 import "./index.css";
 
-// The ONLY place VITE_USE_MOCKS is read. Everything else (RTK Query slices,
-// components) is written exactly as it will be against the real backend --
-// this function is the single seam that gets removed later.
-async function enableMocksIfNeeded() {
-  if (import.meta.env.VITE_USE_MOCKS !== "true") return;
-
-  const { worker } = await import("./mocks/browser.js");
-  await worker.start({
-    onUnhandledRequest: "bypass", // let non-API requests (fonts, vite HMR) through untouched
-  });
-}
-
-enableMocksIfNeeded().then(() => {
-  createRoot(document.getElementById("root")).render(
-    <StrictMode>
-      <ErrorBoundary>
-        <Provider store={store}>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </Provider>
-      </ErrorBoundary>
-    </StrictMode>
-  );
-});
+// Mock data now routes through `mocks/dispatcher.js` (in-process, no
+// service worker). There is no MSW bootstrap step; the RTK Query slice
+// talks to the dispatcher directly. When swapping to the real Django
+// backend, set VITE_USE_MOCKS=false and change `apiSlice.js` to use
+// `fetchBaseQuery` -- this file doesn't need to change.
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </Provider>
+    </ErrorBoundary>
+  </StrictMode>
+);

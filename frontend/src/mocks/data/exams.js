@@ -2,8 +2,6 @@
 // data. Shapes mirror the future backend/exams/models.py models. Handlers
 // read/write this module; components never see it directly.
 
-// ---------- quizzes -------------------------------------------------------
-
 let quizzes = [
   {
     id: "quiz-phy10-1",
@@ -33,128 +31,62 @@ let quizzes = [
     title: "Periodic Trends Quiz",
     description: "Atomic radius, ionization energy, and electronegativity.",
     duration_minutes: 25,
-    is_published: false, // draft -- students don't see it
+    is_published: false,
     created_by_id: "usr-teacher-anita",
     created_at: "2026-09-02T09:00:00+05:30",
     is_deleted: false,
   },
 ];
 
-// ---------- questions + choices ------------------------------------------
-// Each question belongs to a quiz. `order` controls display order.
-// `marks` is the score awarded for a correct answer (defaults to 1).
-
 let questions = [
-  // quiz-phy10-1 -- Motion Basics
-  {
-    id: "q-motion-1",
-    quiz_id: "quiz-phy10-1",
-    order: 1,
-    text: "What is the SI unit of acceleration?",
-    marks: 1,
-    is_deleted: false,
-  },
-  {
-    id: "q-motion-2",
-    quiz_id: "quiz-phy10-1",
-    order: 2,
-    text: "A car travels 100 m in 5 s. What is its average speed?",
-    marks: 1,
-    is_deleted: false,
-  },
-  {
-    id: "q-motion-3",
-    quiz_id: "quiz-phy10-1",
-    order: 3,
-    text: "Which of the following is a vector quantity?",
-    marks: 1,
-    is_deleted: false,
-  },
+  { id: "q-motion-1", quiz_id: "quiz-phy10-1", order: 1, text: "What is the SI unit of acceleration?", marks: 1, is_deleted: false },
+  { id: "q-motion-2", quiz_id: "quiz-phy10-1", order: 2, text: "A car travels 100 m in 5 s. What is its average speed?", marks: 1, is_deleted: false },
+  { id: "q-motion-3", quiz_id: "quiz-phy10-1", order: 3, text: "Which of the following is a vector quantity?", marks: 1, is_deleted: false },
 
-  // quiz-phy10-2 -- Newton's Laws
-  {
-    id: "q-newton-1",
-    quiz_id: "quiz-phy10-2",
-    order: 1,
-    text: "Newton's First Law is also known as the law of:",
-    marks: 1,
-    is_deleted: false,
-  },
-  {
-    id: "q-newton-2",
-    quiz_id: "quiz-phy10-2",
-    order: 2,
-    text: "The SI unit of force is:",
-    marks: 1,
-    is_deleted: false,
-  },
-  {
-    id: "q-newton-3",
-    quiz_id: "quiz-phy10-2",
-    order: 3,
-    text: "For every action there is an equal and opposite reaction. This is Newton's:",
-    marks: 1,
-    is_deleted: false,
-  },
-  {
-    id: "q-newton-4",
-    quiz_id: "quiz-phy10-2",
-    order: 4,
-    text: "Which of these is a contact force?",
-    marks: 1,
-    is_deleted: false,
-  },
+  { id: "q-newton-1", quiz_id: "quiz-phy10-2", order: 1, text: "Newton's First Law is also known as the law of:", marks: 1, is_deleted: false },
+  { id: "q-newton-2", quiz_id: "quiz-phy10-2", order: 2, text: "The SI unit of force is:", marks: 1, is_deleted: false },
+  { id: "q-newton-3", quiz_id: "quiz-phy10-2", order: 3, text: "For every action there is an equal and opposite reaction. This is Newton's:", marks: 1, is_deleted: false },
+  { id: "q-newton-4", quiz_id: "quiz-phy10-2", order: 4, text: "Which of these is a contact force?", marks: 1, is_deleted: false },
 ];
 
 let choices = [
-  // q-motion-1
   { id: "c-m1-a", question_id: "q-motion-1", text: "m/s", is_correct: false },
   { id: "c-m1-b", question_id: "q-motion-1", text: "m/s²", is_correct: true },
   { id: "c-m1-c", question_id: "q-motion-1", text: "m", is_correct: false },
   { id: "c-m1-d", question_id: "q-motion-1", text: "kg·m/s", is_correct: false },
 
-  // q-motion-2
   { id: "c-m2-a", question_id: "q-motion-2", text: "10 m/s", is_correct: false },
   { id: "c-m2-b", question_id: "q-motion-2", text: "20 m/s", is_correct: true },
   { id: "c-m2-c", question_id: "q-motion-2", text: "50 m/s", is_correct: false },
   { id: "c-m2-d", question_id: "q-motion-2", text: "500 m/s", is_correct: false },
 
-  // q-motion-3
   { id: "c-m3-a", question_id: "q-motion-3", text: "Mass", is_correct: false },
   { id: "c-m3-b", question_id: "q-motion-3", text: "Temperature", is_correct: false },
   { id: "c-m3-c", question_id: "q-motion-3", text: "Velocity", is_correct: true },
   { id: "c-m3-d", question_id: "q-motion-3", text: "Time", is_correct: false },
 
-  // q-newton-1
   { id: "c-n1-a", question_id: "q-newton-1", text: "Inertia", is_correct: true },
   { id: "c-n1-b", question_id: "q-newton-1", text: "Acceleration", is_correct: false },
   { id: "c-n1-c", question_id: "q-newton-1", text: "Action-reaction", is_correct: false },
   { id: "c-n1-d", question_id: "q-newton-1", text: "Gravitation", is_correct: false },
 
-  // q-newton-2
   { id: "c-n2-a", question_id: "q-newton-2", text: "Joule", is_correct: false },
   { id: "c-n2-b", question_id: "q-newton-2", text: "Watt", is_correct: false },
   { id: "c-n2-c", question_id: "q-newton-2", text: "Newton", is_correct: true },
   { id: "c-n2-d", question_id: "q-newton-2", text: "Pascal", is_correct: false },
 
-  // q-newton-3
   { id: "c-n3-a", question_id: "q-newton-3", text: "First Law", is_correct: false },
   { id: "c-n3-b", question_id: "q-newton-3", text: "Second Law", is_correct: false },
   { id: "c-n3-c", question_id: "q-newton-3", text: "Third Law", is_correct: true },
   { id: "c-n3-d", question_id: "q-newton-3", text: "Law of Gravitation", is_correct: false },
 
-  // q-newton-4
   { id: "c-n4-a", question_id: "q-newton-4", text: "Gravity", is_correct: false },
   { id: "c-n4-b", question_id: "q-newton-4", text: "Friction", is_correct: true },
   { id: "c-n4-c", question_id: "q-newton-4", text: "Magnetic force", is_correct: false },
   { id: "c-n4-d", question_id: "q-newton-4", text: "Electrostatic force", is_correct: false },
 ];
 
-// ---------- submissions ---------------------------------------------------
-// A submission holds one answer per question. `answer_ids` for MCQs is the
-// single choice id the student selected (kept as an array so the shape
-// generalizes to multi-select later without a schema change).
-
+// submissions: one row per (student, quiz). Lookup is always scoped to both.
 let submissions = [
   {
     id: "sub-rahul-phy10-2",
@@ -198,8 +130,15 @@ export function findSubmissionById(id) {
   return submissions.find((s) => s.id === id);
 }
 
+// Lookup scoped to BOTH quiz and student. Used by the duplicate-submission
+// check and by the already_submitted flag in the quiz serializers.
 export function findSubmissionForStudent(quizId, studentId) {
   return submissions.find((s) => s.quiz_id === quizId && s.student_id === studentId);
+}
+
+// All submissions belonging to one student. Backs GET /submissions/.
+export function submissionsForStudent(studentId) {
+  return submissions.filter((s) => s.student_id === studentId);
 }
 
 // ---------- writes --------------------------------------------------------
@@ -267,9 +206,6 @@ export function updateQuestion(id, { text, marks, choicesData }) {
   if (marks !== undefined) question.marks = marks;
 
   if (Array.isArray(choicesData)) {
-    // Replace all choices for this question -- simpler than diffing, and
-    // matches the API contract (the frontend always sends the full choice
-    // list on update).
     choices = choices.filter((c) => c.question_id !== id);
     const fresh = choicesData.map((c, idx) => ({
       id: c.id || `c-${Math.random().toString(36).slice(2, 8)}-${idx}`,
@@ -290,7 +226,6 @@ export function softDeleteQuestion(id) {
   return true;
 }
 
-// Student submits answers. `answersByQuestionId` is { [questionId]: [choiceId] }.
 // Auto-grades MCQs: a question is correct iff the selected choice set equals
 // the correct choice set for that question.
 export function createSubmission({ quizId, studentId, answersByQuestionId }) {
@@ -327,9 +262,18 @@ export function createSubmission({ quizId, studentId, answersByQuestionId }) {
   return submission;
 }
 
+// Dev-only: clear all submissions. Used by POST /__reset-submissions/ so a
+// tester can wipe the slate without restarting the whole MSW worker.
+export function resetSubmissions() {
+  submissions = [];
+}
+
 // ---------- serializers ---------------------------------------------------
 
-export function serializeQuiz(quiz, { includeQuestions = false } = {}) {
+// `studentId` is optional. When provided, `already_submitted` /
+// `submission_id` are computed from findSubmissionForQuizAndStudent.
+export function serializeQuiz(quiz, { includeQuestions = false, studentId = null } = {}) {
+  const qs = questionsForQuiz(quiz.id);
   const base = {
     id: quiz.id,
     class_id: quiz.class_id,
@@ -338,10 +282,17 @@ export function serializeQuiz(quiz, { includeQuestions = false } = {}) {
     duration_minutes: quiz.duration_minutes,
     is_published: quiz.is_published,
     created_at: quiz.created_at,
-    question_count: questionsForQuiz(quiz.id).length,
-    total_marks: questionsForQuiz(quiz.id).reduce((sum, q) => sum + q.marks, 0),
+    question_count: qs.length,
+    total_marks: qs.reduce((sum, q) => sum + q.marks, 0),
   };
-  if (includeQuestions) base.questions = questionsForQuiz(quiz.id).map(serializeQuestion);
+
+  if (studentId) {
+    const existing = findSubmissionForStudent(quiz.id, studentId);
+    base.already_submitted = !!existing;
+    base.submission_id = existing?.id || null;
+  }
+
+  if (includeQuestions) base.questions = qs.map(serializeQuestion);
   return base;
 }
 
@@ -360,9 +311,6 @@ export function serializeChoice(choice) {
   return {
     id: choice.id,
     text: choice.text,
-    // NOTE: is_correct IS included in the payload for teacher views. For
-    // the student take-quiz flow, examsHandlers.js strips it via a
-    // dedicated serializer (see student-facing GET /quizzes/:id/ below).
     is_correct: choice.is_correct,
   };
 }

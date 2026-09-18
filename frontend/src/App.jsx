@@ -10,12 +10,16 @@ import TeacherDashboardPage from "./features/teacher/dashboard/TeacherDashboardP
 import StudentDashboardPage from "./features/student/dashboard/StudentDashboardPage";
 import ClassListPage from "./features/teacher/classes/ClassListPage";
 import ClassDetailPage from "./features/teacher/classes/ClassDetailPage";
+import QuizBuilderPage from "./features/teacher/quizzes/QuizBuilderPage";
 import MaterialsPage from "./features/teacher/materials/MaterialsPage";
 import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
 import StudentClassListPage from "./features/student/classes/ClassListPage";
 import StudentMaterialsPage from "./features/student/materials/MaterialsPage";
 import PerformancePage from "./features/student/performance/PerformancePage";
 import JoinClassPage from "./features/student/join-class/JoinClassPage";
+import StudentQuizListPage from "./features/student/quizzes/QuizListPage";
+import TakeQuizPage from "./features/student/quizzes/TakeQuizPage";
+import ResultReviewPage from "./features/student/quizzes/ResultReviewPage";
 
 export default function App() {
   return (
@@ -29,6 +33,10 @@ export default function App() {
             <Route index element={<TeacherDashboardPage />} />
             <Route path="classes" element={<ClassListPage />} />
             <Route path="classes/:classId" element={<ClassDetailPage />} />
+            <Route
+              path="classes/:classId/quizzes/:quizId"
+              element={<QuizBuilderPage />}
+            />
             <Route path="materials" element={<MaterialsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
           </Route>
@@ -40,6 +48,9 @@ export default function App() {
             <Route path="classes" element={<StudentClassListPage />} />
             <Route path="join-class" element={<JoinClassPage />} />
             <Route path="materials" element={<StudentMaterialsPage />} />
+            <Route path="quizzes" element={<StudentQuizListPage />} />
+            <Route path="quizzes/:quizId" element={<TakeQuizPage />} />
+            <Route path="submissions/:submissionId" element={<ResultReviewPage />} />
             <Route path="performance" element={<PerformancePage />} />
           </Route>
         </Route>

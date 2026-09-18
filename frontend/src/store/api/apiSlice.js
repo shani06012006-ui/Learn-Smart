@@ -1,35 +1,48 @@
-﻿import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+﻿import { createApi } from "@reduxjs/toolkit/query/react";
 
 import { accessTokenRotated, loggedOut } from "../slices/authSlice";
+import { localDispatcher } from "../../mocks/dispatcher";
 
-// In mock mode, requests must stay same-origin as the page (http://localhost:5173/...)
-// for MSW's service worker to intercept them -- a relative handler path
-// resolves against the PAGE's origin, not as a cross-origin wildcard, so
-// pointing straight at VITE_API_BASE_URL (a different port) would bypass
-// MSW entirely and hit a real (nonexistent) server. In real mode we point
-// at the actual backend origin, which needs CORS configured there.
-const baseUrl =
-  import.meta.env.VITE_USE_MOCKS === "true" ? "/api/v1" : import.meta.env.VITE_API_BASE_URL;
+// MOCK MODE: every endpoint routes through `localDispatcher`, which reads
+// and writes the in-memory stores under `mocks/data/`. No fetch, no MSW,
+// no service worker.
+//
+// TO SWAP TO THE REAL DJANGO BACKEND:
+//   1. Comment out the localDispatcher import.
+//   2. Import fetchBaseQuery from RTK Query.
+//   3. Replace rawBaseQuery below with:
+//        const rawBaseQuery = fetchBaseQuery({ baseUrl, prepareHeaders });
+//   apiSlice's other fields (tagTypes, extraReducers) stay identical.
 
-const rawBaseQuery = fetchBaseQuery({
-  baseUrl,
-  prepareHeaders: (headers, { getState }) => {
-    const token = getState().auth.accessToken;
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-    return headers;
-  },
-});
+// RTK Query passes `args` to the baseQuery in one of two shapes:
+//   - a plain string  ("/classes/")              ← most query endpoints
+//   - an object       ({ url, method, body, ... }) ← mutations + custom queries
+// fetchBaseQuery normalizes both internally; the local dispatcher must too.
+// This helper is the single place that knows that fact.
+function normalizeArgs(args) {
+  if (typeof args === "string") {
+    return { url: args, method: "GET" };
+  }
+  return { method: "GET", ...args };
+}
 
-// Wraps the base query so a single 401 transparently attempts one token
-// refresh and retries the original request — every feature's api slice
-// gets this for free just by injecting into `apiSlice`, no per-endpoint
-// retry logic needed.
+const rawBaseQuery = async (args, api, extraOptions) => {
+  const normalized = normalizeArgs(args);
+  const state = api.getState();
+  const token = state.auth.accessToken;
+  const headers = {
+    ...(normalized.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  return localDispatcher({ ...normalized, headers }, api, extraOptions);
+};
+
 const baseQueryWithReauth = async (args, api, extraOptions) => {
-  let result = await rawBaseQuery(args, api, extraOptions);
+  const normalized = normalizeArgs(args);
+  let result = await rawBaseQuery(normalized, api, extraOptions);
 
   const isAuthEndpoint =
-    typeof args === "object" &&
-    (args.url === "/auth/login/" || args.url === "/auth/token/refresh/");
+    normalized.url === "/auth/login/" || normalized.url === "/auth/token/refresh/";
 
   if (result.error?.status === 401 && !isAuthEndpoint) {
     const refreshToken = api.getState().auth.refreshToken;
@@ -43,7 +56,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
       if (refreshResult.data) {
         api.dispatch(accessTokenRotated(refreshResult.data));
-        result = await rawBaseQuery(args, api, extraOptions); // retry original request
+        result = await rawBaseQuery(normalized, api, extraOptions);
       } else {
         api.dispatch(loggedOut());
       }
@@ -58,11 +71,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const apiSlice = createApi({
   reducerPath: "api",
   baseQuery: baseQueryWithReauth,
-  // Every domain's tag types are declared here as that domain is built,
-  // so RTK Query's cache invalidation works uniformly across the app.
-  // NOTE: TeacherAnalytics and StudentPerformance are deliberately distinct
-  // even though both are "analytics-shaped" -- sharing one tag would let
-  // invalidating one endpoint's cache accidentally invalidate the other.
   tagTypes: [
     "Me",
     "Class",
@@ -74,14 +82,10 @@ export const apiSlice = createApi({
     "Quiz",
     "Question",
     "Submission",
+    "Thread",
+    "Message",
   ],
   endpoints: () => ({}),
-  // Reset every cached query + mutation the moment the user logs out, so
-  // the next session never reads the previous user's data. Without this,
-  // RTK Query keys caches by endpoint name + argument, and endpoints like
-  // getStudentPerformance take no argument (they rely on the auth token to
-  // scope the response), so Rahul's cached result looks identical to
-  // Meera's and would be served to Meera after login.
   extraReducers: (builder) => {
     builder.addMatcher(
       (action) => action.type === loggedOut.type,

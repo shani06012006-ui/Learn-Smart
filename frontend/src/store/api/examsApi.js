@@ -4,8 +4,6 @@ export const examsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // ---------- lists ------------------------------------------------------
 
-    // GET /quizzes/ -- student-only: every published quiz across the
-    // student's enrolled classes. Backs the /student/quizzes page.
     getAllQuizzes: builder.query({
       query: () => "/quizzes/",
       providesTags: (result) =>
@@ -14,8 +12,6 @@ export const examsApi = apiSlice.injectEndpoints({
           : [{ type: "Quiz", id: "LIST" }],
     }),
 
-    // GET /classes/{classId}/quizzes/ -- teacher: all quizzes in class;
-    // student: published only.
     getQuizzesForClass: builder.query({
       query: (classId) => `/classes/${classId}/quizzes/`,
       providesTags: (result, error, classId) =>
@@ -29,15 +25,12 @@ export const examsApi = apiSlice.injectEndpoints({
 
     // ---------- single quiz ------------------------------------------------
 
-    // GET /quizzes/{id}/ -- teacher: full (is_correct included);
-    // student: published only (is_correct stripped server-side).
     getQuizDetail: builder.query({
       query: (quizId) => `/quizzes/${quizId}/`,
       providesTags: (result, error, quizId) => [{ type: "Quiz", id: quizId }],
     }),
 
     createQuiz: builder.mutation({
-      // body: { title, description, duration_minutes }
       query: ({ classId, ...body }) => ({
         url: `/classes/${classId}/quizzes/`,
         method: "POST",
@@ -50,7 +43,6 @@ export const examsApi = apiSlice.injectEndpoints({
     }),
 
     updateQuiz: builder.mutation({
-      // body: partial { title, description, duration_minutes, is_published }
       query: ({ quizId, classId, ...patch }) => ({
         url: `/quizzes/${quizId}/`,
         method: "PATCH",
@@ -78,7 +70,6 @@ export const examsApi = apiSlice.injectEndpoints({
     // ---------- questions -------------------------------------------------
 
     addQuestion: builder.mutation({
-      // body: { text, marks, choices: [{ text, is_correct }] }
       query: ({ quizId, ...body }) => ({
         url: `/quizzes/${quizId}/questions/`,
         method: "POST",
@@ -88,8 +79,6 @@ export const examsApi = apiSlice.injectEndpoints({
     }),
 
     updateQuestion: builder.mutation({
-      // body MUST include quiz_id so the handler can authorize ownership.
-      // body: { quiz_id, text?, marks?, choices? }
       query: ({ questionId, ...body }) => ({
         url: `/questions/${questionId}/`,
         method: "PATCH",
@@ -99,7 +88,6 @@ export const examsApi = apiSlice.injectEndpoints({
     }),
 
     deleteQuestion: builder.mutation({
-      // body MUST include quiz_id (see handler).
       query: ({ questionId, quizId }) => ({
         url: `/questions/${questionId}/`,
         method: "DELETE",
@@ -111,24 +99,43 @@ export const examsApi = apiSlice.injectEndpoints({
     // ---------- submissions -----------------------------------------------
 
     submitQuiz: builder.mutation({
-      // body: { answers: { [questionId]: [choiceId] } }
       query: ({ quizId, answers }) => ({
         url: `/quizzes/${quizId}/submit/`,
         method: "POST",
         body: { answers },
       }),
+      // Invalidate the quiz tag (so the list re-fetches the already_submitted
+      // flag) and the submission list (so a future submissions-list UI
+      // updates). Also drops any cached detail of this specific quiz so
+      // the redirect-to-result flow doesn't render a stale "not submitted"
+      // detail page.
       invalidatesTags: (result, error, { quizId }) => [
         { type: "Quiz", id: quizId },
+        { type: "Quiz", id: "LIST" },
         { type: "Submission", id: "LIST" },
       ],
     }),
 
-    // GET /submissions/{id}/ -- result review
     getSubmission: builder.query({
       query: (submissionId) => `/submissions/${submissionId}/`,
       providesTags: (result, error, submissionId) => [
         { type: "Submission", id: submissionId },
       ],
+    }),
+
+    // GET /submissions/ -- the student's own submissions (optionally
+    // filtered by ?quiz=<id>). Used to check already-submitted state
+    // without triggering a fake submit attempt.
+    getMySubmissions: builder.query({
+      query: ({ quizId } = {}) =>
+        quizId ? `/submissions/?quiz=${quizId}` : "/submissions/",
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((s) => ({ type: "Submission", id: s.id })),
+              { type: "Submission", id: "LIST" },
+            ]
+          : [{ type: "Submission", id: "LIST" }],
     }),
   }),
 });
@@ -145,4 +152,5 @@ export const {
   useDeleteQuestionMutation,
   useSubmitQuizMutation,
   useGetSubmissionQuery,
+  useGetMySubmissionsQuery,
 } = examsApi;
