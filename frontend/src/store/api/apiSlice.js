@@ -60,6 +60,29 @@ export const apiSlice = createApi({
   baseQuery: baseQueryWithReauth,
   // Every domain's tag types are declared here as that domain is built,
   // so RTK Query's cache invalidation works uniformly across the app.
-  tagTypes: ["Me", "Class", "Enrollment", "Material", "Announcement", "Analytics"],
+  // NOTE: TeacherAnalytics and StudentPerformance are deliberately distinct
+  // even though both are "analytics-shaped" -- sharing one tag would let
+  // invalidating one endpoint's cache accidentally invalidate the other.
+  tagTypes: [
+    "Me",
+    "Class",
+    "Enrollment",
+    "Material",
+    "Announcement",
+    "TeacherAnalytics",
+    "StudentPerformance",
+  ],
   endpoints: () => ({}),
+  // Reset every cached query + mutation the moment the user logs out, so
+  // the next session never reads the previous user's data. Without this,
+  // RTK Query keys caches by endpoint name + argument, and endpoints like
+  // getStudentPerformance take no argument (they rely on the auth token to
+  // scope the response), so Rahul's cached result looks identical to
+  // Meera's and would be served to Meera after login.
+  extraReducers: (builder) => {
+    builder.addMatcher(
+      (action) => action.type === loggedOut.type,
+      () => ({})
+    );
+  },
 });

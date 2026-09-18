@@ -14,6 +14,7 @@ import MaterialsPage from "./features/teacher/materials/MaterialsPage";
 import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
 import StudentClassListPage from "./features/student/classes/ClassListPage";
 import StudentMaterialsPage from "./features/student/materials/MaterialsPage";
+import PerformancePage from "./features/student/performance/PerformancePage";
 import JoinClassPage from "./features/student/join-class/JoinClassPage";
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="classes" element={<StudentClassListPage />} />
             <Route path="join-class" element={<JoinClassPage />} />
             <Route path="materials" element={<StudentMaterialsPage />} />
+            <Route path="performance" element={<PerformancePage />} />
           </Route>
         </Route>
       </Route>
