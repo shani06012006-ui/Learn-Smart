@@ -33,8 +33,7 @@ export const classesHandlers = [
   //   400 blocked/removed
   //   200 { class_course: {...}, status: "active" } on success
   http.post(`${BASE}/enrollments/join/`, async ({ request }) => {
-    await delay(400);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "student") {
       return simpleError("Only students can join a class with a code.", 403);
@@ -90,8 +89,7 @@ export const classesHandlers = [
   }),
 
   http.post(`${BASE}/classes/`, async ({ request }) => {
-    await delay(300);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
       return simpleError("Only teachers can create classes.", 403);
@@ -127,8 +125,7 @@ export const classesHandlers = [
   }),
 
   http.patch(`${BASE}/classes/:id`, async ({ request, params }) => {
-    await delay(300);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
 
     const cls = findClassById(params.id);
@@ -171,8 +168,7 @@ export const classesHandlers = [
   }),
 
   http.post(`${BASE}/classes/:id/students`, async ({ request, params }) => {
-    await delay(400);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") return simpleError("Only teachers can add students.", 403);
 
@@ -201,8 +197,7 @@ export const classesHandlers = [
   }),
 
   http.patch(`${BASE}/classes/:id/students/:enrollmentId`, async ({ request, params }) => {
-    await delay(250);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
 
     const cls = findClassById(params.id);
@@ -223,3 +218,4 @@ export const classesHandlers = [
     return HttpResponse.json(serializeEnrollment(enrollment));
   }),
 ];
+

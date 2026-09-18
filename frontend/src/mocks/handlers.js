@@ -5,6 +5,7 @@ import { materialsHandlers } from "./handlers/materialsHandlers";
 import { analyticsHandlers } from "./handlers/analyticsHandlers";
 import { performanceHandlers } from "./handlers/performanceHandlers";
 import { examsHandlers } from "./handlers/examsHandlers";
+import { chatHandlers } from "./handlers/chatHandlers";
 
 export const handlers = [
   ...authHandlers,
@@ -13,4 +14,5 @@ export const handlers = [
   ...analyticsHandlers,
   ...performanceHandlers,
   ...examsHandlers,
+  ...chatHandlers,
 ];

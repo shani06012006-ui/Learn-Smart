@@ -1,4 +1,4 @@
-import { http, HttpResponse } from "msw";
+﻿import { http, HttpResponse } from "msw";
 
 import {
   addUser,
@@ -26,11 +26,10 @@ function requireAuth(request) {
 }
 
 export const authHandlers = [
-  // POST /auth/register/ — teacher/admin self-registration only.
+  // POST /auth/register/ â€” teacher/admin self-registration only.
   // Student accounts are created only via classes/{id}/students/ (Module B).
   http.post(`${BASE}/auth/register/`, async ({ request }) => {
-    await delay(300);
-    const body = await request.json();
+        const body = await request.json();
     const { email, first_name, last_name, role, password, password_confirm } = body;
 
     const errors = {};
@@ -60,7 +59,7 @@ export const authHandlers = [
       last_name,
       full_name: `${first_name} ${last_name}`,
       role: role || "teacher",
-      institution: null, // nullable until Module J — matches the real backend
+      institution: null, // nullable until Module J â€” matches the real backend
       phone: "",
       avatar: null,
       is_blocked: false,
@@ -73,8 +72,7 @@ export const authHandlers = [
 
   // POST /auth/login/
   http.post(`${BASE}/auth/login/`, async ({ request }) => {
-    await delay(400);
-    const { email, password } = await request.json();
+        const { email, password } = await request.json();
     const user = email ? findUserByEmail(email) : null;
 
     if (!user || user.password !== password) {
@@ -90,8 +88,7 @@ export const authHandlers = [
 
   // POST /auth/token/refresh/
   http.post(`${BASE}/auth/token/refresh/`, async ({ request }) => {
-    await delay(200);
-    const { refresh } = await request.json();
+        const { refresh } = await request.json();
     const rotated = refresh ? rotateAccessToken(refresh) : null;
 
     if (!rotated) {
@@ -100,7 +97,7 @@ export const authHandlers = [
     return HttpResponse.json(rotated, { status: 200 });
   }),
 
-  // POST /auth/logout/ — blacklists the refresh token.
+  // POST /auth/logout/ â€” blacklists the refresh token.
   http.post(`${BASE}/auth/logout/`, async ({ request }) => {
     const { refresh } = await request.json();
     if (refresh) revokeRefreshToken(refresh);
@@ -114,10 +111,9 @@ export const authHandlers = [
     return HttpResponse.json(serializeUser(user), { status: 200 });
   }),
 
-  // PATCH /auth/me/ — role is intentionally read-only, same as the real API.
+  // PATCH /auth/me/ â€” role is intentionally read-only, same as the real API.
   http.patch(`${BASE}/auth/me/`, async ({ request }) => {
-    await delay(300);
-    const user = requireAuth(request);
+        const user = requireAuth(request);
     if (!user) return unauthorized();
 
     const body = await request.json();
@@ -127,3 +123,4 @@ export const authHandlers = [
     return HttpResponse.json(serializeUser(updated), { status: 200 });
   }),
 ];
+

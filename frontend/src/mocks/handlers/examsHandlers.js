@@ -11,16 +11,18 @@ import {
   findSubmissionForStudent,
   questionsForQuiz,
   quizzesForClass,
+  resetSubmissions,
   serializeQuestion,
   serializeQuiz,
   serializeSubmission,
   softDeleteQuestion,
   softDeleteQuiz,
+  submissionsForStudent,
   updateQuestion,
   updateQuiz,
 } from "../data/exams";
 import { getBearerToken, userIdForAccessToken } from "../data/session";
-import { delay, simpleError, unauthorized, validationError } from "../utils";
+import { simpleError, unauthorized, validationError } from "../utils";
 
 const BASE = "/api/v1";
 
@@ -30,8 +32,6 @@ function currentUser(request) {
   return userId ? findUserById(userId) : null;
 }
 
-// Teacher-view serializer: includes `is_correct` on every choice so the
-// builder UI can show which option is the right answer.
 function serializeQuizForTeacher(quiz, { includeQuestions = false } = {}) {
   const base = serializeQuiz(quiz, { includeQuestions: false });
   if (includeQuestions) {
@@ -40,11 +40,11 @@ function serializeQuizForTeacher(quiz, { includeQuestions = false } = {}) {
   return base;
 }
 
-// Student-view serializer: strips `is_correct` from every choice so a
-// student can't read the answer key from DevTools. Correct answers are
-// only exposed on the result-review page, after submission.
-function serializeQuizForStudent(quiz) {
-  const base = serializeQuiz(quiz, { includeQuestions: false });
+function serializeQuizForStudent(quiz, studentId) {
+  const base = serializeQuiz(quiz, {
+    includeQuestions: false,
+    studentId,
+  });
   base.questions = questionsForQuiz(quiz.id).map((q) => ({
     id: q.id,
     quiz_id: q.quiz_id,
@@ -57,11 +57,44 @@ function serializeQuizForStudent(quiz) {
 }
 
 export const examsHandlers = [
-  // ---------- student-facing: top-level quiz list -------------------------
+  // DEV-ONLY: clear all submissions so a tester can start clean without
+  // restarting the MSW worker. Returns 204 on success.
+  http.post(`${BASE}/__reset-submissions/`, () => {
+    resetSubmissions();
+    return new HttpResponse(null, { status: 204 });
+  }),
 
-  // GET /quizzes/ -- every published quiz across the student's active
-  // enrollments. Teachers get a 403 here; they use the class-scoped
-  // endpoint below instead. This backs the /student/quizzes page.
+  // ---------- student-facing: submissions list ---------------------------
+
+  // GET /submissions/ -- the caller's own submissions (students) or every
+  // submission on their quizzes (teachers). Supports ?quiz=<id> to filter.
+  http.get(`${BASE}/submissions/`, ({ request }) => {
+    const user = currentUser(request);
+    if (!user) return unauthorized();
+
+    if (user.role === "student") {
+      const url = new URL(request.url);
+      const quizIdFilter = url.searchParams.get("quiz");
+      const list = submissionsForStudent(user.id).filter(
+        (s) => !quizIdFilter || s.quiz_id === quizIdFilter
+      );
+      return HttpResponse.json(list.map(serializeSubmission));
+    }
+
+    if (user.role === "teacher") {
+      // Return an empty list -- the teacher-side submission list isn't
+      // built yet. A real backend would return all submissions for the
+      // teacher's quizzes; we'll wire that when we add the teacher view.
+      return HttpResponse.json([]);
+    }
+
+    return simpleError("Not allowed.", 403);
+  }),
+
+  // ---------- student-facing: top-level quiz list ------------------------
+
+  // GET /quizzes/ -- published quizzes across the student's active
+  // enrollments, with already_submitted flags computed per-student.
   http.get(`${BASE}/quizzes/`, ({ request }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -77,13 +110,11 @@ export const examsHandlers = [
       quizzesForClass(cid, { onlyPublished: true })
     );
 
-    return HttpResponse.json(list.map((q) => serializeQuiz(q)));
+    return HttpResponse.json(list.map((q) => serializeQuiz(q, { studentId: user.id })));
   }),
 
-  // ---------- teacher-facing: class-scoped quiz list ----------------------
+  // ---------- teacher-facing: class-scoped quiz list ---------------------
 
-  // GET /classes/:classId/quizzes/ -- teacher: all quizzes in class;
-  // student: published only (backup path for the class detail view).
   http.get(`${BASE}/classes/:classId/quizzes/`, ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -104,7 +135,9 @@ export const examsHandlers = [
         return simpleError("You do not have access to this class.", 403);
       }
       return HttpResponse.json(
-        quizzesForClass(cls.id, { onlyPublished: true }).map((q) => serializeQuiz(q))
+        quizzesForClass(cls.id, { onlyPublished: true }).map((q) =>
+          serializeQuiz(q, { studentId: user.id })
+        )
       );
     }
 
@@ -113,7 +146,6 @@ export const examsHandlers = [
 
   // POST /classes/:classId/quizzes/ -- teacher creates a quiz (draft)
   http.post(`${BASE}/classes/:classId/quizzes/`, async ({ request, params }) => {
-    await delay(300);
     const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
@@ -147,10 +179,8 @@ export const examsHandlers = [
     return HttpResponse.json(serializeQuizForTeacher(quiz), { status: 201 });
   }),
 
-  // ---------- single quiz -------------------------------------------------
+  // ---------- single quiz ------------------------------------------------
 
-  // GET /quizzes/:id/ -- teacher: full (with is_correct); student: only if
-  // published, with is_correct stripped.
   http.get(`${BASE}/quizzes/:id/`, ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -176,15 +206,13 @@ export const examsHandlers = [
       if (!quiz.is_published) {
         return simpleError("Not found.", 404);
       }
-      return HttpResponse.json(serializeQuizForStudent(quiz));
+      return HttpResponse.json(serializeQuizForStudent(quiz, user.id));
     }
 
     return simpleError("Not allowed.", 403);
   }),
 
-  // PATCH /quizzes/:id/ -- teacher edits metadata or toggles publish
   http.patch(`${BASE}/quizzes/:id/`, async ({ request, params }) => {
-    await delay(200);
     const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
@@ -210,7 +238,6 @@ export const examsHandlers = [
     return HttpResponse.json(serializeQuizForTeacher(updated));
   }),
 
-  // DELETE /quizzes/:id/ -- teacher soft-deletes
   http.delete(`${BASE}/quizzes/:id/`, ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -230,11 +257,9 @@ export const examsHandlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // ---------- questions ---------------------------------------------------
+  // ---------- questions --------------------------------------------------
 
-  // POST /quizzes/:id/questions/ -- teacher adds a question (MCQ)
   http.post(`${BASE}/quizzes/:id/questions/`, async ({ request, params }) => {
-    await delay(200);
     const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
@@ -277,11 +302,7 @@ export const examsHandlers = [
     return HttpResponse.json(serializeQuestion(question), { status: 201 });
   }),
 
-  // PATCH /questions/:id/ -- teacher edits a question + its choices.
-  // Body MUST include quiz_id so the handler can authorize ownership
-  // without needing a reverse lookup from question → quiz.
   http.patch(`${BASE}/questions/:id/`, async ({ request, params }) => {
-    await delay(200);
     const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
@@ -326,8 +347,6 @@ export const examsHandlers = [
     return HttpResponse.json(serializeQuestion(updated));
   }),
 
-  // DELETE /questions/:id/ -- teacher removes a question.
-  // Body MUST include quiz_id (same reason as PATCH above).
   http.delete(`${BASE}/questions/:id/`, async ({ request, params }) => {
     const user = currentUser(request);
     if (!user) return unauthorized();
@@ -351,11 +370,11 @@ export const examsHandlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // ---------- submissions -------------------------------------------------
+  // ---------- submissions ------------------------------------------------
 
-  // POST /quizzes/:id/submit/ -- student submits answers
+  // POST /quizzes/:id/submit/ -- student submits. Duplicate check is
+  // scoped to (quiz, student) via findSubmissionForStudent.
   http.post(`${BASE}/quizzes/:id/submit/`, async ({ request, params }) => {
-    await delay(500);
     const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "student") {
@@ -410,8 +429,6 @@ export const examsHandlers = [
       return simpleError("Not allowed.", 403);
     }
 
-    // Result view includes is_correct on choices so the review page can
-    // mark green/red.
     return HttpResponse.json({
       ...serializeSubmission(submission),
       quiz: {

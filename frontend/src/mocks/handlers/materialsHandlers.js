@@ -55,8 +55,7 @@ export const materialsHandlers = [
 
   // POST /classes/:id/materials/
   http.post(`${BASE}/classes/:id/materials/`, async ({ request, params }) => {
-    await delay(600);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
       return simpleError("Only teachers can upload materials.", 403);
@@ -136,8 +135,7 @@ export const materialsHandlers = [
 
   // POST /classes/:id/announcements/ -- teacher-only
   http.post(`${BASE}/classes/:id/announcements/`, async ({ request, params }) => {
-    await delay(400);
-    const user = currentUser(request);
+        const user = currentUser(request);
     if (!user) return unauthorized();
     if (user.role !== "teacher") {
       return simpleError("Only teachers can post announcements.", 403);
@@ -190,3 +188,4 @@ export const materialsHandlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 ];
+
