@@ -2,7 +2,6 @@
 
 export const chatApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    // GET /chat/threads/
     getThreads: builder.query({
       query: () => "/chat/threads/",
       providesTags: (result) =>
@@ -14,7 +13,6 @@ export const chatApi = apiSlice.injectEndpoints({
           : [{ type: "Thread", id: "LIST" }],
     }),
 
-    // GET /chat/threads/{id}/messages/
     getMessages: builder.query({
       query: (threadId) => `/chat/threads/${threadId}/messages/`,
       providesTags: (result, error, threadId) => [
@@ -22,7 +20,15 @@ export const chatApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // POST /chat/threads/{id}/messages/
+    // GET /chat/threads/:id/members/ -- participant list for Group Info.
+    // Never called for direct threads (they have only 2 participants).
+    getThreadMembers: builder.query({
+      query: (threadId) => `/chat/threads/${threadId}/members/`,
+      providesTags: (result, error, threadId) => [
+        { type: "ThreadMember", id: threadId },
+      ],
+    }),
+
     sendMessage: builder.mutation({
       query: ({ threadId, body }) => ({
         url: `/chat/threads/${threadId}/messages/`,
@@ -36,7 +42,6 @@ export const chatApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // POST /chat/threads/{id}/read/
     markThreadRead: builder.mutation({
       query: (threadId) => ({
         url: `/chat/threads/${threadId}/read/`,
@@ -47,12 +52,26 @@ export const chatApi = apiSlice.injectEndpoints({
         { type: "Thread", id: "LIST" },
       ],
     }),
+
+    deleteMessage: builder.mutation({
+      query: ({ messageId }) => ({
+        url: `/chat/messages/${messageId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { messageId, threadId }) => [
+        { type: "Message", id: `LIST-${threadId}` },
+        { type: "Thread", id: threadId },
+        { type: "Thread", id: "LIST" },
+      ],
+    }),
   }),
 });
 
 export const {
   useGetThreadsQuery,
   useGetMessagesQuery,
+  useGetThreadMembersQuery,
   useSendMessageMutation,
   useMarkThreadReadMutation,
+  useDeleteMessageMutation,
 } = chatApi;

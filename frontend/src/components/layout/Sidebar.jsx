@@ -23,7 +23,7 @@ const TEACHER_ITEMS = [
   { label: "Announcements", to: "/teacher/announcements", icon: Megaphone, enabled: true },
   { label: "AI Insights", to: "/teacher/analytics", icon: BarChart3, enabled: false, note: "Module E" },
   { label: "Live Classes", to: "/teacher/live-classes", icon: Video, enabled: false, note: "Module H" },
-  { label: "Messages", to: "/teacher/chat", icon: MessageSquare, enabled: false, note: "Module F" },
+  { label: "Messages", to: "/teacher/chat", icon: MessageSquare, enabled: true },
 ];
 
 const STUDENT_ITEMS = [
@@ -34,7 +34,7 @@ const STUDENT_ITEMS = [
   { label: "Quizzes", to: "/student/quizzes", icon: ClipboardList, enabled: true },
   { label: "Performance", to: "/student/performance", icon: Trophy, enabled: true },
   { label: "Live Classes", to: "/student/live-classes", icon: Video, enabled: false, note: "Module H" },
-  { label: "Messages", to: "/student/chat", icon: MessageSquare, enabled: false, note: "Module F" },
+  { label: "Messages", to: "/student/chat", icon: MessageSquare, enabled: true },
 ];
 
 export default function Sidebar({ role }) {
