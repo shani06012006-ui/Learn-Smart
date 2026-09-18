@@ -6,7 +6,7 @@ export const analyticsApi = apiSlice.injectEndpoints({
     // dashboard (all six widgets come from this single response).
     getTeacherDashboardAnalytics: builder.query({
       query: () => "/teacher/dashboard/analytics/",
-      providesTags: ["Analytics"],
+      providesTags: ["TeacherAnalytics"],
     }),
   }),
 });
