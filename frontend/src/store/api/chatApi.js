@@ -20,12 +20,23 @@ export const chatApi = apiSlice.injectEndpoints({
       ],
     }),
 
-    // GET /chat/threads/:id/members/ -- participant list for Group Info.
-    // Never called for direct threads (they have only 2 participants).
+    // GET /chat/threads/:id/members/ -- participant list (Group Info).
     getThreadMembers: builder.query({
       query: (threadId) => `/chat/threads/${threadId}/members/`,
       providesTags: (result, error, threadId) => [
-        { type: "ThreadMember", id: threadId },
+        { type: "ThreadMember", id: `LIST-${threadId}` },
+      ],
+    }),
+
+    // GET /chat/threads/:id/members/:userId/ -- single member profile.
+    // Used by both group member click and 1:1 header click. Same access
+    // rules: the viewer must be in the thread, and the target must be a
+    // participant.
+    getThreadMember: builder.query({
+      query: ({ threadId, userId }) =>
+        `/chat/threads/${threadId}/members/${userId}/`,
+      providesTags: (result, error, { threadId, userId }) => [
+        { type: "ThreadMember", id: `${threadId}:${userId}` },
       ],
     }),
 
@@ -71,6 +82,7 @@ export const {
   useGetThreadsQuery,
   useGetMessagesQuery,
   useGetThreadMembersQuery,
+  useGetThreadMemberQuery,
   useSendMessageMutation,
   useMarkThreadReadMutation,
   useDeleteMessageMutation,

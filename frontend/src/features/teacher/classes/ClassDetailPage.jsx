@@ -19,7 +19,6 @@ import EmptyState from "../../../components/feedback/EmptyState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import AddStudentModal from "./components/AddStudentModal";
 import EnrollmentStatusBadge from "./components/EnrollmentStatusBadge";
-import QuizzesPanel from "./components/QuizzesPanel";
 
 export default function ClassDetailPage() {
   const { classId } = useParams();
@@ -70,10 +69,6 @@ export default function ClassDetailPage() {
   }
 
   const cls = classQuery.data;
-
-  if (!cls) {
-    return <ErrorState message="Class not found." onRetry={classQuery.refetch} />;
-  }
 
   const columns = [
     {
@@ -198,8 +193,6 @@ export default function ClassDetailPage() {
         )}
       </div>
 
-      <QuizzesPanel classId={classId} />
-
       <AddStudentModal
         open={addStudentOpen}
         onClose={() => setAddStudentOpen(false)}
@@ -230,4 +223,3 @@ export default function ClassDetailPage() {
     </div>
   );
 }
-

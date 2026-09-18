@@ -1,12 +1,13 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 
 import {
   useGetMessagesQuery,
   useSendMessageMutation,
   useMarkThreadReadMutation,
   useGetThreadsQuery,
+  useGetThreadMembersQuery,
   useDeleteMessageMutation,
 } from "../../../store/api/chatApi";
 import { useAuth } from "../../../hooks/useAuth";
@@ -23,6 +24,7 @@ import DateDivider, { shouldShowDivider } from "./DateDivider";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
 import GroupInfoPanel from "./GroupInfoPanel";
+import MemberProfilePanel from "./MemberProfilePanel";
 
 const SCROLL_THRESHOLD = 80;
 
@@ -38,7 +40,7 @@ export default function ChatWindow({ threadId }) {
   const [sendError, setSendError] = useState(null);
   const [liveMessages, setLiveMessages] = useState([]);
   const [typing, setTyping] = useState(false);
-  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const scrollRef = useRef(null);
   const atBottomRef = useRef(true);
 
@@ -46,11 +48,22 @@ export default function ChatWindow({ threadId }) {
     () => (threads || []).find((t) => t.id === threadId),
     [threads, threadId]
   );
+  const isGroup = thread?.kind === "group";
+
+  // For direct threads, we fetch the member list (2 rows) and pick the
+  // "other" participant. For groups we only need this when the user opens
+  // Group Info -- but the call is cheap and the member list is also what
+  // GroupInfoPanel uses, so a single fetch covers both cases.
+  const membersQuery = useGetThreadMembersQuery(threadId, { skip: !thread });
+  const otherMember = useMemo(() => {
+    if (!membersQuery.data || isGroup) return null;
+    return membersQuery.data.find((m) => !m.is_self) || null;
+  }, [membersQuery.data, isGroup]);
 
   useEffect(() => {
     setLiveMessages([]);
     setSendError(null);
-    setGroupInfoOpen(false);
+    setDrawerOpen(false);
     atBottomRef.current = true;
   }, [threadId]);
 
@@ -138,9 +151,8 @@ export default function ChatWindow({ threadId }) {
   }
 
   const prefix = user?.role === "teacher" ? "/teacher" : "/student";
-  const isGroup = thread?.kind === "group";
 
-  // Header content differs for group vs direct threads.
+  // Header content differs for group vs direct. Both are clickable now.
   const headerContent = isGroup ? (
     <>
       <Avatar userId={thread.id} initials={thread.initials} size="md" neutral />
@@ -158,15 +170,37 @@ export default function ChatWindow({ threadId }) {
   ) : (
     <>
       <Avatar
-        userId={thread?.id || "?"}
-        initials={thread?.initials || "?"}
+        userId={otherMember?.id || thread?.id || "?"}
+        initials={otherMember?.initials || thread?.initials || "?"}
         size="md"
       />
       <div className="min-w-0 flex-1 text-left">
         <p className="truncate font-medium text-ink-900">
-          {thread?.title || "Conversation"}
+          {otherMember?.full_name || thread?.title || "Conversation"}
         </p>
+        {otherMember?.presence && (
+          <p className="text-xs text-ink-500">
+            {otherMember.presence.is_online ? (
+              <span className="inline-flex items-center gap-1.5 text-success-700">
+                <span
+                  className="h-1.5 w-1.5 rounded-full bg-success-500"
+                  aria-hidden="true"
+                />
+                Online
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="h-1.5 w-1.5 rounded-full bg-ink-300"
+                  aria-hidden="true"
+                />
+                Offline
+              </span>
+            )}
+          </p>
+        )}
       </div>
+      <ChevronRight size={16} className="shrink-0 text-ink-300" />
     </>
   );
 
@@ -181,18 +215,14 @@ export default function ChatWindow({ threadId }) {
           <ArrowLeft size={18} />
         </Link>
 
-        {isGroup ? (
-          <button
-            type="button"
-            onClick={() => setGroupInfoOpen(true)}
-            className="focus-ring flex flex-1 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-ink-100/60"
-            aria-label="Open group info"
-          >
-            {headerContent}
-          </button>
-        ) : (
-          <div className="flex flex-1 items-center gap-3">{headerContent}</div>
-        )}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="focus-ring flex flex-1 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-ink-100/60"
+          aria-label={isGroup ? "Open group info" : "Open member info"}
+        >
+          {headerContent}
+        </button>
       </header>
 
       <div
@@ -237,16 +267,20 @@ export default function ChatWindow({ threadId }) {
         <MessageInput onSend={handleSend} disabled={isSending} />
       </div>
 
-      {isGroup && (
-        <Drawer
-          open={groupInfoOpen}
-          onClose={() => setGroupInfoOpen(false)}
-          title="Group info"
-          width="md:max-w-md"
-        >
+      <Drawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={isGroup ? "Group info" : "Member info"}
+        width="md:max-w-md"
+      >
+        {isGroup ? (
           <GroupInfoPanel thread={thread} />
-        </Drawer>
-      )}
+        ) : otherMember ? (
+          <MemberProfilePanel member={otherMember} />
+        ) : (
+          <LoadingState label="Loading profile..." />
+        )}
+      </Drawer>
     </div>
   );
 }

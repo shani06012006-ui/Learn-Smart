@@ -167,9 +167,6 @@ export function readByOthers(message) {
   return otherIds.every((id) => message.read_by_ids.includes(id));
 }
 
-// Returns the list of participant user ids for a thread, resolving group
-// threads to (teacher + active students in the class). Used by both the
-// member serializer and the thread participant count.
 export function participantIdsForThread(thread) {
   if (thread.kind === "direct") return [...thread.participant_ids];
   if (thread.kind === "group") {
@@ -271,16 +268,66 @@ function studentsInClass(classId) {
   );
 }
 
-// Participant list for the Group Info panel. Access is enforced at the
-// handler layer (the caller must be able to access the thread). Here we
-// shape each participant row and, importantly, strip `email` from students
-// viewing OTHER students.
-//
-// Rules:
-//   - viewer sees their own row fully (including email)
-//   - viewer.role === "teacher"  => sees everyone's email
-//   - viewer.role === "student"  => sees only teacher emails; other
-//      students' emails are omitted (undefined)
+// Presence for a user. Reads `is_online` from data/users.js; when offline,
+// fabricates a deterministic "last seen" timestamp in the recent past so the
+// UI has something subtle to show. Real presence (WebSocket) is a future
+// module -- this is a UI placeholder.
+function presenceFor(user) {
+  if (user?.is_online) {
+    return { is_online: true, last_seen: null };
+  }
+  // Deterministic offset from the user id so the same user always shows the
+  // same "last seen" value during a session.
+  let seed = 0;
+  for (let i = 0; i < (user?.id || "").length; i++) {
+    seed = (seed << 5) - seed + user.id.charCodeAt(i);
+    seed |= 0;
+  }
+  const hoursAgo = 1 + (Math.abs(seed) % 24);
+  const lastSeen = new Date(Date.now() - hoursAgo * 60 * 60 * 1000).toISOString();
+  return { is_online: false, last_seen: lastSeen };
+}
+
+// Shared helper for building a member row from a user record.
+function serializeMember(u, viewer, classDoc) {
+  const isSelf = u.id === viewer?.id;
+  const isTeacherOfClass = classDoc && classDoc.teacher_id === u.id;
+
+  let email;
+  if (isSelf) {
+    email = u.email;
+  } else if (viewer?.role === "teacher") {
+    email = u.email;
+  } else if (viewer?.role === "student" && u.role === "teacher") {
+    email = u.email;
+  } else {
+    email = undefined;
+  }
+
+  const classNames =
+    u.role === "student"
+      ? classesForStudent(u.id).map((c) => c.name)
+      : classDoc
+      ? [classDoc.name]
+      : [];
+
+  return {
+    id: u.id,
+    full_name: u.full_name,
+    initials: initialsFor(u.full_name),
+    role: u.role,
+    thread_role: isTeacherOfClass
+      ? "Teacher"
+      : u.role === "student"
+      ? "Class member"
+      : u.role,
+    email,
+    class_names: classNames,
+    is_self: isSelf,
+    presence: presenceFor(u),
+  };
+}
+
 export function serializeThreadMembers(threadId, viewerId) {
   const thread = findThreadById(threadId);
   if (!thread) return [];
@@ -293,45 +340,28 @@ export function serializeThreadMembers(threadId, viewerId) {
   return participantIds
     .map((uid) => findUserById(uid))
     .filter(Boolean)
-    .map((u) => {
-      const isSelf = u.id === viewerId;
-      const isTeacherOfClass = classDoc && classDoc.teacher_id === u.id;
+    .map((u) => serializeMember(u, viewer, classDoc));
+}
 
-      // Email visibility rule.
-      let email;
-      if (isSelf) {
-        email = u.email;
-      } else if (viewer?.role === "teacher") {
-        email = u.email;
-      } else if (viewer?.role === "student" && u.role === "teacher") {
-        email = u.email;
-      } else {
-        email = undefined; // hidden
-      }
+// Single member profile lookup for a specific (thread, user). Returns null if
+// the user is not a participant of the thread -- the caller (dispatcher)
+// translates that into a 404. This is the ONLY way to fetch a user's profile:
+// via a thread the viewer already has access to.
+export function serializeThreadMember(threadId, userId, viewerId) {
+  const thread = findThreadById(threadId);
+  if (!thread) return null;
 
-      // Which classes the user is in (for the profile panel).
-      const classNames =
-        u.role === "student"
-          ? classesForStudent(u.id).map((c) => c.name)
-          : classDoc
-          ? [classDoc.name]
-          : [];
+  const viewer = findUserById(viewerId);
+  const participantIds = participantIdsForThread(thread);
+  if (!participantIds.includes(userId)) return null;
 
-      return {
-        id: u.id,
-        full_name: u.full_name,
-        initials: initialsFor(u.full_name),
-        role: u.role, // "teacher" | "student" | "admin"
-        thread_role: isTeacherOfClass
-          ? "Teacher"
-          : u.role === "student"
-          ? "Class member"
-          : u.role,
-        email,
-        class_names: classNames,
-        is_self: isSelf,
-      };
-    });
+  const target = findUserById(userId);
+  if (!target) return null;
+
+  const isGroup = thread.kind === "group";
+  const classDoc = isGroup ? findClassById(thread.class_id) : null;
+
+  return serializeMember(target, viewer, classDoc);
 }
 
 export function serializeMessage(message) {
