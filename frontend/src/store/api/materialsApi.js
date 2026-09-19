@@ -50,6 +50,19 @@ export const materialsApi = apiSlice.injectEndpoints({
           : [{ type: "Announcement", id: `LIST-${classId}` }],
     }),
 
+    // GET /announcements/ -- the student's aggregated announcements across
+    // every class they're actively enrolled in. Backs the dashboard widget.
+    getMyAnnouncements: builder.query({
+      query: () => "/announcements/",
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.map((a) => ({ type: "Announcement", id: a.id })),
+              { type: "Announcement", id: "MY-LIST" },
+            ]
+          : [{ type: "Announcement", id: "MY-LIST" }],
+    }),
+
     createAnnouncement: builder.mutation({
       query: ({ classId, ...body }) => ({
         url: `/classes/${classId}/announcements/`,
@@ -58,6 +71,7 @@ export const materialsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { classId }) => [
         { type: "Announcement", id: `LIST-${classId}` },
+        { type: "Announcement", id: "MY-LIST" },
       ],
     }),
 
@@ -69,6 +83,7 @@ export const materialsApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { announcementId, classId }) => [
         { type: "Announcement", id: announcementId },
         { type: "Announcement", id: `LIST-${classId}` },
+        { type: "Announcement", id: "MY-LIST" },
       ],
     }),
   }),
@@ -79,6 +94,7 @@ export const {
   useUploadMaterialMutation,
   useDeleteMaterialMutation,
   useGetAnnouncementsQuery,
+  useGetMyAnnouncementsQuery,
   useCreateAnnouncementMutation,
   useDeleteAnnouncementMutation,
 } = materialsApi;

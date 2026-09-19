@@ -23,6 +23,7 @@ import {
   addAnnouncement,
   addMaterial,
   announcementsForClass,
+  announcementsForStudent,
   findAnnouncementById,
   findMaterialById,
   materialsForClass,
@@ -345,6 +346,19 @@ const ROUTES = [
     const hasAccess = cls.teacher_id === user.id || (user.role === "student" && enrollmentsForClass(cls.id).some((e) => e.student_id === user.id && e.status === "active"));
     if (!hasAccess) return { error: simpleError("You do not have access to this class.", 403) };
     return { data: announcementsForClass(cls.id).map(serializeAnnouncement) };
+  }},
+
+  // GET /announcements/ -- student-only aggregated list across every class
+  // the caller is actively enrolled in. Filtering is enforced inside
+  // announcementsForStudent (which only reads from active enrollments), so
+  // a student cannot receive announcements from classes they aren't in.
+  { method: "GET", pattern: "/announcements/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (user.role !== "student") {
+      return { error: simpleError("This endpoint is for students.", 403) };
+    }
+    return { data: announcementsForStudent(user.id).map(serializeAnnouncement) };
   }},
 
   { method: "POST", pattern: "/classes/:id/announcements/", handler: async (args) => {
@@ -857,6 +871,7 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
 
 
 
