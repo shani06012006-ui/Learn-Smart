@@ -2,6 +2,10 @@
 // data. Shapes mirror the future backend/exams/models.py models. Handlers
 // read/write this module; components never see it directly.
 
+import { findUserById, users as allUsers } from "./users";
+import { enrollmentsForClass } from "./classes";
+import { addNotification } from "./notifications";
+
 let quizzes = [
   {
     id: "quiz-phy10-1",
@@ -162,7 +166,37 @@ export function addQuiz({ classId, title, description, durationMinutes, createdB
 export function updateQuiz(id, patch) {
   const quiz = quizzes.find((q) => q.id === id);
   if (!quiz) return null;
+
+  const wasPublished = !!quiz.is_published;
   Object.assign(quiz, patch);
+  const nowPublished = !!quiz.is_published;
+
+  // Fire notification only on false -> true transition.
+  if (!wasPublished && nowPublished) {
+    const publisher = findUserById(quiz.created_by_id);
+    const recipients = allUsers.filter(
+      (u) =>
+        u.role === "student" &&
+        enrollmentsForClass(quiz.class_id).some(
+          (e) => e.student_id === u.id && e.status === "active"
+        )
+    );
+    recipients.forEach((student) => {
+      addNotification({
+        kind: "quiz_published",
+        recipientId: student.id,
+        senderId: quiz.created_by_id,
+        title: "New quiz published in your class",
+        body: `${quiz.title} is now open — published by ${publisher?.full_name || "your teacher"}`,
+        target: {
+          kind: "quiz",
+          class_id: quiz.class_id,
+          quiz_id: quiz.id,
+        },
+      });
+    });
+  }
+
   return quiz;
 }
 
@@ -326,3 +360,6 @@ export function serializeSubmission(submission) {
     answers: submission.answers,
   };
 }
+
+
+

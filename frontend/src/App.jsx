@@ -15,6 +15,7 @@ import MaterialsPage from "./features/teacher/materials/MaterialsPage";
 import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
 import StudentClassListPage from "./features/student/classes/ClassListPage";
 import StudentMaterialsPage from "./features/student/materials/MaterialsPage";
+import StudentAnnouncementsPage from "./features/student/announcements/AnnouncementsPage";
 import PerformancePage from "./features/student/performance/PerformancePage";
 import JoinClassPage from "./features/student/join-class/JoinClassPage";
 import StudentQuizListPage from "./features/student/quizzes/QuizListPage";
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="classes" element={<StudentClassListPage />} />
             <Route path="join-class" element={<JoinClassPage />} />
             <Route path="materials" element={<StudentMaterialsPage />} />
+            <Route path="announcements" element={<StudentAnnouncementsPage />} />
             <Route path="quizzes" element={<StudentQuizListPage />} />
             <Route path="quizzes/:quizId" element={<TakeQuizPage />} />
             <Route path="submissions/:submissionId" element={<ResultReviewPage />} />
