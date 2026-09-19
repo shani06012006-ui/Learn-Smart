@@ -3,7 +3,7 @@
 // module; components never see it directly.
 
 import { findUserById, users } from "./users";
-import { enrollmentsForClass } from "./classes";
+import { enrollmentsForClass, classesForStudent } from "./classes";
 import { addNotification } from "./notifications";
 
 // ---------- materials -----------------------------------------------------
@@ -163,6 +163,20 @@ export function announcementsForClass(classId) {
   return announcements.filter((a) => a.class_id === classId && !a.is_deleted);
 }
 
+// All announcements across every class the student is actively enrolled in.
+// Sorted: pinned first, then newest by posted_at within each group.
+// Backs GET /announcements/ and the student dashboard widget.
+export function announcementsForStudent(studentId) {
+  const activeClassIds = classesForStudent(studentId).map((c) => c.id);
+  const list = announcements.filter(
+    (a) => activeClassIds.includes(a.class_id) && !a.is_deleted
+  );
+  return list.sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+    return new Date(b.posted_at) - new Date(a.posted_at);
+  });
+}
+
 export function findAnnouncementById(id) {
   return announcements.find((a) => a.id === id && !a.is_deleted);
 }
@@ -228,6 +242,8 @@ export function serializeAnnouncement(announcement) {
     posted_at: announcement.posted_at,
   };
 }
+
+
 
 
 

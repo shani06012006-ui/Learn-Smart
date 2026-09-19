@@ -2,6 +2,7 @@
 import { BookOpen, KeyRound, ArrowRight } from "lucide-react";
 
 import { useAuth } from "../../../hooks/useAuth";
+import AnnouncementsCard from "./components/AnnouncementsCard";
 
 export default function StudentDashboardPage() {
   const { user } = useAuth();
@@ -52,6 +53,8 @@ export default function StudentDashboardPage() {
           </span>
         </Link>
       </div>
+
+      <AnnouncementsCard />
     </div>
   );
 }

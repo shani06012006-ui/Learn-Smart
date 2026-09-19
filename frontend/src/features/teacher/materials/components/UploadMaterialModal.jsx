@@ -40,13 +40,25 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("file", file);
-
+    // NOTE: in mock mode the local dispatcher expects a plain object with
+    // file metadata, not a FormData instance. When the real Django backend
+    // lands, this reverts to:
+    //
+    //   const formData = new FormData();
+    //   formData.append("title", title);
+    //   formData.append("description", description);
+    //   formData.append("file", file);
+    //   await uploadMaterial({ classId, formData }).unwrap();
+    //
+    // Django's FileField expects multipart, so the shape change is
+    // temporary and isolated to this one call site.
     try {
-      await uploadMaterial({ classId, formData }).unwrap();
+      await uploadMaterial({
+        classId,
+        title,
+        description,
+        file: { name: file.name, size: file.size, type: file.type },
+      }).unwrap();
       reset();
       onClose();
     } catch (err) {
