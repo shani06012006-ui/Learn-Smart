@@ -1,16 +1,4 @@
-﻿// Local dispatcher -- replaces MSW + fetchBaseQuery for mock mode.
-//
-// Every function here is keyed by (method, urlPattern). The dispatcher
-// matches an incoming request against these, calls the handler, and
-// returns a fetchBaseQuery-shaped result:
-//
-//   success: { data: <response body> }
-//   failure: { error: { status: <number>, data: <error body> } }
-//
-// Error body shapes match the real backend's custom exception handler:
-//   validation:  { error: { detail: { field: [msg] }, status_code: 400 } }
-//   simple:      { detail: "human readable message" }
-
+﻿
 import { findUserById, findUserByEmail, addUser, updateUser, serializeUser } from "./data/users";
 import {
   issueTokenPair,
@@ -83,6 +71,13 @@ import {
   serializeThreadMembers,
   threadsForUser,
 } from "./data/chat";
+import {
+  findNotificationById,
+  markAllNotificationsRead,
+  markNotificationRead,
+  notificationsForUser,
+  serializeNotification,
+} from "./data/notifications";
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -739,6 +734,35 @@ const ROUTES = [
     });
     return { data: serializeMessage(message) };
   }},
+
+  // -------- notifications -----------------------------------------------
+  // GET /notifications/ -- the caller's own notifications, newest first.
+  { method: "GET", pattern: "/notifications/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const list = notificationsForUser(user.id).map(serializeNotification);
+    return { data: list };
+  }},
+
+  // POST /notifications/:id/read/ -- mark one notification as read.
+  { method: "POST", pattern: "/notifications/:id/read/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const result = markNotificationRead(args.params.id, user.id);
+    if (!result.ok) {
+      if (result.reason === "not_found") return { error: simpleError("Not found.", 404) };
+      return { error: simpleError("You do not have access to this notification.", 403) };
+    }
+    return { data: serializeNotification(result.notification) };
+  }},
+
+  // POST /notifications/read-all/ -- mark all of the caller's as read.
+  { method: "POST", pattern: "/notifications/read-all/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const marked = markAllNotificationsRead(user.id);
+    return { data: { marked } };
+  }},
 ];
 
 function compilePattern(pattern) {
@@ -833,6 +857,7 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
 
 
 

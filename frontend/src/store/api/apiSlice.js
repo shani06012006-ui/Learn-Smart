@@ -71,6 +71,7 @@ export const apiSlice = createApi({
     "Thread",
     "ThreadMember",
     "Message",
+    "Notification",
   ],
   endpoints: () => ({}),
   extraReducers: (builder) => {

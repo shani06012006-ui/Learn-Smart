@@ -2,36 +2,38 @@
 import clsx from "clsx";
 import { Check, CheckCheck, Trash2 } from "lucide-react";
 
-import { avatarColor } from "../../../utils/avatarColor";
+import Avatar from "../../../components/ui/Avatar";
+import { formatClockTime } from "../../../utils/formatters";
 
-function formatTime(iso) {
-  return new Date(iso).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+function Ticks({ message }) {
+  const read = !!message.read_by_others;
+  const ageMs = Date.now() - new Date(message.created_at).getTime();
+  const delivered = read || ageMs > 2000;
 
-// Tick states:
-//   isOwn && !message.read_by_others => single gray tick (sent)
-//   isOwn &&  message.read_by_others => double blue tick (read)
-// Non-own messages don't render ticks.
-function Ticks({ readByOthers }) {
-  if (readByOthers) {
-    return <CheckCheck size={12} className="text-brand-100" aria-label="Read" />;
+  if (read) {
+    return <CheckCheck size={14} className="text-brand-100" aria-label="Read" />;
   }
-  return <Check size={12} className="text-brand-100" aria-label="Sent" />;
+  if (delivered) {
+    return (
+      <CheckCheck size={14} className="text-brand-100/70" aria-label="Delivered" />
+    );
+  }
+  return <Check size={14} className="text-brand-100/70" aria-label="Sent" />;
 }
 
-export default function MessageBubble({ message, isOwn, onDelete }) {
+export default function MessageBubble({
+  message,
+  isOwn,
+  onDelete,
+  isGrouped = false,
+}) {
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const avatar = avatarColor(message.sender_id);
 
   const handleDeleteClick = () => {
     if (confirmDelete) {
       onDelete?.(message);
     } else {
       setConfirmDelete(true);
-      // Auto-cancel after a few seconds if user doesn't confirm.
       setTimeout(() => setConfirmDelete(false), 4000);
     }
   };
@@ -40,21 +42,19 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
     <div
       className={clsx(
         "group flex items-end gap-2",
-        isOwn ? "flex-row-reverse" : "flex-row"
+        isOwn ? "flex-row-reverse" : "flex-row",
+        isGrouped ? "mt-0.5" : "mt-3"
       )}
     >
-      {!isOwn && (
-        <div
-          className={clsx(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-            avatar.bg,
-            avatar.text
-          )}
-          aria-hidden="true"
-        >
-          {message.sender_initials}
-        </div>
-      )}
+      {!isOwn && !isGrouped ? (
+        <Avatar
+          userId={message.sender_id}
+          initials={message.sender_initials}
+          size="sm"
+        />
+      ) : !isOwn ? (
+        <span className="h-7 w-7 shrink-0" aria-hidden="true" />
+      ) : null}
 
       <div className={clsx("flex flex-col", isOwn ? "items-end" : "items-start")}>
         <div
@@ -62,21 +62,24 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             "flex max-w-[80vw] flex-col gap-1 rounded-2xl px-3.5 py-2 text-sm sm:max-w-md",
             isOwn
               ? "rounded-br-md bg-brand-600 text-white"
-              : "rounded-bl-md bg-white text-ink-900 shadow-sm"
+              : "rounded-bl-md bg-white text-ink-900 shadow-sm",
+            isGrouped && (isOwn ? "rounded-tr-md" : "rounded-tl-md")
           )}
         >
-          {!isOwn && (
-            <p className="text-xs font-semibold text-ink-700">{message.sender_name}</p>
+          {!isOwn && !isGrouped && (
+            <p className="text-xs font-semibold text-ink-700">
+              {message.sender_name}
+            </p>
           )}
           <p className="whitespace-pre-wrap break-words">{message.body}</p>
           <div
             className={clsx(
               "flex items-center gap-1 self-end text-[10px]",
-              isOwn ? "text-brand-100" : "text-ink-500"
+              isOwn ? "text-brand-100/80" : "text-ink-500"
             )}
           >
-            <span>{formatTime(message.created_at)}</span>
-            {isOwn && <Ticks readByOthers={message.read_by_others} />}
+            <span>{formatClockTime(message.created_at)}</span>
+            {isOwn && <Ticks message={message} />}
           </div>
         </div>
 
@@ -85,7 +88,8 @@ export default function MessageBubble({ message, isOwn, onDelete }) {
             onClick={handleDeleteClick}
             onBlur={() => setConfirmDelete(false)}
             className={clsx(
-              "mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium opacity-0 transition-opacity group-hover:opacity-100",
+              "mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-opacity",
+              "lg:opacity-0 lg:group-hover:opacity-100",
               confirmDelete
                 ? "bg-danger-500 text-white opacity-100"
                 : "text-ink-500 hover:bg-danger-50 hover:text-danger-700"

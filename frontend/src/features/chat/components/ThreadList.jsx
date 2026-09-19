@@ -1,9 +1,11 @@
 ﻿import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
+import { useAuth } from "../../../hooks/useAuth";
 import ThreadListItem from "./ThreadListItem";
 
 export default function ThreadList({ threads, activeThreadId }) {
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -39,7 +41,11 @@ export default function ThreadList({ threads, activeThreadId }) {
           <ul>
             {filtered.map((thread) => (
               <li key={thread.id}>
-                <ThreadListItem thread={thread} isActive={thread.id === activeThreadId} />
+                <ThreadListItem
+                  thread={thread}
+                  isActive={thread.id === activeThreadId}
+                  currentUserId={user?.id}
+                />
               </li>
             ))}
           </ul>
