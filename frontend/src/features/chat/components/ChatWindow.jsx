@@ -27,6 +27,7 @@ import GroupInfoPanel from "./GroupInfoPanel";
 import MemberProfilePanel from "./MemberProfilePanel";
 
 const SCROLL_THRESHOLD = 80;
+const GROUPING_WINDOW_MS = 5 * 60 * 1000;
 
 export default function ChatWindow({ threadId }) {
   const { user } = useAuth();
@@ -50,15 +51,20 @@ export default function ChatWindow({ threadId }) {
   );
   const isGroup = thread?.kind === "group";
 
-  // For direct threads, we fetch the member list (2 rows) and pick the
-  // "other" participant. For groups we only need this when the user opens
-  // Group Info -- but the call is cheap and the member list is also what
-  // GroupInfoPanel uses, so a single fetch covers both cases.
   const membersQuery = useGetThreadMembersQuery(threadId, { skip: !thread });
   const otherMember = useMemo(() => {
     if (!membersQuery.data || isGroup) return null;
     return membersQuery.data.find((m) => !m.is_self) || null;
   }, [membersQuery.data, isGroup]);
+
+  // For the group typing indicator, pick a plausible "other member" to
+  // attribute the typing to. In a real backend this would be driven by a
+  // typing event; for now, the first non-self member in the group.
+  const typingName = useMemo(() => {
+    if (!isGroup || !membersQuery.data) return null;
+    const other = membersQuery.data.find((m) => !m.is_self);
+    return other?.full_name || null;
+  }, [isGroup, membersQuery.data]);
 
   useEffect(() => {
     setLiveMessages([]);
@@ -87,10 +93,10 @@ export default function ChatWindow({ threadId }) {
   useEffect(() => {
     if (!threadId) return;
     const interval = setInterval(() => {
-      if (Math.random() > 0.25) return;
+      if (Math.random() > 0.125) return;
       setTyping(true);
-      setTimeout(() => setTyping(false), 2000);
-    }, 8000);
+      setTimeout(() => setTyping(false), 2500);
+    }, 20000);
     return () => clearInterval(interval);
   }, [threadId]);
 
@@ -152,7 +158,6 @@ export default function ChatWindow({ threadId }) {
 
   const prefix = user?.role === "teacher" ? "/teacher" : "/student";
 
-  // Header content differs for group vs direct. Both are clickable now.
   const headerContent = isGroup ? (
     <>
       <Avatar userId={thread.id} initials={thread.initials} size="md" neutral />
@@ -219,7 +224,7 @@ export default function ChatWindow({ threadId }) {
           type="button"
           onClick={() => setDrawerOpen(true)}
           className="focus-ring flex flex-1 items-center gap-3 rounded-lg px-1 py-1 transition-colors hover:bg-ink-100/60"
-          aria-label={isGroup ? "Open group info" : "Open member info"}
+          aria-label={isGroup ? "Open group info" : "Open profile"}
         >
           {headerContent}
         </button>
@@ -228,7 +233,7 @@ export default function ChatWindow({ threadId }) {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 space-y-3 overflow-y-auto bg-ink-100/40 px-4 py-4"
+        className="flex-1 overflow-y-auto bg-ink-100/40 px-4 py-4"
       >
         {allMessages.length === 0 && (
           <p className="py-8 text-center text-sm text-ink-500">
@@ -241,6 +246,13 @@ export default function ChatWindow({ threadId }) {
             message.created_at,
             previous?.created_at
           );
+          const isGrouped =
+            !showDivider &&
+            previous &&
+            previous.sender_id === message.sender_id &&
+            new Date(message.created_at) - new Date(previous.created_at) <
+              GROUPING_WINDOW_MS;
+
           return (
             <div key={message.id}>
               {showDivider && <DateDivider iso={message.created_at} />}
@@ -248,11 +260,12 @@ export default function ChatWindow({ threadId }) {
                 message={message}
                 isOwn={message.sender_id === user?.id}
                 onDelete={handleDelete}
+                isGrouped={isGrouped}
               />
             </div>
           );
         })}
-        {typing && <TypingIndicator />}
+        {typing && <TypingIndicator name={typingName} />}
       </div>
 
       <div className="border-t border-ink-300">
@@ -270,7 +283,7 @@ export default function ChatWindow({ threadId }) {
       <Drawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={isGroup ? "Group info" : "Member info"}
+        title={isGroup ? "Group info" : "Profile"}
         width="md:max-w-md"
       >
         {isGroup ? (
