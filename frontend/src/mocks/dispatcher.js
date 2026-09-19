@@ -79,6 +79,17 @@ import {
   notificationsForUser,
   serializeNotification,
 } from "./data/notifications";
+import {
+  addLiveClass,
+  cancelLiveClass,
+  findLiveClassById,
+  liveClassesForClass,
+  liveClassesForStudent,
+  liveClassesForTeacher,
+  serializeLiveClass,
+  softDeleteLiveClass,
+  updateLiveClass,
+} from "./data/liveClasses";
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -777,6 +788,131 @@ const ROUTES = [
     const marked = markAllNotificationsRead(user.id);
     return { data: { marked } };
   }},
+
+  // -------- live classes -------------------------------------------------
+  // GET /live-classes/ -- teacher: their own classes' sessions;
+  //                        student: sessions in their actively-enrolled classes.
+  { method: "GET", pattern: "/live-classes/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (user.role === "teacher") {
+      return { data: liveClassesForTeacher(user.id).map(serializeLiveClass) };
+    }
+    if (user.role === "student") {
+      return { data: liveClassesForStudent(user.id).map(serializeLiveClass) };
+    }
+    return { error: simpleError("Not allowed.", 403) };
+  }},
+
+  // GET /classes/:classId/live-classes/ -- teacher: own class; student: enrolled class.
+  { method: "GET", pattern: "/classes/:classId/live-classes/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const cls = findClassById(args.params.classId);
+    if (!cls) return { error: simpleError("Not found.", 404) };
+    const hasAccess =
+      cls.teacher_id === user.id ||
+      (user.role === "student" &&
+        classesForStudent(user.id).some((c) => c.id === cls.id));
+    if (!hasAccess) {
+      return { error: simpleError("You do not have access to this class.", 403) };
+    }
+    return { data: liveClassesForClass(cls.id).map(serializeLiveClass) };
+  }},
+
+  // POST /classes/:classId/live-classes/ -- teacher-only, schedules a session.
+  { method: "POST", pattern: "/classes/:classId/live-classes/", handler: async (args) => {
+    await delay(300);
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (user.role !== "teacher") {
+      return { error: simpleError("Only teachers can schedule live classes.", 403) };
+    }
+    const cls = findClassById(args.params.classId);
+    if (!cls) return { error: simpleError("Not found.", 404) };
+    if (cls.teacher_id !== user.id) {
+      return { error: simpleError("You are not the teacher assigned to this class.", 403) };
+    }
+    const body = args.body || {};
+    const errors = {};
+    if (!body.title || !String(body.title).trim()) errors.title = ["This field is required."];
+    if (!body.start_time) errors.start_time = ["This field is required."];
+    else if (new Date(body.start_time).getTime() < Date.now() - 60 * 1000) {
+      errors.start_time = ["Start time must be in the future."];
+    }
+    if (
+      body.duration_minutes == null ||
+      Number(body.duration_minutes) <= 0 ||
+      Number(body.duration_minutes) > 480
+    ) {
+      errors.duration_minutes = ["Enter a duration between 1 and 480 minutes."];
+    }
+    if (Object.keys(errors).length > 0) return { error: validationError(errors) };
+    const liveClass = addLiveClass({
+      classId: cls.id,
+      title: String(body.title).trim(),
+      description: body.description ? String(body.description).trim() : "",
+      startTime: new Date(body.start_time).toISOString(),
+      durationMinutes: Number(body.duration_minutes),
+      meetingUrl: body.meeting_url ? String(body.meeting_url).trim() : "",
+      createdById: user.id,
+    });
+    return { data: serializeLiveClass(liveClass) };
+  }},
+
+  // PATCH /live-classes/:id/ -- teacher-only, edit or cancel.
+  { method: "PATCH", pattern: "/live-classes/:id/", handler: async (args) => {
+    await delay(200);
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (user.role !== "teacher") {
+      return { error: simpleError("Only teachers can edit live classes.", 403) };
+    }
+    const liveClass = findLiveClassById(args.params.id);
+    if (!liveClass) return { error: simpleError("Not found.", 404) };
+    const cls = findClassById(liveClass.class_id);
+    if (!cls || cls.teacher_id !== user.id) {
+      return { error: simpleError("You are not the teacher assigned to this class.", 403) };
+    }
+    const body = args.body || {};
+    const patch = {};
+    if (body.title !== undefined) patch.title = String(body.title).trim();
+    if (body.description !== undefined) patch.description = String(body.description).trim();
+    if (body.start_time !== undefined) {
+      if (new Date(body.start_time).getTime() < Date.now() - 60 * 1000) {
+        return { error: validationError({ start_time: ["Start time must be in the future."] }) };
+      }
+      patch.start_time = new Date(body.start_time).toISOString();
+    }
+    if (body.duration_minutes !== undefined) {
+      const d = Number(body.duration_minutes);
+      if (d <= 0 || d > 480) {
+        return { error: validationError({ duration_minutes: ["Enter a duration between 1 and 480 minutes."] }) };
+      }
+      patch.duration_minutes = d;
+    }
+    if (body.meeting_url !== undefined) patch.meeting_url = String(body.meeting_url).trim();
+    if (body.is_cancelled !== undefined) patch.is_cancelled = !!body.is_cancelled;
+    const updated = updateLiveClass(liveClass.id, patch);
+    return { data: serializeLiveClass(updated) };
+  }},
+
+  // DELETE /live-classes/:id/ -- teacher-only, soft-deletes.
+  { method: "DELETE", pattern: "/live-classes/:id/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    if (user.role !== "teacher") {
+      return { error: simpleError("Only teachers can delete live classes.", 403) };
+    }
+    const liveClass = findLiveClassById(args.params.id);
+    if (!liveClass) return { error: simpleError("Not found.", 404) };
+    const cls = findClassById(liveClass.class_id);
+    if (!cls || cls.teacher_id !== user.id) {
+      return { error: simpleError("You are not the teacher assigned to this class.", 403) };
+    }
+    softDeleteLiveClass(liveClass.id);
+    return { data: null };
+  }},
 ];
 
 function compilePattern(pattern) {
@@ -871,6 +1007,8 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
+
 
 
 

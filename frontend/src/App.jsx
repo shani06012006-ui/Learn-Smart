@@ -13,6 +13,7 @@ import ClassDetailPage from "./features/teacher/classes/ClassDetailPage";
 import QuizBuilderPage from "./features/teacher/quizzes/QuizBuilderPage";
 import MaterialsPage from "./features/teacher/materials/MaterialsPage";
 import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
+import LiveClassesPage from "./features/teacher/live-classes/LiveClassesPage";
 import StudentClassListPage from "./features/student/classes/ClassListPage";
 import StudentMaterialsPage from "./features/student/materials/MaterialsPage";
 import StudentAnnouncementsPage from "./features/student/announcements/AnnouncementsPage";
@@ -21,6 +22,8 @@ import JoinClassPage from "./features/student/join-class/JoinClassPage";
 import StudentQuizListPage from "./features/student/quizzes/QuizListPage";
 import TakeQuizPage from "./features/student/quizzes/TakeQuizPage";
 import ResultReviewPage from "./features/student/quizzes/ResultReviewPage";
+import StudentLiveClassesPage from "./features/student/live-classes/LiveClassesPage";
+import LiveSessionPage from "./features/student/live-classes/LiveSessionPage";
 import ChatPage from "./features/chat/ChatPage";
 
 export default function App() {
@@ -41,6 +44,7 @@ export default function App() {
             />
             <Route path="materials" element={<MaterialsPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
+            <Route path="live-classes" element={<LiveClassesPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="chat/:threadId" element={<ChatPage />} />
           </Route>
@@ -57,6 +61,8 @@ export default function App() {
             <Route path="quizzes/:quizId" element={<TakeQuizPage />} />
             <Route path="submissions/:submissionId" element={<ResultReviewPage />} />
             <Route path="performance" element={<PerformancePage />} />
+            <Route path="live-classes" element={<StudentLiveClassesPage />} />
+            <Route path="live-classes/:liveClassId" element={<LiveSessionPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="chat/:threadId" element={<ChatPage />} />
           </Route>

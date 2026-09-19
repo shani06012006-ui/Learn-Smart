@@ -6,12 +6,34 @@ import NotificationPanel from "./NotificationPanel";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [pulse, setPulse] = useState(false);
   const containerRef = useRef(null);
+  const prevCountRef = useRef(0);
 
   const { data: notifications } = useGetNotificationsQuery();
   const unreadCount = (notifications || []).filter((n) => !n.read_at).length;
   const badgeLabel = unreadCount > 9 ? "9+" : String(unreadCount);
 
+  // Subtle pulse when the unread count increases. Skips the initial mount
+  // (prevCountRef starts at 0 and we only fire on an increase) and
+  // respects prefers-reduced-motion.
+  useEffect(() => {
+    const prev = prevCountRef.current;
+    if (unreadCount > prev) {
+      const reducedMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      if (!reducedMotion) {
+        setPulse(true);
+        const t = setTimeout(() => setPulse(false), 600);
+        prevCountRef.current = unreadCount;
+        return () => clearTimeout(t);
+      }
+    }
+    prevCountRef.current = unreadCount;
+  }, [unreadCount]);
+
+  // Close on outside click and Escape.
   useEffect(() => {
     if (!open) return undefined;
 
@@ -48,7 +70,13 @@ export default function NotificationBell() {
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger-500 px-1 text-[10px] font-semibold text-white">
+          <span
+            className={
+              "absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger-500 px-1 text-[10px] font-semibold text-white transition-transform " +
+              (pulse ? "scale-125" : "scale-100")
+            }
+            aria-hidden="true"
+          >
             {badgeLabel}
           </span>
         )}
@@ -57,7 +85,7 @@ export default function NotificationBell() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-40 mt-2 w-[22rem] overflow-hidden rounded-xl border border-ink-300 bg-white shadow-xl sm:w-[24rem]"
+          className="absolute right-0 top-full z-40 mt-2 w-[22rem] overflow-hidden rounded-card border border-ink-300 bg-white shadow-xl sm:w-[24rem]"
         >
           <NotificationPanel onNavigate={() => setOpen(false)} />
         </div>
