@@ -2,29 +2,29 @@
 
 import Avatar from "../../../../components/ui/Avatar";
 import Badge from "../../../../components/ui/Badge";
+import Card from "../../../../components/ui/Card";
 import { formatRelativeShort } from "../../../../utils/formatters";
 
-// Renders a single announcement card. Used by both the dedicated
-// announcements page and (later) the dashboard widget.
-//
-// Data shape comes from `serializeAnnouncement` in mocks/data/materials.js:
-//   { id, class_id, title, body, is_pinned, posted_by_id, posted_at }
-//
-// The teacher's display name is resolved by the parent page (which already
-// has the users lookup) and passed in as `teacherName` + `teacherInitials`.
-
+// Renders one announcement. Used by both the dedicated page and the
+// dashboard widget. Two visual states:
+//   - normal: standard card
+//   - pinned: brand-tinted left accent + Pinned badge
 export default function AnnouncementCard({
   announcement,
   teacherName,
   teacherInitials,
   className = "",
 }) {
+  const pinned = announcement.is_pinned;
   const postedLabel = formatRelativeShort(announcement.posted_at);
 
   return (
-    <article
+    <Card
+      padding="md"
       className={
-        "rounded-xl border border-ink-300 bg-white p-4 " + className
+        "relative " +
+        (pinned ? "border-l-4 border-l-brand-500 pl-4 " : "") +
+        className
       }
     >
       <header className="mb-3 flex items-start justify-between gap-3">
@@ -41,14 +41,14 @@ export default function AnnouncementCard({
             <p className="text-xs text-ink-500">Teacher</p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {announcement.is_pinned && (
-            <Badge variant="warning">
+
+        <div className="flex shrink-0 items-center gap-2">
+          {pinned && (
+            <Badge variant="brand">
               <Pin size={10} />
               Pinned
             </Badge>
           )}
-          <span className="text-xs text-ink-500">{postedLabel}</span>
         </div>
       </header>
 
@@ -58,6 +58,10 @@ export default function AnnouncementCard({
       <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">
         {announcement.body}
       </p>
-    </article>
+
+      <footer className="mt-3 flex items-center justify-end">
+        <span className="text-xs text-ink-500">{postedLabel}</span>
+      </footer>
+    </Card>
   );
 }

@@ -1,5 +1,5 @@
 ﻿import { useRef, useState } from "react";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, X } from "lucide-react";
 
 import { useUploadMaterialMutation } from "../../../../store/api/materialsApi";
 import { extractErrorMessage, extractFieldErrors } from "../../../../utils/apiError";
@@ -30,6 +30,11 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
     onClose();
   };
 
+  const handleClearFile = () => {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFieldErrors({});
@@ -49,9 +54,6 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
     //   formData.append("description", description);
     //   formData.append("file", file);
     //   await uploadMaterial({ classId, formData }).unwrap();
-    //
-    // Django's FileField expects multipart, so the shape change is
-    // temporary and isolated to this one call site.
     try {
       await uploadMaterial({
         classId,
@@ -89,7 +91,8 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="focus-ring rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900"
+            className="focus-ring rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500"
+            placeholder="What does this material cover?"
           />
         </div>
 
@@ -97,15 +100,42 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
           <label htmlFor="material-file" className="text-sm font-medium text-ink-700">
             File
           </label>
-          <label
-            htmlFor="material-file"
-            className="focus-ring flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-ink-300 bg-ink-100/50 px-4 py-4 text-sm text-ink-700 hover:bg-ink-100"
-          >
-            <UploadCloud size={20} className="text-ink-500" />
-            <span className="flex-1 truncate">
-              {file ? file.name : "Choose a file (PDF, image, or notes)"}
-            </span>
-          </label>
+
+          {file ? (
+            <div className="flex items-center gap-3 rounded-lg border border-brand-200 bg-brand-50/50 px-4 py-3 text-sm">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-brand-600">
+                <UploadCloud size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-ink-900">{file.name}</p>
+                <p className="text-xs text-ink-500">
+                  {(file.size / 1024).toFixed(1)} KB
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearFile}
+                className="focus-ring shrink-0 rounded-md p-1 text-ink-500 hover:bg-white hover:text-danger-700"
+                aria-label="Remove selected file"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <label
+              htmlFor="material-file"
+              className="focus-ring flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-ink-300 bg-ink-100/40 px-4 py-6 text-sm text-ink-700 transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+            >
+              <UploadCloud size={22} className="text-ink-500" />
+              <span className="font-medium text-ink-900">
+                Choose a file to upload
+              </span>
+              <span className="text-xs text-ink-500">
+                PDF, image, or notes — up to 10 MB
+              </span>
+            </label>
+          )}
+
           <input
             ref={fileInputRef}
             id="material-file"
@@ -113,14 +143,17 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
             className="hidden"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
+
           {fieldErrors.file && (
             <p className="text-sm text-danger-700">{fieldErrors.file}</p>
           )}
-          <p className="text-xs text-ink-500">Maximum size: 10 MB.</p>
         </div>
 
         {formError && !Object.keys(fieldErrors).length && (
-          <p role="alert" className="text-sm text-danger-700">
+          <p
+            role="alert"
+            className="rounded-lg border border-danger-50 bg-danger-50/60 px-3 py-2 text-sm text-danger-700"
+          >
             {formError}
           </p>
         )}

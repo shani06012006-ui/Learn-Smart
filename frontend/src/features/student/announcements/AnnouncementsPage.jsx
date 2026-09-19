@@ -5,15 +5,14 @@ import { Megaphone } from "lucide-react";
 import { useGetClassesQuery } from "../../../store/api/classesApi";
 import { useGetAnnouncementsQuery } from "../../../store/api/materialsApi";
 import { extractErrorMessage } from "../../../utils/apiError";
+import PageHeader from "../../../components/ui/PageHeader";
 import LoadingState from "../../../components/feedback/LoadingState";
 import EmptyState from "../../../components/feedback/EmptyState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import AnnouncementCard from "./components/AnnouncementCard";
 
-// NOTE: the mock announcement serializer only returns `posted_by_id`, not
-// the teacher's name. When the real Django backend lands, the serializer
-// will include `teacher_name` + `teacher_initials` directly, and this local
-// map is deleted. Until then, we resolve against the three seeded users.
+// NOTE: resolves against seeded users until the real backend serializer
+// returns teacher_name + teacher_initials directly.
 const TEACHER_DIRECTORY = {
   "usr-teacher-anita": { full_name: "Anita Iyer", initials: "AI" },
   "usr-teacher-vikram": { full_name: "Vikram Rao", initials: "VR" },
@@ -27,7 +26,6 @@ export default function AnnouncementsPage() {
     searchParams.get("class") || ""
   );
 
-  // Auto-select the first class once the list loads.
   useEffect(() => {
     if (selectedClassId) return;
     if (classesQuery.data?.length > 0) {
@@ -35,7 +33,6 @@ export default function AnnouncementsPage() {
     }
   }, [classesQuery.data, selectedClassId]);
 
-  // Keep the URL in sync so notification links with ?class=X land correctly.
   useEffect(() => {
     if (!selectedClassId) return;
     const current = searchParams.get("class");
@@ -52,7 +49,7 @@ export default function AnnouncementsPage() {
 
   const classes = classesQuery.data || [];
 
-  // Sort: pinned first, then newest first within each group.
+  // Pinned first, then newest by posted_at.
   const sorted = useMemo(() => {
     const list = announcementsQuery.data || [];
     return [...list].sort((a, b) => {
@@ -63,12 +60,10 @@ export default function AnnouncementsPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-ink-900">Announcements</h1>
-        <p className="mt-1 text-sm text-ink-500">
-          Notices and updates from your teachers.
-        </p>
-      </div>
+      <PageHeader
+        title="Announcements"
+        subtitle="Notices and updates from your teachers."
+      />
 
       {classesQuery.isLoading && <LoadingState label="Loading your classes..." />}
 
@@ -96,7 +91,8 @@ export default function AnnouncementsPage() {
 
       {!classesQuery.isLoading && !classesQuery.isError && classes.length > 0 && (
         <>
-          <div className="mb-4 flex items-center gap-3">
+          {/* Class filter row */}
+          <div className="mb-5 flex flex-wrap items-center gap-3">
             <label
               htmlFor="class-select"
               className="text-sm font-medium text-ink-700"

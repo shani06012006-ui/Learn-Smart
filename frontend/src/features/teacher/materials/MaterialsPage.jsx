@@ -11,6 +11,8 @@ import { extractErrorMessage } from "../../../utils/apiError";
 import Button from "../../../components/ui/Button";
 import Table from "../../../components/ui/Table";
 import Modal from "../../../components/ui/Modal";
+import PageHeader from "../../../components/ui/PageHeader";
+import Card from "../../../components/ui/Card";
 import LoadingState from "../../../components/feedback/LoadingState";
 import EmptyState from "../../../components/feedback/EmptyState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -41,7 +43,6 @@ export default function MaterialsPage() {
 
   const [deleteMaterial, { isLoading: isDeleting }] = useDeleteMaterialMutation();
 
-  // Pick a default class once classes load, if none selected.
   useEffect(() => {
     if (selectedClassId) return;
     if (classesQuery.data?.length > 0) {
@@ -49,7 +50,6 @@ export default function MaterialsPage() {
     }
   }, [classesQuery.data, selectedClassId]);
 
-  // Keep URL in sync with selected class (deep-linkable).
   useEffect(() => {
     if (!selectedClassId) return;
     const current = searchParams.get("class");
@@ -77,21 +77,29 @@ export default function MaterialsPage() {
       key: "title",
       header: "Material",
       render: (row) => (
-        <div>
+        <div className="min-w-0">
           <p className="font-medium text-ink-900">{row.title}</p>
-          <p className="text-xs text-ink-500">{row.original_filename}</p>
+          <p className="mt-0.5 text-xs text-ink-500">{row.original_filename}</p>
         </div>
       ),
     },
     {
       key: "size",
       header: "Size",
-      render: (row) => <span className="text-sm text-ink-700">{formatBytes(row.size_bytes)}</span>,
+      render: (row) => (
+        <span className="whitespace-nowrap text-sm text-ink-700">
+          {formatBytes(row.size_bytes)}
+        </span>
+      ),
     },
     {
       key: "uploaded_at",
       header: "Uploaded",
-      render: (row) => <span className="text-sm text-ink-700">{formatDate(row.uploaded_at)}</span>,
+      render: (row) => (
+        <span className="whitespace-nowrap text-sm text-ink-700">
+          {formatDate(row.uploaded_at)}
+        </span>
+      ),
     },
     {
       key: "actions",
@@ -101,7 +109,7 @@ export default function MaterialsPage() {
           <a
             href={row.download_url}
             onClick={(e) => e.preventDefault()}
-            className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-600 hover:bg-brand-50"
+            className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50"
             title="Download (mocked — see note below)"
           >
             <Download size={14} />
@@ -109,7 +117,7 @@ export default function MaterialsPage() {
           </a>
           <button
             onClick={() => setDeleteTarget(row)}
-            className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-danger-700 hover:bg-danger-50"
+            className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-danger-700 transition-colors hover:bg-danger-50"
           >
             <Trash2 size={14} />
             Delete
@@ -121,18 +129,16 @@ export default function MaterialsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
-          <h1 className="text-xl font-semibold text-ink-900">Materials</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            Upload notes, PDFs, and study resources for your classes.
-          </p>
-        </div>
-        <Button onClick={() => setUploadOpen(true)} disabled={!selectedClassId}>
-          <Plus size={16} />
-          Upload material
-        </Button>
-      </div>
+      <PageHeader
+        title="Materials"
+        subtitle="Upload notes, PDFs, and study resources for your classes."
+        actions={
+          <Button onClick={() => setUploadOpen(true)} disabled={!selectedClassId}>
+            <Plus size={16} />
+            Upload material
+          </Button>
+        }
+      />
 
       {classesQuery.isLoading && <LoadingState label="Loading your classes..." />}
 
@@ -158,7 +164,7 @@ export default function MaterialsPage() {
 
       {!classesQuery.isLoading && !classesQuery.isError && classes.length > 0 && (
         <>
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <label htmlFor="class-select" className="text-sm font-medium text-ink-700">
               Class
             </label>
@@ -201,9 +207,9 @@ export default function MaterialsPage() {
           {!materialsQuery.isLoading &&
             !materialsQuery.isError &&
             materialsQuery.data?.length > 0 && (
-              <div className="rounded-xl bg-white p-1">
+              <Card padding="none" className="overflow-hidden">
                 <Table columns={columns} data={materialsQuery.data} />
-              </div>
+              </Card>
             )}
         </>
       )}
@@ -237,3 +243,4 @@ export default function MaterialsPage() {
     </div>
   );
 }
+

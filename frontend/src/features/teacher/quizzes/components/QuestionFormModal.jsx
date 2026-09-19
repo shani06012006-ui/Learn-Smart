@@ -121,7 +121,7 @@ export default function QuestionFormModal({ open, onClose, quizId, question }) {
       onClose={handleClose}
       title={isEdit ? "Edit question" : "Add question"}
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="q-text" className="text-sm font-medium text-ink-700">
             Question text
@@ -132,7 +132,7 @@ export default function QuestionFormModal({ open, onClose, quizId, question }) {
             required
             value={form.text}
             onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
-            className="focus-ring rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900"
+            className="focus-ring rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500"
             placeholder="e.g. What is the SI unit of acceleration?"
           />
           {fieldErrors.text && (
@@ -148,51 +148,57 @@ export default function QuestionFormModal({ open, onClose, quizId, question }) {
           value={form.marks}
           onChange={(e) => setForm((f) => ({ ...f, marks: e.target.value }))}
           error={fieldErrors.marks}
+          className="w-32"
         />
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-ink-700">
-              Choices <span className="font-normal text-ink-500">(pick exactly one correct)</span>
-            </label>
+            <div>
+              <p className="text-sm font-medium text-ink-700">Choices</p>
+              <p className="text-xs text-ink-500">
+                Pick exactly one correct answer.
+              </p>
+            </div>
             <button
               type="button"
               onClick={addChoice}
-              className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50"
+              className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-brand-600 transition-colors hover:bg-brand-50"
             >
               <Plus size={12} />
               Add choice
             </button>
           </div>
 
-          {form.choices.map((choice, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="correct-choice"
-                checked={choice.is_correct}
-                onChange={() => markCorrect(idx)}
-                className="focus-ring h-4 w-4 text-brand-600"
-                aria-label={`Mark choice ${idx + 1} as correct`}
-              />
-              <input
-                type="text"
-                value={choice.text}
-                onChange={(e) => setChoiceText(idx, e.target.value)}
-                placeholder={`Choice ${idx + 1}`}
-                className="focus-ring flex-1 rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900"
-              />
-              <button
-                type="button"
-                onClick={() => removeChoice(idx)}
-                disabled={form.choices.length <= 2}
-                className="focus-ring rounded-md p-1.5 text-ink-500 hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-30"
-                aria-label={`Remove choice ${idx + 1}`}
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
+          <div className="flex flex-col gap-2">
+            {form.choices.map((choice, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="correct-choice"
+                  checked={choice.is_correct}
+                  onChange={() => markCorrect(idx)}
+                  className="focus-ring h-4 w-4 shrink-0 text-brand-600"
+                  aria-label={`Mark choice ${idx + 1} as correct`}
+                />
+                <input
+                  type="text"
+                  value={choice.text}
+                  onChange={(e) => setChoiceText(idx, e.target.value)}
+                  placeholder={`Choice ${idx + 1}`}
+                  className="focus-ring min-w-0 flex-1 rounded-lg border border-ink-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeChoice(idx)}
+                  disabled={form.choices.length <= 2}
+                  className="focus-ring shrink-0 rounded-md p-1.5 text-ink-500 transition-colors hover:bg-danger-50 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-30"
+                  aria-label={`Remove choice ${idx + 1}`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
 
           {correctCount !== 1 && (
             <p className="text-sm text-danger-700">
@@ -205,12 +211,15 @@ export default function QuestionFormModal({ open, onClose, quizId, question }) {
         </div>
 
         {formError && !Object.keys(fieldErrors).length && (
-          <p role="alert" className="text-sm text-danger-700">
+          <p
+            role="alert"
+            className="rounded-lg border border-danger-50 bg-danger-50/60 px-3 py-2 text-sm text-danger-700"
+          >
             {formError}
           </p>
         )}
 
-        <div className="mt-2 flex justify-end gap-3">
+        <div className="flex justify-end gap-3 border-t border-ink-200 pt-4">
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
