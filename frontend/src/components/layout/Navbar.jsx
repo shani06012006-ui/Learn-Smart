@@ -1,9 +1,10 @@
-import { Menu, LogOut, GraduationCap } from "lucide-react";
+﻿import { Menu, LogOut, GraduationCap } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
 import { useDispatch } from "react-redux";
 import { sidebarToggled } from "../../store/slices/uiSlice";
 import Badge from "../ui/Badge";
+import NotificationBell from "../../features/notifications/components/NotificationBell";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -25,13 +26,17 @@ export default function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-ink-900">{user?.full_name}</p>
-          <Badge variant={user?.role === "teacher" ? "brand" : "neutral"} className="capitalize">
+          <Badge
+            variant={user?.role === "teacher" ? "brand" : "neutral"}
+            className="capitalize"
+          >
             {user?.role}
           </Badge>
         </div>
+        <NotificationBell />
         <button
           onClick={logout}
           className="focus-ring flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"

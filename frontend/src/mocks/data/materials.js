@@ -2,6 +2,10 @@
 // the future backend/materials/models.py models. Handlers read/write this
 // module; components never see it directly.
 
+import { findUserById, users } from "./users";
+import { enrollmentsForClass } from "./classes";
+import { addNotification } from "./notifications";
+
 // ---------- materials -----------------------------------------------------
 
 let materials = [
@@ -73,6 +77,28 @@ export function addMaterial({
     is_deleted: false,
   };
   materials.push(material);
+
+  // Notify every active student in this class (skip the uploader).
+  const uploader = findUserById(uploadedById);
+  const recipients = users.filter(
+    (u) =>
+      u.role === "student" &&
+      u.id !== uploadedById &&
+      enrollmentsForClass(classId).some(
+        (e) => e.student_id === u.id && e.status === "active"
+      )
+  );
+  recipients.forEach((student) => {
+    addNotification({
+      kind: "material",
+      recipientId: student.id,
+      senderId: uploadedById,
+      title: "New material in your class",
+      body: `${title} — uploaded by ${uploader?.full_name || "your teacher"}`,
+      target: { kind: "material", class_id: classId },
+    });
+  });
+
   return material;
 }
 
@@ -159,6 +185,28 @@ export function addAnnouncement({
     is_deleted: false,
   };
   announcements.push(announcement);
+
+  // Notify every active student in the class (skip the poster).
+  const poster = findUserById(postedById);
+  const recipients = users.filter(
+    (u) =>
+      u.role === "student" &&
+      u.id !== postedById &&
+      enrollmentsForClass(classId).some(
+        (e) => e.student_id === u.id && e.status === "active"
+      )
+  );
+  recipients.forEach((student) => {
+    addNotification({
+      kind: "announcement",
+      recipientId: student.id,
+      senderId: postedById,
+      title: `New announcement in your class`,
+      body: title,
+      target: { kind: "announcement", class_id: classId },
+    });
+  });
+
   return announcement;
 }
 
@@ -180,3 +228,7 @@ export function serializeAnnouncement(announcement) {
     posted_at: announcement.posted_at,
   };
 }
+
+
+
+

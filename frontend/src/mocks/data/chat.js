@@ -4,6 +4,7 @@
 
 import { findUserById, users as allUsers } from "./users";
 import { findClassById, classesForStudent } from "./classes";
+import { addNotification } from "./notifications";
 
 let threads = [
   {
@@ -190,6 +191,26 @@ export function appendMessage({ threadId, senderId, body }) {
     deleted: false,
   };
   messages.push(message);
+
+  // Fan out a notification to each recipient (everyone else in the thread).
+  const thread = findThreadById(threadId);
+  if (thread) {
+    const sender = findUserById(senderId);
+    const recipientIds = participantIdsForThread(thread).filter(
+      (id) => id !== senderId
+    );
+    recipientIds.forEach((recipientId) => {
+      addNotification({
+        kind: "chat_message",
+        recipientId,
+        senderId,
+        title: `New message from ${sender?.full_name || "someone"}`,
+        body: String(body).slice(0, 140),
+        target: { kind: "chat_thread", thread_id: threadId },
+      });
+    });
+  }
+
   return message;
 }
 
@@ -383,3 +404,4 @@ export function serializeMessage(message) {
 export function emptyThreadList() {
   return [];
 }
+
