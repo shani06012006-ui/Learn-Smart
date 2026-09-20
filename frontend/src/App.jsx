@@ -4,6 +4,7 @@ import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import RootRoute from "./routes/RootRoute";
 import TeacherLayout from "./components/layout/TeacherLayout";
 import StudentLayout from "./components/layout/StudentLayout";
 import TeacherDashboardPage from "./features/teacher/dashboard/TeacherDashboardPage";
@@ -29,6 +30,8 @@ import ChatPage from "./features/chat/ChatPage";
 export default function App() {
   return (
     <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -69,8 +72,12 @@ export default function App() {
         </Route>
       </Route>
 
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      {/* Catch-all: unknown routes redirect to the landing page for
+          unauthenticated visitors, or to /login for authenticated users
+          (ProtectedRoute handles the redirect once they hit a protected
+          route, but a bare 404 sends them to landing which then sends
+          them to their dashboard via RootRoute). */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
