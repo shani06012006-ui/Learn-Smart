@@ -41,25 +41,6 @@ import {
   performanceForStudent,
 } from "./data/performance";
 import {
-  addQuestion,
-  addQuiz,
-  createSubmission,
-  findQuizById,
-  findSubmissionById,
-  findSubmissionForStudent,
-  questionsForQuiz,
-  quizzesForClass,
-  resetSubmissions,
-  serializeQuestion,
-  serializeQuiz,
-  serializeSubmission,
-  softDeleteQuestion,
-  softDeleteQuiz,
-  submissionsForStudent,
-  updateQuestion,
-  updateQuiz,
-} from "./data/exams";
-import {
   appendMessage,
   canAccessThread,
   deleteMessage as deleteChatMessage,
@@ -336,6 +317,26 @@ const ROUTES = [
     return { data: serializeMaterial(material) };
   }},
 
+  // GET /materials/:id/ -- fetch a single material by its id. Access is
+  // scoped: teachers see materials for their own classes; students see
+  // materials for classes they are actively enrolled in. Same visibility
+  // rule as the list endpoint, applied to one material.
+  { method: "GET", pattern: "/materials/:id/", handler: (args) => {
+    const user = currentUserFromArgs(args);
+    if (!user) return { error: unauthorized() };
+    const material = findMaterialById(args.params.id);
+    if (!material) return { error: simpleError("Not found.", 404) };
+    const cls = findClassById(material.class_id);
+    if (!cls) return { error: simpleError("Not found.", 404) };
+    const hasAccess =
+      user.role === "teacher"
+        ? cls.teacher_id === user.id
+        : enrollmentsForClass(cls.id).some(
+            (e) => e.student_id === user.id && e.status === "active"
+          );
+    if (!hasAccess) return { error: simpleError("You do not have access to this material.", 403) };
+    return { data: serializeMaterial(material) };
+  }},
   { method: "DELETE", pattern: "/materials/:id/", handler: (args) => {
     const user = currentUserFromArgs(args);
     if (!user) return { error: unauthorized() };
@@ -420,242 +421,6 @@ const ROUTES = [
     if (user.role !== "student") return { error: simpleError("Only students can access their performance page.", 403) };
     const data = performanceForStudent(user.id) || emptyPerformance();
     return { data };
-  }},
-
-  // -------- exams: lists -------------------------------------------------
-  { method: "GET", pattern: "/quizzes/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "student") return { error: simpleError("This endpoint is for students.", 403) };
-    const enrolledClassIds = classesForStudent(user.id).map((c) => c.id);
-    const list = enrolledClassIds.flatMap((cid) => quizzesForClass(cid, { onlyPublished: true }));
-    return { data: list.map((q) => serializeQuiz(q, { studentId: user.id })) };
-  }},
-
-  { method: "GET", pattern: "/classes/:classId/quizzes/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    const cls = findClassById(args.params.classId);
-    if (!cls) return { error: simpleError("Not found.", 404) };
-    if (user.role === "teacher") {
-      if (cls.teacher_id !== user.id) return { error: simpleError("You do not have access to this class.", 403) };
-      return { data: quizzesForClass(cls.id).map((q) => serializeQuiz(q)) };
-    }
-    if (user.role === "student") {
-      const enrolled = classesForStudent(user.id).some((c) => c.id === cls.id);
-      if (!enrolled) return { error: simpleError("You do not have access to this class.", 403) };
-      return { data: quizzesForClass(cls.id, { onlyPublished: true }).map((q) => serializeQuiz(q, { studentId: user.id })) };
-    }
-    return { error: simpleError("Not allowed.", 403) };
-  }},
-
-  { method: "POST", pattern: "/classes/:classId/quizzes/", handler: async (args) => {
-    await delay(300);
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can create quizzes.", 403) };
-    const cls = findClassById(args.params.classId);
-    if (!cls) return { error: simpleError("Not found.", 404) };
-    if (cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    const body = args.body || {};
-    const errors = {};
-    if (!body.title || !String(body.title).trim()) errors.title = ["This field is required."];
-    if (body.duration_minutes == null || Number(body.duration_minutes) <= 0) errors.duration_minutes = ["Must be a positive number of minutes."];
-    if (Object.keys(errors).length > 0) return { error: validationError(errors) };
-    const quiz = addQuiz({
-      classId: cls.id, title: String(body.title).trim(),
-      description: body.description ? String(body.description).trim() : "",
-      durationMinutes: Number(body.duration_minutes), createdById: user.id,
-    });
-    return { data: serializeQuiz(quiz) };
-  }},
-
-  // -------- exams: single quiz ------------------------------------------
-  { method: "GET", pattern: "/quizzes/:id/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    const quiz = findQuizById(args.params.id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls) return { error: simpleError("Not found.", 404) };
-    if (user.role === "teacher") {
-      if (cls.teacher_id !== user.id) return { error: simpleError("You do not have access to this quiz.", 403) };
-      const base = serializeQuiz(quiz, { includeQuestions: false });
-      base.questions = questionsForQuiz(quiz.id).map(serializeQuestion);
-      return { data: base };
-    }
-    if (user.role === "student") {
-      const enrolled = classesForStudent(user.id).some((c) => c.id === cls.id);
-      if (!enrolled) return { error: simpleError("You do not have access to this quiz.", 403) };
-      if (!quiz.is_published) return { error: simpleError("Not found.", 404) };
-      const base = serializeQuiz(quiz, { includeQuestions: false, studentId: user.id });
-      base.questions = questionsForQuiz(quiz.id).map((q) => ({
-        id: q.id, quiz_id: q.quiz_id, order: q.order, text: q.text, marks: q.marks,
-        choices: serializeQuestion(q).choices.map((c) => ({ id: c.id, text: c.text })),
-      }));
-      return { data: base };
-    }
-    return { error: simpleError("Not allowed.", 403) };
-  }},
-
-  { method: "PATCH", pattern: "/quizzes/:id/", handler: async (args) => {
-    await delay(200);
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can edit quizzes.", 403) };
-    const quiz = findQuizById(args.params.id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    const body = args.body || {};
-    const patch = {};
-    if (body.title !== undefined) patch.title = String(body.title).trim();
-    if (body.description !== undefined) patch.description = String(body.description).trim();
-    if (body.duration_minutes !== undefined) patch.duration_minutes = Number(body.duration_minutes);
-    if (body.is_published !== undefined) patch.is_published = !!body.is_published;
-    const updated = updateQuiz(quiz.id, patch);
-    return { data: serializeQuiz(updated) };
-  }},
-
-  { method: "DELETE", pattern: "/quizzes/:id/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can delete quizzes.", 403) };
-    const quiz = findQuizById(args.params.id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    softDeleteQuiz(quiz.id);
-    return { data: null };
-  }},
-
-  // -------- exams: questions --------------------------------------------
-  { method: "POST", pattern: "/quizzes/:id/questions/", handler: async (args) => {
-    await delay(200);
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can add questions.", 403) };
-    const quiz = findQuizById(args.params.id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    const body = args.body || {};
-    const errors = {};
-    if (!body.text || !String(body.text).trim()) errors.text = ["This field is required."];
-    if (!Array.isArray(body.choices) || body.choices.length < 2) errors.choices = ["Provide at least two choices."];
-    else {
-      const correctCount = body.choices.filter((c) => c.is_correct).length;
-      if (correctCount !== 1) errors.choices = ["Exactly one choice must be marked correct."];
-      if (body.choices.some((c) => !c.text || !String(c.text).trim())) errors.choices = ["Every choice needs text."];
-    }
-    if (Object.keys(errors).length > 0) return { error: validationError(errors) };
-    const { question } = addQuestion({
-      quizId: quiz.id, text: String(body.text).trim(),
-      marks: Number(body.marks) || 1, choicesData: body.choices,
-    });
-    return { data: serializeQuestion(question) };
-  }},
-
-  { method: "PATCH", pattern: "/questions/:id/", handler: async (args) => {
-    await delay(200);
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can edit questions.", 403) };
-    const body = args.body || {};
-    if (!body.quiz_id) return { error: simpleError("quiz_id is required in the body.", 400) };
-    const quiz = findQuizById(body.quiz_id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    const errors = {};
-    if (body.text !== undefined && !String(body.text).trim()) errors.text = ["This field is required."];
-    if (Array.isArray(body.choices)) {
-      if (body.choices.length < 2) errors.choices = ["Provide at least two choices."];
-      else {
-        const correctCount = body.choices.filter((c) => c.is_correct).length;
-        if (correctCount !== 1) errors.choices = ["Exactly one choice must be marked correct."];
-      }
-    }
-    if (Object.keys(errors).length > 0) return { error: validationError(errors) };
-    const updated = updateQuestion(args.params.id, {
-      text: body.text !== undefined ? String(body.text).trim() : undefined,
-      marks: body.marks !== undefined ? Number(body.marks) : undefined,
-      choicesData: body.choices,
-    });
-    if (!updated) return { error: simpleError("Not found.", 404) };
-    return { data: serializeQuestion(updated) };
-  }},
-
-  { method: "DELETE", pattern: "/questions/:id/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "teacher") return { error: simpleError("Only teachers can delete questions.", 403) };
-    const quizId = args.body?.quiz_id;
-    if (!quizId) return { error: simpleError("quiz_id is required in the body.", 400) };
-    const quiz = findQuizById(quizId);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You are not the teacher assigned to this class.", 403) };
-    softDeleteQuestion(args.params.id);
-    return { data: null };
-  }},
-
-  // -------- exams: submissions ------------------------------------------
-  { method: "GET", pattern: "/submissions/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role === "student") {
-      const quizFilter = args.params.__query?.quiz;
-      const list = submissionsForStudent(user.id).filter((s) => !quizFilter || s.quiz_id === quizFilter);
-      return { data: list.map(serializeSubmission) };
-    }
-    if (user.role === "teacher") return { data: [] };
-    return { error: simpleError("Not allowed.", 403) };
-  }},
-
-  { method: "POST", pattern: "/quizzes/:id/submit/", handler: async (args) => {
-    await delay(500);
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    if (user.role !== "student") return { error: simpleError("Only students can submit quizzes.", 403) };
-    const quiz = findQuizById(args.params.id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    if (!quiz.is_published) return { error: simpleError("This quiz is not open.", 400) };
-    const cls = findClassById(quiz.class_id);
-    const enrolled = cls && classesForStudent(user.id).some((c) => c.id === cls.id);
-    if (!enrolled) return { error: simpleError("You do not have access to this quiz.", 403) };
-    const existing = findSubmissionForStudent(quiz.id, user.id);
-    if (existing) return { error: simpleError("You have already submitted this quiz.", 400) };
-    const answers = args.body?.answers || {};
-    const submission = createSubmission({ quizId: quiz.id, studentId: user.id, answersByQuestionId: answers });
-    return { data: serializeSubmission(submission) };
-  }},
-
-  { method: "GET", pattern: "/submissions/:id/", handler: (args) => {
-    const user = currentUserFromArgs(args);
-    if (!user) return { error: unauthorized() };
-    const submission = findSubmissionById(args.params.id);
-    if (!submission) return { error: simpleError("Not found.", 404) };
-    const quiz = findQuizById(submission.quiz_id);
-    if (!quiz) return { error: simpleError("Not found.", 404) };
-    const cls = findClassById(quiz.class_id);
-    if (user.role === "student") {
-      if (submission.student_id !== user.id) return { error: simpleError("You do not have access to this submission.", 403) };
-    } else if (user.role === "teacher") {
-      if (!cls || cls.teacher_id !== user.id) return { error: simpleError("You do not have access to this submission.", 403) };
-    } else {
-      return { error: simpleError("Not allowed.", 403) };
-    }
-    return { data: {
-      ...serializeSubmission(submission),
-      quiz: { id: quiz.id, title: quiz.title, class_id: quiz.class_id },
-      questions: questionsForQuiz(quiz.id).map(serializeQuestion),
-    }};
-  }},
-
-  { method: "POST", pattern: "/__reset-submissions/", handler: () => {
-    resetSubmissions();
-    return { data: null };
   }},
 
   // -------- chat ---------------------------------------------------------
@@ -1007,6 +772,7 @@ export async function localDispatcher(args, api, extraOptions) {
     };
   }
 }
+
 
 
 

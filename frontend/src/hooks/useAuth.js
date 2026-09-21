@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+﻿import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { tokenStorage } from "../utils/tokenStorage";
 
 import { useLazyGetMeQuery, useLoginMutation, useLogoutMutation } from "../store/api/authApi";
@@ -15,6 +16,7 @@ import {
 
 export function useAuth() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const user = useSelector(selectCurrentUser);
   const status = useSelector(selectAuthStatus);
   const accessToken = useSelector(selectAccessToken);
@@ -52,7 +54,15 @@ export function useAuth() {
     try {
       await logoutMutation(refresh).unwrap();
     } finally {
+      // Clear the session.
       dispatch(loggedOut());
+      // Wait one tick so React has processed the state change and
+      // ProtectedRoute's fallback redirect has run. Then navigate to `/`
+      // to overwrite it. RootRoute at `/` will then render LandingPage
+      // because isAuthenticated is now false.
+      setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 0);
     }
   };
 
