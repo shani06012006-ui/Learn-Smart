@@ -84,7 +84,13 @@ export default function MaterialsPage() {
       key: "actions",
       header: "",
       render: (row) => (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Link
+            to={`/student/materials/${row.id}`}
+            className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100"
+          >
+            View Details
+          </Link>
           <a
             href={row.download_url}
             onClick={(e) => e.preventDefault()}
@@ -181,3 +187,4 @@ export default function MaterialsPage() {
     </div>
   );
 }
+

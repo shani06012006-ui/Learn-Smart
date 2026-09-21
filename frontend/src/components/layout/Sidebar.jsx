@@ -11,7 +11,6 @@ import {
   Video,
   Trophy,
   KeyRound,
-  ClipboardList,
 } from "lucide-react";
 
 import { sidebarClosed } from "../../store/slices/uiSlice";
@@ -32,7 +31,6 @@ const STUDENT_ITEMS = [
   { label: "Join a class", to: "/student/join-class", icon: KeyRound, enabled: true },
   { label: "Materials", to: "/student/materials", icon: FileText, enabled: true },
   { label: "Announcements", to: "/student/announcements", icon: Megaphone, enabled: true },
-  { label: "Quizzes", to: "/student/quizzes", icon: ClipboardList, enabled: true },
   { label: "Performance", to: "/student/performance", icon: Trophy, enabled: true },
   { label: "Live Classes", to: "/student/live-classes", icon: Video, enabled: true },
   { label: "Messages", to: "/student/chat", icon: MessageSquare, enabled: true },
@@ -98,3 +96,7 @@ export default function Sidebar({ role }) {
     </>
   );
 }
+
+
+
+

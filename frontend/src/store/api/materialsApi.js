@@ -15,6 +15,13 @@ export const materialsApi = apiSlice.injectEndpoints({
           : [{ type: "Material", id: `LIST-${classId}` }],
     }),
 
+    getMaterial: builder.query({
+      query: (materialId) => `/materials/${materialId}/`,
+      providesTags: (result, error, materialId) => [
+        { type: "Material", id: materialId },
+      ],
+    }),
+
     uploadMaterial: builder.mutation({
       query: ({ classId, formData }) => ({
         url: `/classes/${classId}/materials/`,
@@ -23,6 +30,7 @@ export const materialsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (result, error, { classId }) => [
         { type: "Material", id: `LIST-${classId}` },
+        { type: "Notification", id: "LIST" },
       ],
     }),
 
@@ -72,6 +80,7 @@ export const materialsApi = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, { classId }) => [
         { type: "Announcement", id: `LIST-${classId}` },
         { type: "Announcement", id: "MY-LIST" },
+        { type: "Notification", id: "LIST" },
       ],
     }),
 
@@ -91,6 +100,7 @@ export const materialsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetMaterialsQuery,
+  useGetMaterialQuery,
   useUploadMaterialMutation,
   useDeleteMaterialMutation,
   useGetAnnouncementsQuery,
@@ -98,3 +108,5 @@ export const {
   useCreateAnnouncementMutation,
   useDeleteAnnouncementMutation,
 } = materialsApi;
+
+

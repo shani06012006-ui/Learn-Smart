@@ -5,13 +5,15 @@
 // app so the landing hero feels like the product without wiring any
 // live hooks. This keeps the landing page deterministic and light.
 
-export function MiniPanel({ className, children }) {
+export function MiniPanel({ className, children, style, ...rest }) {
   return (
     <div
       className={clsx(
         "rounded-lg border border-ink-200 bg-white shadow-card",
         className
       )}
+      style={style}
+      {...rest}
     >
       {children}
     </div>
@@ -109,3 +111,4 @@ export function MiniNotificationDot({ pulsing = true }) {
     </span>
   );
 }
+

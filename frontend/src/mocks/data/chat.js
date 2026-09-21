@@ -1,12 +1,22 @@
 ﻿// In-memory store for ChatThread + ChatMessage mock data. Shapes mirror the
 // future backend/chat/models.py models. Handlers read/write this module;
 // components never see it directly.
+//
+// Cross-tab persistence: the seed arrays below are only the fallback. On
+// first load (or after localStorage is cleared), the seed is used. After
+// any write, state is persisted to localStorage and a change ping is
+// broadcast to other tabs of the same browser. See ../crossTabSync.js.
 
 import { findUserById, users as allUsers } from "./users";
 import { findClassById, classesForStudent } from "./classes";
 import { addNotification } from "./notifications";
+import {
+  loadFromStorage,
+  persistToStorage,
+  broadcastChangeSoon,
+} from "../crossTabSync";
 
-let threads = [
+const THREADS_SEED = [
   {
     id: "thread-anita-rahul",
     kind: "direct",
@@ -37,7 +47,7 @@ let threads = [
   },
 ];
 
-let messages = [
+const MESSAGES_SEED = [
   {
     id: "msg-a-r-1",
     thread_id: "thread-anita-rahul",
@@ -102,6 +112,9 @@ let messages = [
     deleted: false,
   },
 ];
+
+let threads = loadFromStorage("chat.threads", THREADS_SEED);
+let messages = loadFromStorage("chat.messages", MESSAGES_SEED);
 
 // ---------- reads ---------------------------------------------------------
 
@@ -211,6 +224,10 @@ export function appendMessage({ threadId, senderId, body }) {
     });
   }
 
+  persistToStorage("chat.messages", messages);
+  persistToStorage("chat.threads", threads);
+  broadcastChangeSoon("chat.appendMessage");
+
   return message;
 }
 
@@ -222,6 +239,10 @@ export function markThreadRead(threadId, userId) {
       changed += 1;
     }
   });
+  if (changed > 0) {
+    persistToStorage("chat.messages", messages);
+    broadcastChangeSoon("chat.markThreadRead");
+  }
   return changed;
 }
 
@@ -231,6 +252,8 @@ export function deleteMessage(messageId, userId) {
   if (message.sender_id !== userId) return { ok: false, reason: "not_owner" };
   if (message.deleted) return { ok: false, reason: "already_deleted" };
   message.deleted = true;
+  persistToStorage("chat.messages", messages);
+  broadcastChangeSoon("chat.deleteMessage");
   return { ok: true, message };
 }
 
@@ -289,16 +312,10 @@ function studentsInClass(classId) {
   );
 }
 
-// Presence for a user. Reads `is_online` from data/users.js; when offline,
-// fabricates a deterministic "last seen" timestamp in the recent past so the
-// UI has something subtle to show. Real presence (WebSocket) is a future
-// module -- this is a UI placeholder.
 function presenceFor(user) {
   if (user?.is_online) {
     return { is_online: true, last_seen: null };
   }
-  // Deterministic offset from the user id so the same user always shows the
-  // same "last seen" value during a session.
   let seed = 0;
   for (let i = 0; i < (user?.id || "").length; i++) {
     seed = (seed << 5) - seed + user.id.charCodeAt(i);
@@ -309,7 +326,6 @@ function presenceFor(user) {
   return { is_online: false, last_seen: lastSeen };
 }
 
-// Shared helper for building a member row from a user record.
 function serializeMember(u, viewer, classDoc) {
   const isSelf = u.id === viewer?.id;
   const isTeacherOfClass = classDoc && classDoc.teacher_id === u.id;
@@ -364,10 +380,6 @@ export function serializeThreadMembers(threadId, viewerId) {
     .map((u) => serializeMember(u, viewer, classDoc));
 }
 
-// Single member profile lookup for a specific (thread, user). Returns null if
-// the user is not a participant of the thread -- the caller (dispatcher)
-// translates that into a 404. This is the ONLY way to fetch a user's profile:
-// via a thread the viewer already has access to.
 export function serializeThreadMember(threadId, userId, viewerId) {
   const thread = findThreadById(threadId);
   if (!thread) return null;
@@ -404,4 +416,3 @@ export function serializeMessage(message) {
 export function emptyThreadList() {
   return [];
 }
-

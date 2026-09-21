@@ -6,9 +6,10 @@ import clsx from "clsx";
 import Button from "../../../components/ui/Button";
 import { useScrolled } from "../../../hooks/useScrolled";
 
+// In-page anchors use `href`. Route-based links use `to`.
 const NAV_LINKS = [
   { label: "Product", href: "#hero" },
-  { label: "Features", href: "#features" },
+  { label: "Features", to: "/features" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "For Students", href: "#students" },
   { label: "For Teachers", href: "#teachers" },
@@ -59,15 +60,25 @@ export default function LandingNavbar() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 lg:flex">
-          {NAV_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100/60 hover:text-ink-900"
-            >
-              {link.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((link) =>
+            link.to ? (
+              <Link
+                key={link.label}
+                to={link.to}
+                className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100/60 hover:text-ink-900"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.label}
+                href={link.href}
+                className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100/60 hover:text-ink-900"
+              >
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
         {/* Desktop CTAs */}
@@ -99,16 +110,27 @@ export default function LandingNavbar() {
         <div className="lg:hidden">
           <div className="border-t border-ink-200 bg-white px-6 pb-6 pt-4">
             <nav className="flex flex-col gap-1">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  onClick={handleNavigate}
-                  className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
-                >
-                  {link.label}
-                </a>
-              ))}
+              {NAV_LINKS.map((link) =>
+                link.to ? (
+                  <Link
+                    key={link.label}
+                    to={link.to}
+                    onClick={handleNavigate}
+                    className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    onClick={handleNavigate}
+                    className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
+                  >
+                    {link.label}
+                  </a>
+                )
+              )}
             </nav>
             <div className="mt-4 flex flex-col gap-2">
               <Link to="/login" onClick={handleNavigate}>
@@ -126,3 +148,4 @@ export default function LandingNavbar() {
     </header>
   );
 }
+

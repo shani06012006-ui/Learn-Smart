@@ -17,7 +17,21 @@ const CANNED_LINES = [
   "Thanks for checking in.",
 ];
 
+// Simulator is off by default once cross-tab sync is enabled, so that
+// canned messages don't compete with real cross-tab messages. To turn it
+// back on for local demos, run in DevTools:
+//   localStorage.setItem("learn-smart.enableSimulator", "1")
+const SIMULATOR_ENABLED =
+  typeof window !== "undefined" &&
+  window.localStorage.getItem("learn-smart.enableSimulator") === "1";
+
 export function useMockSocket({ threadId, enabled, onIncoming }) {
+  // If the simulator flag is off, this hook is a no-op. Keeps the same
+  // public signature so callers don't need to change.
+  if (!SIMULATOR_ENABLED) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return undefined;
+  }
   const timeoutRef = useRef(null);
   const cancelledRef = useRef(false);
 
@@ -63,3 +77,4 @@ export function useMockSocket({ threadId, enabled, onIncoming }) {
     };
   }, [threadId, enabled, onIncoming]);
 }
+

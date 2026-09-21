@@ -50,6 +50,11 @@ export const chatApi = apiSlice.injectEndpoints({
         { type: "Message", id: `LIST-${threadId}` },
         { type: "Thread", id: threadId },
         { type: "Thread", id: "LIST" },
+        // Sending a message fans out a notification to every other
+        // participant. Invalidate the recipient's notification list so
+        // their bell updates. On the sender's tab, this is a no-op since
+        // they don't receive their own message as a notification.
+        { type: "Notification", id: "LIST" },
       ],
     }),
 
@@ -87,3 +92,4 @@ export const {
   useMarkThreadReadMutation,
   useDeleteMessageMutation,
 } = chatApi;
+

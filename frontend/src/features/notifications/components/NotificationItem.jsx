@@ -15,15 +15,6 @@ function targetUrl(target, prefix) {
       return `${prefix}/announcements?class=${target.class_id}`;
     case "material":
       return `${prefix}/materials?class=${target.class_id}`;
-    case "quiz":
-      return `${prefix}/quizzes/${target.quiz_id}`;
-    case "live_class":
-      // Teachers land on their list page; students land on the session.
-      // (Teacher-side notifications for live classes are rare — they're
-      // the creator — but this keeps the routing consistent.)
-      return prefix === "/teacher"
-        ? `${prefix}/live-classes`
-        : `${prefix}/live-classes/${target.live_class_id}`;
     default:
       return `${prefix}`;
   }
@@ -55,6 +46,8 @@ export default function NotificationItem({ notification, onRead }) {
           : "bg-white hover:bg-ink-100/60")
       }
     >
+      {/* Unread accent stripe. Absolutely positioned so it doesn't shift
+          content between read and unread rows. */}
       {unread && (
         <span
           className="absolute inset-y-0 left-0 w-0.5 bg-brand-500"
@@ -98,4 +91,3 @@ export default function NotificationItem({ notification, onRead }) {
     </button>
   );
 }
-

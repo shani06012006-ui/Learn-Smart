@@ -110,6 +110,7 @@ export function softDeleteMaterial(id) {
 }
 
 export function serializeMaterial(material) {
+  const uploader = findUserById(material.uploaded_by_id);
   return {
     id: material.id,
     class_id: material.class_id,
@@ -119,6 +120,16 @@ export function serializeMaterial(material) {
     mime_type: material.mime_type,
     size_bytes: material.size_bytes,
     uploaded_by_id: material.uploaded_by_id,
+    uploaded_by_name: uploader?.full_name || "Unknown",
+    uploaded_by_initials: uploader
+      ? uploader.full_name
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((p) => p[0])
+          .join("")
+          .toUpperCase()
+      : "?",
     uploaded_at: material.uploaded_at,
     download_url: `/api/v1/materials/${material.id}/download/`,
   };
@@ -242,6 +253,7 @@ export function serializeAnnouncement(announcement) {
     posted_at: announcement.posted_at,
   };
 }
+
 
 
 
