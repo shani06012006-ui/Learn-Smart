@@ -1,4 +1,4 @@
-"""
+﻿"""
 Base settings shared by all environments.
 Environment-specific overrides live in dev.py / prod.py.
 """
@@ -43,6 +43,7 @@ LOCAL_APPS = [
     "accounts",
     "institutions",
     "classes",
+    "admin_api",
     # "materials" is added when Module B (Teacher Features) is implemented.
     # exams, ai_engine, analytics, chat, notifications, live_classes are added
     # to this list as their respective modules are implemented.
