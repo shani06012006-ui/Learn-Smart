@@ -13,6 +13,7 @@ a client-supplied institution id.
 from django.db.models import Count, Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -22,6 +23,8 @@ from institutions.models import Institution
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
 from .serializers import (
+    AdminCourseReadSerializer,
+    AdminCourseWriteSerializer,
     AdminStatsSerializer,
     AdminUserCreateSerializer,
     AdminUserSerializer,
@@ -191,7 +194,7 @@ class AdminStatsView(APIView):
         if not user.is_superuser:
             users_qs = users_qs.filter(institution=user.institution)
             classes_qs = classes_qs.filter(institution=user.institution)
-            # Enrollments don't have a direct institution field — scope via
+            # Enrollments don't have a direct institution field Ã¢â‚¬â€ scope via
             # the class the enrollment belongs to.
             enrollments_qs = enrollments_qs.filter(class_course__institution=user.institution)
 
@@ -221,3 +224,209 @@ class AdminStatsView(APIView):
             "is_superuser_view": user.is_superuser,
         }
         return Response(AdminStatsSerializer(payload).data)
+
+class InstitutionCourseViewSet(viewsets.GenericViewSet):
+    """
+    Admin-only course management, scoped to the caller's institution.
+
+    Endpoints:
+        GET    /api/v1/admin/courses/                 list
+        POST   /api/v1/admin/courses/                 create
+        GET    /api/v1/admin/courses/<uuid>/          retrieve
+        PATCH  /api/v1/admin/courses/<uuid>/          update (name, subject, description, is_archived)
+        DELETE /api/v1/admin/courses/<uuid>/          soft delete
+
+    Isolation rules match AdminUserViewSet:
+        - Superuser sees every institution.
+        - Everyone else sees only courses where course.institution == user.institution.
+        - The institution on a new course is resolved server-side; the
+          client never supplies it (except superusers, who must supply it
+          because they have no institution of their own).
+    """
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    # ------------------------------------------------------------------ scope
+
+    def _scope_queryset(self, qs):
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        return qs.filter(institution=user.institution)
+
+    def get_queryset(self):
+        qs = (
+            ClassCourse.objects.all()
+            .select_related("teacher", "institution")
+            .order_by("-created_at")
+        )
+        qs = self._scope_queryset(qs)
+
+        # Optional ?is_archived=true|false
+        archived = self.request.query_params.get("is_archived")
+        if archived is not None:
+            qs = qs.filter(is_archived=archived.lower() in {"true", "1", "yes"})
+
+        # Optional ?subject=Physics
+        subject = self.request.query_params.get("subject")
+        if subject:
+            qs = qs.filter(subject__iexact=subject)
+
+        # Optional ?q= search on name / subject
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(subject__icontains=q))
+
+        # Annotate active student count for the read serializer
+        qs = qs.annotate(
+            student_count=Count(
+                "enrollments",
+                filter=Q(enrollments__status=StudentEnrollment.STATUS_ACTIVE),
+                distinct=True,
+            )
+        )
+        return qs
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self._scope_queryset(
+            ClassCourse.objects.all().select_related("teacher", "institution")
+        )
+        try:
+            return qs.get(pk=pk)
+        except ClassCourse.DoesNotExist:
+            # 404 (not 403) per the cross-tenant policy: a resource that
+            # exists in another institution must not be discoverable.
+            raise NotFound("Course not found.")
+
+    # ------------------------------------------------------------------ read
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = AdminCourseReadSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(AdminCourseReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        course = self.get_object()
+        return Response(AdminCourseReadSerializer(course).data)
+
+    # ------------------------------------------------------------------ write
+
+    def create(self, request):
+        serializer = AdminCourseWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Required fields on create
+        for field in ("name", "subject", "teacher_id"):
+            if field not in data:
+                return Response(
+                    {
+                        "error": {
+                            "detail": f"{field} is required.",
+                            "status_code": 400,
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Resolve the institution (never trust the client for non-superusers)
+        user = request.user
+        if user.is_superuser:
+            institution_id = request.data.get("institution_id")
+            if not institution_id:
+                return Response(
+                    {
+                        "error": {
+                            "detail": "institution_id is required for superuser course creation.",
+                            "status_code": 400,
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                institution = Institution.objects.get(pk=institution_id)
+            except Institution.DoesNotExist:
+                return Response(
+                    {
+                        "error": {
+                            "detail": "institution_id does not match any institution.",
+                            "status_code": 400,
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            institution = user.institution
+
+        # Resolve and validate the teacher
+        try:
+            teacher = User.objects.get(pk=data["teacher_id"])
+        except User.DoesNotExist:
+            return Response(
+                {
+                    "error": {
+                        "detail": "teacher_id does not match any user.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if teacher.role != User.ROLE_TEACHER:
+            return Response(
+                {
+                    "error": {
+                        "detail": "The specified user is not a teacher.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not user.is_superuser and teacher.institution_id != institution.id:
+            return Response(
+                {
+                    "error": {
+                        "detail": "The specified teacher is not in your institution.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        course = ClassCourse.objects.create(
+            institution=institution,
+            teacher=teacher,
+            name=data["name"],
+            subject=data["subject"],
+            description=data.get("description", ""),
+        )
+        return Response(
+            AdminCourseReadSerializer(course).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, pk=None):
+        course = self.get_object()
+        serializer = AdminCourseWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        for field in ("name", "subject", "description", "is_archived"):
+            if field in serializer.validated_data:
+                setattr(course, field, serializer.validated_data[field])
+        course.save()
+
+        return Response(AdminCourseReadSerializer(course).data)
+
+    def destroy(self, request, pk=None):
+        """
+        Soft-deletes the course. The React admin UI exposes this only as
+        an "Archive" action (which uses partial_update with
+        is_archived=true). The DELETE endpoint remains available for a
+        future hard-removal flow, but is not wired into the UI.
+        """
+        course = self.get_object()
+        course.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

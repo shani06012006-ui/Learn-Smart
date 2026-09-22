@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from accounts.models import User
+from classes.models import ClassCourse, StudentEnrollment
 from institutions.models import Institution
 
 
@@ -47,7 +48,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
 class AdminUserCreateSerializer(serializers.Serializer):
     """
     Create a teacher or student. Admins cannot create other admins through
-    this endpoint — admin accounts are provisioned via the management
+    this endpoint Ã¢â‚¬â€ admin accounts are provisioned via the management
     commands (create_institution_admin) or Django's createsuperuser, so
     privilege escalation isn't possible via the API.
 
@@ -108,3 +109,86 @@ class AdminStatsSerializer(serializers.Serializer):
     enrollments_active = serializers.IntegerField()
     institution = InstitutionBriefSerializer(allow_null=True)
     is_superuser_view = serializers.BooleanField()
+
+# --------------------------------------------------------------------------
+# Course management
+# --------------------------------------------------------------------------
+
+class AdminCourseTeacherBriefSerializer(serializers.ModelSerializer):
+    """Compact teacher payload embedded in course rows."""
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AdminCourseReadSerializer(serializers.ModelSerializer):
+    """
+    Read representation of a course for the admin UI.
+
+    Mirrors the fields exposed by the teacher-facing ClassCourseSerializer
+    so the UI components can be shared, with teacher expanded into a
+    full brief object (rather than just the id) and institution included.
+    """
+    teacher = AdminCourseTeacherBriefSerializer(read_only=True)
+    institution = InstitutionBriefSerializer(read_only=True)
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClassCourse
+        fields = [
+            "id",
+            "name",
+            "subject",
+            "description",
+            "teacher",
+            "institution",
+            "is_archived",
+            "student_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_student_count(self, obj):
+        # Use the annotated value if the view provided one; fall back to
+        # a query otherwise (for single-object retrieves).
+        count = getattr(obj, "student_count", None)
+        if count is not None:
+            return count
+        return obj.enrollments.filter(status=StudentEnrollment.STATUS_ACTIVE).count()
+
+
+class AdminCourseWriteSerializer(serializers.Serializer):
+    """
+    Create + update payload for the admin course endpoints.
+
+    - On create: name, subject, teacher_id are required. The institution is
+      resolved server-side from the caller (or from an explicit
+      institution_id for superusers).
+    - On update: only name, subject, description, is_archived are accepted.
+      teacher_id is not changeable here (a separate operation if needed
+      later).
+    """
+    name = serializers.CharField(max_length=255, required=False)
+    subject = serializers.CharField(max_length=100, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    teacher_id = serializers.UUIDField(required=False)
+    is_archived = serializers.BooleanField(required=False)
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("This field is required.")
+        return value
+
+    def validate_subject(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("This field is required.")
+        return value
