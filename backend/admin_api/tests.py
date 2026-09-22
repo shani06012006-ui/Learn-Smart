@@ -153,7 +153,7 @@ def test_admin_cannot_create_user_in_other_institution(northwood, riverdale):
     )
     assert resp.status_code == 201
     created = User.objects.get(email="sneaky@test.local")
-    assert created.institution_id == northwood.id, "institution_id from body was honoured — security bug"
+    assert created.institution_id == northwood.id, "institution_id from body was honoured â€” security bug"
 
 
 # ----------------------------------------------------------------- deactivate
@@ -214,3 +214,238 @@ def test_non_admin_rejected(northwood):
     client = auth_client(teacher)
     resp = client.get("/api/v1/admin/users/")
     assert resp.status_code == 403
+
+# ---------------------------------------------------------------------------
+# Course management tests
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def course_teacher(db, northwood):
+    """A teacher in the Northwood institution."""
+    return make_user(
+        "teacher.nw@test.local",
+        User.ROLE_TEACHER,
+        northwood,
+        password="TestPass123!",
+    )
+
+
+@pytest.fixture
+def course_teacher_riverdale(db, riverdale):
+    """A teacher in the Riverdale institution."""
+    return make_user(
+        "teacher.rd@test.local",
+        User.ROLE_TEACHER,
+        riverdale,
+        password="TestPass123!",
+    )
+
+
+def test_admin_can_create_course_in_own_institution(northwood, course_teacher):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    client = auth_client(admin)
+
+    resp = client.post(
+        "/api/v1/admin/courses/",
+        {
+            "name": "Grade 10 Physics",
+            "subject": "Physics",
+            "description": "Mechanics and motion",
+            "teacher_id": str(course_teacher.id),
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    body = resp.json()
+    assert body["name"] == "Grade 10 Physics"
+    assert body["subject"] == "Physics"
+    assert body["teacher"]["id"] == str(course_teacher.id)
+    assert body["institution"]["slug"] == "northwood"
+    assert body["is_archived"] is False
+
+
+def test_admin_cannot_create_course_with_other_institution_teacher(
+    northwood, riverdale, course_teacher_riverdale
+):
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    client = auth_client(admin_nw)
+
+    resp = client.post(
+        "/api/v1/admin/courses/",
+        {
+            "name": "Cross-tenant test",
+            "subject": "Physics",
+            "teacher_id": str(course_teacher_riverdale.id),
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_admin_cannot_create_course_with_invalid_teacher_id(northwood):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    client = auth_client(admin)
+
+    resp = client.post(
+        "/api/v1/admin/courses/",
+        {
+            "name": "Bad teacher",
+            "subject": "Physics",
+            "teacher_id": "00000000-0000-0000-0000-000000000000",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_admin_cannot_create_course_with_student_as_teacher(northwood):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("student.nw@test.local", User.ROLE_STUDENT, northwood)
+    client = auth_client(admin)
+
+    resp = client.post(
+        "/api/v1/admin/courses/",
+        {
+            "name": "Student as teacher",
+            "subject": "Physics",
+            "teacher_id": str(student.id),
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_admin_lists_only_own_institution_courses(northwood, riverdale, course_teacher, course_teacher_riverdale):
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Northwood Course", subject="Physics",
+    )
+    ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale,
+        name="Riverdale Course", subject="Chemistry",
+    )
+
+    client = auth_client(admin_nw)
+    resp = client.get("/api/v1/admin/courses/")
+    assert resp.status_code == 200
+    names = {row["name"] for row in resp.json()["results"]}
+    assert "Northwood Course" in names
+    assert "Riverdale Course" not in names
+
+
+def test_admin_cannot_retrieve_course_from_other_institution(northwood, riverdale, course_teacher_riverdale):
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    rd_course = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale,
+        name="Riverdale Course", subject="Chemistry",
+    )
+
+    client = auth_client(admin_nw)
+    resp = client.get(f"/api/v1/admin/courses/{rd_course.id}/")
+    assert resp.status_code == 404
+
+
+def test_admin_cannot_update_course_from_other_institution(northwood, riverdale, course_teacher_riverdale):
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    rd_course = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale,
+        name="Riverdale Course", subject="Chemistry",
+    )
+
+    client = auth_client(admin_nw)
+    resp = client.patch(
+        f"/api/v1/admin/courses/{rd_course.id}/",
+        {"name": "Hijacked"},
+        format="json",
+    )
+    assert resp.status_code == 404
+
+
+def test_admin_can_update_own_course(northwood, course_teacher):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Old Name", subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.patch(
+        f"/api/v1/admin/courses/{course.id}/",
+        {"name": "New Name", "description": "Updated description"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "New Name"
+    assert resp.json()["description"] == "Updated description"
+
+
+def test_admin_can_archive_own_course(northwood, course_teacher):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="To Archive", subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.patch(
+        f"/api/v1/admin/courses/{course.id}/",
+        {"is_archived": True},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["is_archived"] is True
+
+
+def test_admin_can_soft_delete_own_course(northwood, course_teacher):
+    admin = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+
+    from classes.models import ClassCourse
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="To Delete", subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.delete(f"/api/v1/admin/courses/{course.id}/")
+    assert resp.status_code == 204
+
+    # Not in default list
+    list_resp = client.get("/api/v1/admin/courses/")
+    names = {row["name"] for row in list_resp.json()["results"]}
+    assert "To Delete" not in names
+
+
+def test_non_admin_cannot_access_course_endpoints(northwood, course_teacher):
+    """A teacher must not be able to hit the admin course API."""
+    client = auth_client(course_teacher)
+    resp = client.get("/api/v1/admin/courses/")
+    assert resp.status_code == 403
+
+
+def test_superuser_can_create_course_in_any_institution(northwood, course_teacher):
+    su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
+    client = auth_client(su)
+
+    resp = client.post(
+        "/api/v1/admin/courses/",
+        {
+            "name": "Superuser Course",
+            "subject": "Physics",
+            "teacher_id": str(course_teacher.id),
+            "institution_id": str(northwood.id),
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    assert resp.json()["institution"]["slug"] == "northwood"
