@@ -1,4 +1,4 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
@@ -24,6 +24,10 @@ import LiveSessionPage from "./features/student/live-classes/LiveSessionPage";
 import ChatPage from "./features/chat/ChatPage";
 import FeaturesPage from "./features/features-page/FeaturesPage";
 import MaterialDetailPage from "./features/materials/MaterialDetailPage";
+import AdminLayout from "./features/admin/AdminLayout";
+import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
+import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
+import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 
 export default function App() {
   return (
@@ -34,14 +38,21 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/features" element={<FeaturesPage />} />
 
+      {/* Institution admin — the guard redirects to the shared /login
+          when no admin session is present. */}
+      <Route element={<AdminRouteGuard />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+        </Route>
+      </Route>
+
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["teacher", "admin"]} />}>
           <Route path="/teacher" element={<TeacherLayout />}>
             <Route index element={<TeacherDashboardPage />} />
             <Route path="classes" element={<ClassListPage />} />
             <Route path="classes/:classId" element={<ClassDetailPage />} />
-            <Route
-            />
             <Route path="materials" element={<MaterialsPage />} />
             <Route path="materials/:materialId" element={<MaterialDetailPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
@@ -68,21 +79,9 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Catch-all: unknown routes redirect to the landing page for
-          unauthenticated visitors, or to /login for authenticated users
-          (ProtectedRoute handles the redirect once they hit a protected
-          route, but a bare 404 sends them to landing which then sends
-          them to their dashboard via RootRoute). */}
       {/* Unknown routes → land on the public entry (RootRoute will then
           decide: landing page or role-based dashboard redirect). */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-
-
-
-
-
-
