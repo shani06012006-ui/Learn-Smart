@@ -1,18 +1,4 @@
-﻿// Per-student performance dataset. Keyed by user ID so each logged-in
-// student sees their own numbers -- mirrors how the real backend would
-// scope the /student/performance/ response by request.user.
-//
-// Values align with the teacher-side analytics dataset so the two views
-// tell the same story:
-//   - Rahul shows up in "Needs Attention" (Physics 48%) and "Improving"
-//     (Chemistry 71%, +7%).
-//   - Meera shows up in "Improving" (Chemistry 78%, +15%).
-//   - Arjun shows up in "Needs Attention" (Physics 42%) and
-//     "Needs Improvement" (Chemistry 62%).
-//
-// The overall summary block computes `level` from `average_percent` using
-// the proposal's thresholds (Excellent 90-100, Very Good 75-89,
-// Average 50-74, Needs Improvement below 50).
+﻿
 
 function computeLevel(averagePercent) {
   if (averagePercent >= 90) return { level: "excellent", label: "Excellent" };
