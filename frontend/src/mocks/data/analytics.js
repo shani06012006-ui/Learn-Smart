@@ -1,13 +1,4 @@
-﻿// Fixed analytics dataset for the teacher dashboard. Numbers are chosen to
-// match the proposal's worked examples exactly so the widgets render with
-// the same story the design document describes:
-//
-//   🔴 Rahul — 48% Physics, Weak Topic: Projectile Motion, decreasing
-//   🟢 Meera — 78% Chemistry, +15% improvement
-//
-// This module is deliberately static (no per-request randomness). Future
-// modules (exams, auto-grading) will compute these from real submissions;
-// for now they are the authoritative mock the dashboard binds to.
+﻿
 
 export const dashboardAnalytics = {
   needs_attention: [
