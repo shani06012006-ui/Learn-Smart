@@ -1,4 +1,4 @@
-﻿"""
+"""
 Base settings shared by all environments.
 Environment-specific overrides live in dev.py / prod.py.
 """
@@ -137,7 +137,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "accounts.jwt_auth.TokensValidAfterJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -218,3 +218,18 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # ---------------------------------------------------------------------------
 JOINING_CODE_LENGTH = 6
 JOINING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O/1/I to avoid ambiguity
+
+
+# ---------------------------------------------------------------------------
+# Cache
+# ---------------------------------------------------------------------------
+# Redis-backed cache. Required for the WebSocket ticket flow and for
+# anything else that crosses process boundaries (rate limits, presence
+# throttles, permission caches). Do not switch this to LocMemCache: it
+# is process-local and would silently break those flows under Daphne.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+    },
+}

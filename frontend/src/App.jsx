@@ -28,6 +28,7 @@ import AdminLayout from "./features/admin/AdminLayout";
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
 import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
 import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
+import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 
 export default function App() {
   return (
@@ -38,11 +39,12 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/features" element={<FeaturesPage />} />
 
-      {/* Institution admin — the guard redirects to the shared /login
+      {/* Institution admin â€” the guard redirects to the shared /login
           when no admin session is present. */}
       <Route element={<AdminRouteGuard />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
+          <Route path="courses" element={<AdminCoursesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
         </Route>
       </Route>
@@ -79,7 +81,7 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Unknown routes → land on the public entry (RootRoute will then
+      {/* Unknown routes â†’ land on the public entry (RootRoute will then
           decide: landing page or role-based dashboard redirect). */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -5,7 +5,7 @@ import {
   adminLoggedOut,
 } from "../slices/adminAuthSlice";
 
-// Real backend API slice — separate from the mock-backed `apiSlice`. Talks
+// Real backend API slice â€” separate from the mock-backed `apiSlice`. Talks
 // to Django via the Vite proxy at /api/v1/*. Different reducer path, own
 // cache, own tag model, own middleware. It never touches the mock slice.
 
@@ -60,7 +60,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const realApi = createApi({
   reducerPath: "realApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["AdminUser", "AdminStats", "AdminInstitution"],
+  tagTypes: ["AdminUser", "AdminStats", "AdminInstitution", "AdminCourse"],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
 
@@ -159,11 +159,70 @@ export const realApi = createApi({
       query: () => "/admin/stats/",
       providesTags: ["AdminStats"],
     }),
+
+    // ---------- admin courses ---------------------------------------
+
+    getAdminCourses: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.is_archived !== undefined)
+          search.set("is_archived", String(params.is_archived));
+        if (params.subject) search.set("subject", params.subject);
+        if (params.q) search.set("q", params.q);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/courses/?${qs}` : "/admin/courses/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((c) => ({
+                type: "AdminCourse",
+                id: c.id,
+              })),
+              { type: "AdminCourse", id: "LIST" },
+            ]
+          : [{ type: "AdminCourse", id: "LIST" }],
+    }),
+
+    getAdminCourse: builder.query({
+      query: (id) => `/admin/courses/${id}/`,
+      providesTags: (result, error, id) => [{ type: "AdminCourse", id }],
+    }),
+
+    createAdminCourse: builder.mutation({
+      query: (body) => ({
+        url: "/admin/courses/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        { type: "AdminCourse", id: "LIST" },
+        { type: "AdminStats" },
+      ],
+    }),
+
+    updateAdminCourse: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/admin/courses/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "AdminCourse", id },
+        { type: "AdminCourse", id: "LIST" },
+        { type: "AdminStats" },
+      ],
+    }),
   }),
 });
 
 export const {
   useAdminLoginMutation,
+  useGetAdminCoursesQuery,
+  useGetAdminCourseQuery,
+  useCreateAdminCourseMutation,
+  useUpdateAdminCourseMutation,
   useAdminMeQuery,
   useAdminLogoutMutation,
   useGetAdminUsersQuery,
