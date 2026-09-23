@@ -8,6 +8,7 @@ import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import UsersTable from "../components/UsersTable";
 import CreateUserModal from "../components/CreateUserModal";
+import EditUserModal from "../components/EditUserModal";
 import { useGetAdminUsersQuery } from "../../../store/api/realApi";
 import { selectAdminUser } from "../../../store/slices/adminAuthSlice";
 import { extractErrorMessage } from "../../../utils/apiError";
@@ -17,6 +18,7 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState("");
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
 
   const queryParams = {};
   if (roleFilter) queryParams.role = roleFilter;
@@ -90,10 +92,20 @@ export default function AdminUsersPage() {
       )}
 
       {!isLoading && !isError && (
-        <UsersTable users={users} currentUserId={currentUser?.id} />
+        <UsersTable
+          users={users}
+          currentUserId={currentUser?.id}
+          onEdit={setEditUser}
+        />
       )}
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      <EditUserModal
+        open={!!editUser}
+        user={editUser}
+        onClose={() => setEditUser(null)}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Shield, ShieldOff } from "lucide-react";
+import { Pencil, Shield, ShieldOff } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
@@ -12,7 +12,7 @@ const ROLE_VARIANT = {
   student: "neutral",
 };
 
-export default function UsersTable({ users, currentUserId }) {
+export default function UsersTable({ users, currentUserId, onEdit }) {
   const [toggleActive, { isLoading: isToggling }] = useToggleAdminUserActiveMutation();
   const [pendingId, setPendingId] = useState(null);
 
@@ -54,7 +54,7 @@ export default function UsersTable({ users, currentUserId }) {
               Status
             </th>
             <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-500">
-              Action
+              Actions
             </th>
           </tr>
         </thead>
@@ -105,26 +105,36 @@ export default function UsersTable({ users, currentUserId }) {
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button
-                    size="sm"
-                    variant={u.is_active ? "secondary" : "primary"}
-                    disabled={isSelf}
-                    loading={isPending}
-                    onClick={() => handleToggle(u)}
-                    title={isSelf ? "You cannot change your own status" : ""}
-                  >
-                    {u.is_active ? (
-                      <>
-                        <ShieldOff size={14} />
-                        Deactivate
-                      </>
-                    ) : (
-                      <>
-                        <Shield size={14} />
-                        Activate
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onEdit(u)}
+                    >
+                      <Pencil size={14} />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={u.is_active ? "secondary" : "primary"}
+                      disabled={isSelf}
+                      loading={isPending}
+                      onClick={() => handleToggle(u)}
+                      title={isSelf ? "You cannot change your own status" : ""}
+                    >
+                      {u.is_active ? (
+                        <>
+                          <ShieldOff size={14} />
+                          Deactivate
+                        </>
+                      ) : (
+                        <>
+                          <Shield size={14} />
+                          Activate
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </td>
               </tr>
             );
