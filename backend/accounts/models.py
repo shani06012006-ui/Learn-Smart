@@ -58,6 +58,15 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
+    # Presence: last time we saw this user interactively (updated by the
+    # WebSocket heartbeat, throttled to once per minute per user).
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
+    # Global access-token revocation epoch. When this is set, any access
+    # JWT with an `iat` earlier than this value is rejected on the next
+    # request. Used for admin force-logout and password reset.
+    tokens_valid_after = models.DateTimeField(null=True, blank=True)
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"
@@ -94,3 +103,86 @@ class OnlineStatus(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user.email} - {'Online' if self.is_online else 'Offline'}"
+
+class RefreshToken(models.Model):
+    """
+    Stateful, revocable refresh tokens with session-family tracking.
+
+    Every login creates a new family (family_id). Rotation issues a new
+    token in the same family and revokes the old one. If a rotated token
+    is presented again, the entire family is revoked (reuse detection).
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="refresh_tokens"
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    family_id = models.UUIDField(db_index=True)
+    expires_at = models.DateTimeField(db_index=True)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=50, blank=True, default="")
+    replaced_by = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="replaces",
+    )
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+    device_label = models.CharField(max_length=80, blank=True, default="")
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user"],
+                name="idx_refresh_token_user_active",
+                condition=models.Q(revoked_at__isnull=True),
+            ),
+            models.Index(fields=["family_id"]),
+        ]
+
+    def is_active(self):
+        from django.utils import timezone
+        return self.revoked_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"RefreshToken({self.user_id}, family={self.family_id})"
+
+
+class PasswordResetToken(models.Model):
+    """
+    Single-use, hashed, expiring password-reset tokens.
+
+    Generated when an admin triggers a reset (or, later, when a self-service
+    flow exists). Consumed on first use. The plaintext is only ever returned
+    once and never stored.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="password_reset_tokens"
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(db_index=True)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    issued_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="password_resets_issued",
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["user"],
+                name="idx_password_reset_user_active",
+                condition=models.Q(consumed_at__isnull=True),
+            ),
+        ]
+
+    def is_active(self):
+        from django.utils import timezone
+        return self.consumed_at is None and self.expires_at > timezone.now()
+
+    def __str__(self):
+        return f"PasswordResetToken({self.user_id})"

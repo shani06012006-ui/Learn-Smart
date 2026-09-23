@@ -5,7 +5,7 @@ from django.utils import timezone
 
 
 class TimeStampedModel(models.Model):
-    """Adds created/updated timestamps. Abstract — mix into concrete models."""
+    """Adds created/updated timestamps. Abstract â€” mix into concrete models."""
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -30,14 +30,14 @@ class SoftDeleteQuerySet(models.QuerySet):
 
 
 class SoftDeleteManager(models.Manager):
-    """Default manager — excludes soft-deleted rows from every normal query."""
+    """Default manager â€” excludes soft-deleted rows from every normal query."""
 
     def get_queryset(self):
         return SoftDeleteQuerySet(self.model, using=self._db).alive()
 
 
 class AllObjectsManager(models.Manager):
-    """Escape hatch manager — includes soft-deleted rows. Use sparingly (admin, audits)."""
+    """Escape hatch manager â€” includes soft-deleted rows. Use sparingly (admin, audits)."""
 
     def get_queryset(self):
         return SoftDeleteQuerySet(self.model, using=self._db)
@@ -92,3 +92,69 @@ class UUIDPKModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class AuditLog(models.Model):
+    """
+    Append-only audit trail.
+
+    Constraints:
+    - No updates or deletes via the ORM (save() rejects changes; delete()
+      raises).
+    - No updates or deletes at the DB level (a Postgres trigger installed
+      in the migration rejects UPDATE and DELETE).
+    - Never stores secrets: passwords, JWTs, refresh tokens, reset tokens.
+      Enforced by core.audit.log_audit's sanitization and by callers never
+      passing them.
+    """
+
+    id = models.BigAutoField(primary_key=True)
+    occurred_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    actor = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_events",
+    )
+    actor_type = models.CharField(max_length=20)  # 'user' | 'system' | 'anonymous'
+
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_events",
+    )
+
+    action = models.CharField(max_length=80, db_index=True)
+    resource_type = models.CharField(max_length=50, blank=True, default="")
+    resource_id = models.UUIDField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-occurred_at"]
+        indexes = [
+            models.Index(fields=["-occurred_at"]),
+            models.Index(fields=["institution", "-occurred_at"]),
+            models.Index(fields=["actor", "-occurred_at"]),
+            models.Index(fields=["action", "-occurred_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        # Reject updates. Only inserts are allowed.
+        if self.pk is not None:
+            raise NotImplementedError(
+                "AuditLog is append-only. Use core.audit.log_audit() to add entries."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise NotImplementedError("AuditLog is append-only. Deletion is forbidden.")
+
+    def __str__(self):
+        return f"{self.occurred_at:%Y-%m-%d %H:%M:%S} {self.action} by {self.actor_id}"
