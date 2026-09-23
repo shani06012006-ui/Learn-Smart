@@ -37,7 +37,7 @@ export default function UsersTable({ users, currentUserId, onEdit }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-ink-300 bg-white shadow-card">
+    <div className="overflow-x-auto rounded-card border border-ink-300 bg-white shadow-card">
       <table className="w-full">
         <thead className="border-b border-ink-200 bg-ink-100/40">
           <tr>
