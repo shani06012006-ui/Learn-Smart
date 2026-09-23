@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 
 import Button from "../../../components/ui/Button";
+import Pager from "../../../components/ui/Pager";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import CoursesTable from "../components/CoursesTable";
@@ -12,13 +13,20 @@ import {
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
+const PAGE_SIZE = 20;
+
 export default function AdminCoursesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
 
-  const queryParams = {};
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, subjectFilter]);
+
+  const queryParams = { page };
   if (statusFilter === "active") queryParams.is_archived = false;
   if (statusFilter === "archived") queryParams.is_archived = true;
   if (subjectFilter) queryParams.subject = subjectFilter;
@@ -30,10 +38,8 @@ export default function AdminCoursesPage() {
     useUpdateAdminCourseMutation();
 
   const courses = data?.results || [];
+  const count = data?.count || 0;
 
-  // Subject options derived from the currently loaded list. Paginated
-  // subjects beyond page 1 won't appear until the user navigates — an
-  // acceptable MVP limitation, noted in the plan.
   const subjectOptions = useMemo(() => {
     const set = new Set();
     courses.forEach((c) => {
@@ -64,9 +70,7 @@ export default function AdminCoursesPage() {
         is_archived: !course.is_archived,
       }).unwrap();
     } catch {
-      // RTK Query will refetch on the invalidated tags; a failed toggle
-      // simply leaves the row as it was. Errors surface on the next
-      // mutation attempt or on a manual refresh.
+      // RTK Query will refetch on the invalidated tags.
     }
   };
 
@@ -87,7 +91,6 @@ export default function AdminCoursesPage() {
         </Button>
       </header>
 
-      {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label
@@ -141,11 +144,19 @@ export default function AdminCoursesPage() {
       )}
 
       {!isLoading && !isError && (
-        <CoursesTable
-          courses={courses}
-          onEdit={handleEdit}
-          onArchiveToggle={handleArchiveToggle}
-        />
+        <>
+          <CoursesTable
+            courses={courses}
+            onEdit={handleEdit}
+            onArchiveToggle={handleArchiveToggle}
+          />
+          <Pager
+            page={page}
+            count={count}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <CreateCourseModal

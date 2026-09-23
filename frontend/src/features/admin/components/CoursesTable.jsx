@@ -3,8 +3,6 @@ import { Pencil, Archive, ArchiveRestore } from "lucide-react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 
-// Table for the admin Courses page. Stateless: all interactions bubble up
-// through callbacks so the parent owns the modal state and mutation calls.
 export default function CoursesTable({ courses, onEdit, onArchiveToggle }) {
   if (!courses || courses.length === 0) {
     return (
@@ -15,7 +13,7 @@ export default function CoursesTable({ courses, onEdit, onArchiveToggle }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-ink-300 bg-white shadow-card">
+    <div className="overflow-x-auto rounded-card border border-ink-300 bg-white shadow-card">
       <table className="w-full">
         <thead className="border-b border-ink-200 bg-ink-100/40">
           <tr>

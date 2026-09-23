@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { useSelector } from "react-redux";
 
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
+import Pager from "../../../components/ui/Pager";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import UsersTable from "../components/UsersTable";
@@ -13,14 +14,21 @@ import { useGetAdminUsersQuery } from "../../../store/api/realApi";
 import { selectAdminUser } from "../../../store/slices/adminAuthSlice";
 import { extractErrorMessage } from "../../../utils/apiError";
 
+const PAGE_SIZE = 20;
+
 export default function AdminUsersPage() {
   const currentUser = useSelector(selectAdminUser);
   const [roleFilter, setRoleFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
 
-  const queryParams = {};
+  useEffect(() => {
+    setPage(1);
+  }, [roleFilter, search]);
+
+  const queryParams = { page };
   if (roleFilter) queryParams.role = roleFilter;
   if (search.trim()) queryParams.q = search.trim();
 
@@ -28,6 +36,7 @@ export default function AdminUsersPage() {
     useGetAdminUsersQuery(queryParams);
 
   const users = data?.results || [];
+  const count = data?.count || 0;
 
   return (
     <div>
@@ -46,7 +55,6 @@ export default function AdminUsersPage() {
         </Button>
       </header>
 
-      {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label
@@ -92,11 +100,19 @@ export default function AdminUsersPage() {
       )}
 
       {!isLoading && !isError && (
-        <UsersTable
-          users={users}
-          currentUserId={currentUser?.id}
-          onEdit={setEditUser}
-        />
+        <>
+          <UsersTable
+            users={users}
+            currentUserId={currentUser?.id}
+            onEdit={setEditUser}
+          />
+          <Pager
+            page={page}
+            count={count}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </>
       )}
 
       <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
