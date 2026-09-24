@@ -16,12 +16,137 @@ import pytest
 from rest_framework.test import APIClient
 
 from accounts.models import User
+from classes.models import ClassCourse, StudentEnrollment
 from institutions.models import Institution
 
 
 pytestmark = pytest.mark.django_db
 
+# ----------------------------------------------------------------- classes / enrollments
 
+
+def test_teacher_classes_returns_own_classes(northwood):
+    """An institution admin can list a teacher's classes."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
+
+    ClassCourse.objects.create(
+        institution=northwood,
+        teacher=teacher,
+        name="Physics 101",
+        subject="Physics",
+    )
+    ClassCourse.objects.create(
+        institution=northwood,
+        teacher=teacher,
+        name="Physics 102",
+        subject="Physics",
+        is_archived=True,
+    )
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{teacher.id}/classes/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 2
+    names = {row["name"] for row in body["results"]}
+    assert names == {"Physics 101", "Physics 102"}
+
+
+def test_classes_endpoint_400_for_non_teacher(northwood):
+    """Calling /classes/ on a student returns 400."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("student@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{student.id}/classes/")
+    assert resp.status_code == 400
+    assert "not a teacher" in resp.json()["error"]["detail"]
+
+
+def test_classes_endpoint_404_for_other_institution(northwood, riverdale):
+    """Cross-institution access returns 404 (not 403)."""
+    admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
+    teacher_b = make_user("teacher.b@test.local", User.ROLE_TEACHER, riverdale)
+
+    client = auth_client(admin_a)
+    resp = client.get(f"/api/v1/admin/users/{teacher_b.id}/classes/")
+    assert resp.status_code == 404
+
+
+def test_student_enrollments_returns_own_enrollments(northwood):
+    """An institution admin can list a student's enrollments."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
+    student = make_user("student@test.local", User.ROLE_STUDENT, northwood)
+
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=teacher,
+        name="Physics 101",
+        subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student,
+        class_course=course,
+        joining_code="ABC123",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{student.id}/enrollments/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    row = body["results"][0]
+    assert row["status"] == "active"
+    assert row["class_course"]["name"] == "Physics 101"
+    assert row["class_course"]["teacher"]["email"] == "teacher@test.local"
+
+
+def test_enrollments_endpoint_400_for_non_student(northwood):
+    """Calling /enrollments/ on a teacher returns 400."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{teacher.id}/enrollments/")
+    assert resp.status_code == 400
+    assert "not a student" in resp.json()["error"]["detail"]
+
+
+def test_enrollments_endpoint_404_for_other_institution(northwood, riverdale):
+    """Cross-institution access returns 404."""
+    admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
+    student_b = make_user("student.b@test.local", User.ROLE_STUDENT, riverdale)
+
+    client = auth_client(admin_a)
+    resp = client.get(f"/api/v1/admin/users/{student_b.id}/enrollments/")
+    assert resp.status_code == 404
+
+
+def test_classes_empty_for_teacher_with_no_classes(northwood):
+    """Teacher with no classes returns empty results."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{teacher.id}/classes/")
+    assert resp.status_code == 200
+    assert resp.json() == {"results": [], "count": 0}
+
+
+def test_enrollments_empty_for_student_with_no_enrollments(northwood):
+    """Student with no enrollments returns empty results."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("student@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/users/{student.id}/enrollments/")
+    assert resp.status_code == 200
+    assert resp.json() == {"results": [], "count": 0}
+    
+    
 # ----------------------------------------------------------------- helpers
 
 @pytest.fixture
