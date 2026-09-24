@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom"
 import { Pencil, Shield, ShieldOff } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
@@ -82,10 +83,16 @@ export default function UsersTable({ users, currentUserId, onEdit }) {
                       size="sm"
                     />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-ink-900">
-                        {u.full_name || "—"}
-                      </p>
-                      <p className="truncate text-xs text-ink-500">{u.email}</p>
+
+                      <Link to={`/admin/users/${u.id}`} 
+                      className="block min-w-0" > 
+                      <p className="truncate text-sm font-medium text-ink-900 hover:text-brand-600"> 
+                        {u.full_name || "—"} 
+                      </p> 
+                        <p className="truncate text-xs text-ink-500">{u.email}</p> 
+
+                      </Link>
+
                     </div>
                   </div>
                 </td>

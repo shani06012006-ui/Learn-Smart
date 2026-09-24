@@ -5,9 +5,7 @@ import {
   adminLoggedOut,
 } from "../slices/adminAuthSlice";
 
-// Real backend API slice â€” separate from the mock-backed `apiSlice`. Talks
-// to Django via the Vite proxy at /api/v1/*. Different reducer path, own
-// cache, own tag model, own middleware. It never touches the mock slice.
+
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: "/api/v1",
@@ -19,9 +17,7 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
-// Refresh-on-401, mirroring the mock slice's pattern. Only the auth
-// endpoints are exempt (a 401 from /auth/login/ is a real credential
-// failure, not an expired session).
+
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await rawBaseQuery(args, api, extraOptions);
 
@@ -153,6 +149,20 @@ export const realApi = createApi({
       ],
     }),
 
+    getAdminUserClasses: builder.query({
+      query: (id) => `/admin/users/${id}/classes/`,
+      providesTags: (result, error, id) => [
+        { type: "AdminUser", id: `classes-${id}` },
+      ],
+    }),
+
+    getAdminUserEnrollments: builder.query({
+      query: (id) => `/admin/users/${id}/enrollments/`,
+      providesTags: (result, error, id) => [
+        { type: "AdminUser", id: `enrollments-${id}` },
+      ],
+    }),
+
     // ---------- admin stats -----------------------------------------
 
     getAdminStats: builder.query({
@@ -231,4 +241,6 @@ export const {
   useUpdateAdminUserMutation,
   useToggleAdminUserActiveMutation,
   useGetAdminStatsQuery,
+  useGetAdminUserClassesQuery,
+  useGetAdminUserEnrollmentsQuery
 } = realApi;
