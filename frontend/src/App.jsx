@@ -29,6 +29,7 @@ import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
 import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
 import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
+import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 
 export default function App() {
   return (
@@ -39,13 +40,13 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/features" element={<FeaturesPage />} />
 
-      {/* Institution admin â€” the guard redirects to the shared /login
-          when no admin session is present. */}
+
       <Route element={<AdminRouteGuard />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="courses" element={<AdminCoursesPage />} />
           <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:id" element={<AdminUserDetailPage />} />
         </Route>
       </Route>
 
