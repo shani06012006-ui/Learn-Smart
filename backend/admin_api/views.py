@@ -173,6 +173,99 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         user.save(update_fields=["is_active", "updated_at"])
         return Response(AdminUserSerializer(user).data)
 
+     # ------------------------------------------------------------------ relations
+
+    @action(detail=True, methods=["get"], url_path="classes")
+    def classes(self, request, pk=None):
+        """
+        GET /api/v1/admin/users/<id>/classes/
+
+        Return the classes taught by this user. Only valid for teachers.
+        Respects institution isolation via get_object().
+        """
+        user = self.get_object()
+
+        if user.role != User.ROLE_TEACHER:
+            return Response(
+                {
+                    "error": {
+                        "detail": "This user is not a teacher.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = (
+            ClassCourse.objects.filter(teacher=user)
+            .select_related("institution")
+            .annotate(student_count=Count("enrollments"))
+            .order_by("-created_at")
+        )
+
+        data = [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "subject": c.subject,
+                "description": c.description,
+                "is_archived": c.is_archived,
+                "student_count": c.student_count,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in qs
+        ]
+        return Response({"results": data, "count": len(data)})
+
+    @action(detail=True, methods=["get"], url_path="enrollments")
+    def enrollments(self, request, pk=None):
+        """
+        GET /api/v1/admin/users/<id>/enrollments/
+
+        Return the classes this student is enrolled in. Only valid for
+        students. Respects institution isolation via get_object().
+        """
+        user = self.get_object()
+
+        if user.role != User.ROLE_STUDENT:
+            return Response(
+                {
+                    "error": {
+                        "detail": "This user is not a student.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = (
+            StudentEnrollment.objects.filter(student=user)
+            .select_related("class_course", "class_course__teacher")
+            .order_by("-created_at")
+        )
+
+        data = [
+            {
+                "id": str(e.id),
+                "status": e.status,
+                "joined_at": e.joined_at.isoformat() if e.joined_at else None,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "class_course": {
+                    "id": str(e.class_course.id),
+                    "name": e.class_course.name,
+                    "subject": e.class_course.subject,
+                    "is_archived": e.class_course.is_archived,
+                    "teacher": {
+                        "id": str(e.class_course.teacher.id),
+                        "full_name": e.class_course.teacher.get_full_name(),
+                        "email": e.class_course.teacher.email,
+                    },
+                },
+            }
+            for e in qs
+        ]
+        return Response({"results": data, "count": len(data)})
+
 
 class AdminStatsView(APIView):
     """
