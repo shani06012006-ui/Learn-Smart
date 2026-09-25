@@ -163,6 +163,14 @@ export const realApi = createApi({
       ],
     }),
 
+    
+    getAdminCourseStudents: builder.query({
+      query: (id) => `/admin/courses/${id}/students/`,
+      providesTags: (result, error, id) => [
+        { type: "AdminCourse", id: `students-${id}` },
+      ],
+    }),
+
     // ---------- admin stats -----------------------------------------
 
     getAdminStats: builder.query({
@@ -242,5 +250,6 @@ export const {
   useToggleAdminUserActiveMutation,
   useGetAdminStatsQuery,
   useGetAdminUserClassesQuery,
-  useGetAdminUserEnrollmentsQuery
+  useGetAdminUserEnrollmentsQuery ,
+  useGetAdminCourseStudentsQuery
 } = realApi;
