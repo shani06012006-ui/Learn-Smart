@@ -17,6 +17,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User
 from classes.models import ClassCourse, StudentEnrollment
+from core.models import AuditLog
 from institutions.models import Institution
 
 
@@ -663,4 +664,131 @@ def test_course_students_requires_authentication(northwood, course_teacher):
 
     client = APIClient()  # no force_authenticate
     resp = client.get(f"/api/v1/admin/courses/{course.id}/students/")
+    assert resp.status_code in (401, 403)    
+    
+    
+
+
+# ----------------------------------------------------------------- audit log
+
+
+def test_audit_list_scoped_to_institution(northwood, riverdale):
+    """Institution admin sees only their institution's audit rows."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    other_admin = make_user("other@test.local", User.ROLE_ADMIN, riverdale)
+
+    AuditLog.objects.create(
+        actor=admin,
+        actor_type="user",
+        institution=northwood,
+        action="user.created",
+        resource_type="user",
+    )
+    AuditLog.objects.create(
+        actor=other_admin,
+        actor_type="user",
+        institution=riverdale,
+        action="user.created",
+        resource_type="user",
+    )
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/audit/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["action"] == "user.created"
+
+
+def test_audit_list_superuser_sees_all(northwood, riverdale):
+    """Superuser sees audit rows across every institution."""
+    su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
+    admin_a = make_user("a@test.local", User.ROLE_ADMIN, northwood)
+    admin_b = make_user("b@test.local", User.ROLE_ADMIN, riverdale)
+
+    AuditLog.objects.create(
+        actor=admin_a, actor_type="user", institution=northwood,
+        action="user.created",
+    )
+    AuditLog.objects.create(
+        actor=admin_b, actor_type="user", institution=riverdale,
+        action="user.created",
+    )
+
+    client = auth_client(su)
+    resp = client.get("/api/v1/admin/audit/")
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 2
+
+
+def test_audit_list_filter_by_action(northwood):
+    """?action= narrows the list."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="user.created",
+    )
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="course.created",
+    )
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/audit/?action=course.created")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["action"] == "course.created"
+
+
+def test_audit_list_filter_by_search(northwood):
+    """?q= matches against action / resource_type."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="user.created", resource_type="user",
+    )
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="course.created", resource_type="course",
+    )
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/audit/?q=course")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["resource_type"] == "course"
+
+
+def test_audit_actions_endpoint_returns_distinct(northwood):
+    """GET /audit/actions/ returns distinct action codes for the caller."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="user.created",
+    )
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="user.created",  # duplicate
+    )
+    AuditLog.objects.create(
+        actor=admin, actor_type="user", institution=northwood,
+        action="course.created",
+    )
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/audit/actions/")
+    assert resp.status_code == 200
+    actions = resp.json()["results"]
+    assert sorted(actions) == ["course.created", "user.created"]
+
+
+def test_audit_list_requires_authentication(northwood):
+    """Unauthenticated request is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/admin/audit/")
     assert resp.status_code in (401, 403)    

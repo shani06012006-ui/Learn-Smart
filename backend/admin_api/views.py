@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 
 from accounts.models import User
 from classes.models import ClassCourse, StudentEnrollment
+from core.models import AuditLog
 from institutions.models import Institution
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
@@ -30,6 +31,7 @@ from .serializers import (
     AdminUserSerializer,
     AdminUserToggleActiveSerializer,
     AdminUserUpdateSerializer,
+    AuditLogSerializer,
 )
 
 
@@ -317,6 +319,91 @@ class AdminStatsView(APIView):
             "is_superuser_view": user.is_superuser,
         }
         return Response(AdminStatsSerializer(payload).data)
+    
+
+
+class AdminAuditLogViewSet(viewsets.GenericViewSet):
+    """
+    Admin-only audit log reader.
+
+    Endpoints:
+        GET /api/v1/admin/audit/    list (paginated, filterable)
+
+    Read-only. AuditLog rows are append-only at the ORM and DB level,
+    so there are no create/update/delete paths here.
+
+    Isolation rule (same as the rest of admin_api):
+        - Superuser sees every institution's audit rows.
+        - A regular admin sees only rows where institution == their own.
+          Rows with institution IS NULL (e.g. system events, anonymous
+          logins before tenant resolution) are hidden from non-superusers.
+    """
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = AuditLog.objects.all().select_related("actor", "institution")
+
+        if not user.is_superuser:
+            qs = qs.filter(institution=user.institution)
+
+        # Optional ?action=user.created  (exact match; the whitelist is small)
+        action = self.request.query_params.get("action")
+        if action:
+            qs = qs.filter(action=action)
+
+        # Optional ?resource_type=user  (exact match)
+        resource_type = self.request.query_params.get("resource_type")
+        if resource_type:
+            qs = qs.filter(resource_type=resource_type)
+
+        # Optional ?actor_id=<uuid>
+        actor_id = self.request.query_params.get("actor_id")
+        if actor_id:
+            qs = qs.filter(actor_id=actor_id)
+
+        # Optional ?since=<iso>&until=<iso> — passed straight through to
+        # the DateTimeField, which will raise a clean DRF error on bad input.
+        since = self.request.query_params.get("since")
+        if since:
+            qs = qs.filter(occurred_at__gte=since)
+
+        until = self.request.query_params.get("until")
+        if until:
+            qs = qs.filter(occurred_at__lte=until)
+
+        # Optional ?q= free text — matches action or resource_type
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(Q(action__icontains=q) | Q(resource_type__icontains=q))
+
+        return qs.order_by("-occurred_at")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = AuditLogSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(AuditLogSerializer(qs, many=True).data)
+
+    @action(detail=False, methods=["get"], url_path="actions")
+    def actions(self, request):
+        """
+        GET /api/v1/admin/audit/actions/
+
+        Return the distinct set of action codes that appear in the audit
+        trail, scoped to the caller. Used to populate the frontend filter
+        dropdown without hardcoding the whitelist in two places.
+        """
+        qs = self.get_queryset()
+        actions = (
+            qs.values_list("action", flat=True).distinct().order_by("action")
+        )
+        return Response({"results": list(actions)})
+    
+        
 
 class InstitutionCourseViewSet(viewsets.GenericViewSet):
     """

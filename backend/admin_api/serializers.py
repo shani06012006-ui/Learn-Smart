@@ -5,6 +5,7 @@ from rest_framework import serializers
 
 from accounts.models import User
 from classes.models import ClassCourse, StudentEnrollment
+from core.models import AuditLog
 from institutions.models import Institution
 
 
@@ -192,3 +193,46 @@ class AdminCourseWriteSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("This field is required.")
         return value
+    
+
+
+# ---------------------------------------------------------------- audit log
+
+
+class AuditActorBriefSerializer(serializers.ModelSerializer):
+    """Compact actor payload embedded in audit rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name", "role"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+
+    actor = AuditActorBriefSerializer(read_only=True)
+    resource_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = [ 
+            "id",
+            "occurred_at",
+            "actor",
+            "actor_type",
+            "action",
+            "resource_type",
+            "resource_id",
+            "metadata",
+            "ip_address",
+            "user_agent",
+        ]
+        read_only_fields = fields
+
+    def get_resource_id(self, obj):
+        return str(obj.resource_id) if obj.resource_id else None    
