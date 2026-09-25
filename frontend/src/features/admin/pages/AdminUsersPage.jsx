@@ -19,6 +19,7 @@ const PAGE_SIZE = 20;
 export default function AdminUsersPage() {
   const currentUser = useSelector(selectAdminUser);
   const [roleFilter, setRoleFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -26,11 +27,13 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [roleFilter, search]);
+  }, [roleFilter, search, activeFilter]);
 
-  const queryParams = { page };
-  if (roleFilter) queryParams.role = roleFilter;
-  if (search.trim()) queryParams.q = search.trim();
+  const queryParams = {};
+    if (roleFilter) queryParams.role = roleFilter;
+    if (activeFilter === "active") queryParams.is_active = true;
+    if (activeFilter === "inactive") queryParams.is_active = false;
+    if (search.trim()) queryParams.q = search.trim();
 
   const { data, isLoading, isError, error, refetch } =
     useGetAdminUsersQuery(queryParams);
@@ -75,6 +78,25 @@ export default function AdminUsersPage() {
             <option value="student">Student</option>
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="admin-status-filter"
+            className="text-sm font-medium text-ink-700"
+          >
+            Status
+          </label>
+          <select
+            id="admin-status-filter"
+            value={activeFilter}
+            onChange={(e) => setActiveFilter(e.target.value)}
+            className="focus-ring rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900"
+          >
+            <option value="">All statuses</option>
+            <option value="active">Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+        </div>
+
 
         <div className="relative flex-1 min-w-[14rem] max-w-sm">
           <Search
