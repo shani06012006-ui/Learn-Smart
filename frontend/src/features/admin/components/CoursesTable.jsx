@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Pencil, Archive, ArchiveRestore } from "lucide-react";
 
 import Badge from "../../../components/ui/Badge";
@@ -44,15 +45,17 @@ export default function CoursesTable({ courses, onEdit, onArchiveToggle }) {
               className="border-b border-ink-200 last:border-b-0 hover:bg-ink-100/30"
             >
               <td className="px-4 py-3">
-                <p className="text-sm font-medium text-ink-900">
-                  {course.name}
-                </p>
-                {course.description && (
-                  <p className="mt-0.5 line-clamp-1 text-xs text-ink-500">
-                    {course.description}
-                  </p>
-                )}
+                <Link 
+                to={`/admin/courses/${course.id}`} 
+                className="focus-ring block text-sm font-medium text-ink-900 hover:text-brand-600 hover:underline" > 
+                  {course.name} 
+                  </Link> 
+                  {course.description && ( 
+                    <p className="mt-0.5 line-clamp-1 text-xs text-ink-500"> 
+                    {course.description} 
+                    </p> )} 
               </td>
+              
               <td className="px-4 py-3 text-sm text-ink-700">
                 {course.subject}
               </td>

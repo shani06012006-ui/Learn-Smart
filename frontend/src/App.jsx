@@ -30,6 +30,8 @@ import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
 import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
+import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
+
 
 export default function App() {
   return (
@@ -45,6 +47,7 @@ export default function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="courses/:id" element={<AdminCourseDetailPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:id" element={<AdminUserDetailPage />} />
         </Route>
