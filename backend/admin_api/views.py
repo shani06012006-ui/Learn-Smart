@@ -514,12 +514,42 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         return Response(AdminCourseReadSerializer(course).data)
 
     def destroy(self, request, pk=None):
-        """
-        Soft-deletes the course. The React admin UI exposes this only as
-        an "Archive" action (which uses partial_update with
-        is_archived=true). The DELETE endpoint remains available for a
-        future hard-removal flow, but is not wired into the UI.
-        """
         course = self.get_object()
         course.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    # ------------------------------------------------------------------ relations
+
+    @action(detail=True, methods=["get"], url_path="students")
+    def students(self, request, pk=None):
+        """
+        GET /api/v1/admin/courses/<id>/students/
+
+        Return students enrolled in this course, newest first. Respects
+        institution isolation via get_object(). Includes blocked and
+        removed rows so the admin sees the full lifecycle.
+        """
+        course = self.get_object()
+
+        qs = (
+            StudentEnrollment.objects.filter(class_course=course)
+            .select_related("student")
+            .order_by("-created_at")
+        )
+
+        data = [
+            {
+                "id": str(e.id),
+                "status": e.status,
+                "joined_at": e.joined_at.isoformat() if e.joined_at else None,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "student": {
+                    "id": str(e.student.id),
+                    "full_name": e.student.get_full_name(),
+                    "email": e.student.email,
+                    "is_active": e.student.is_active,
+                },
+            }
+            for e in qs
+        ]
+        return Response({"results": data, "count": len(data)})

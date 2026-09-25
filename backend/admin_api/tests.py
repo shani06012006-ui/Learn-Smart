@@ -574,3 +574,93 @@ def test_superuser_can_create_course_in_any_institution(northwood, course_teache
     )
     assert resp.status_code == 201, resp.content
     assert resp.json()["institution"]["slug"] == "northwood"
+    
+
+
+# ----------------------------------------------------------------- course students
+
+
+def test_course_students_returns_enrolled_students(northwood, course_teacher):
+    """An institution admin can list students enrolled in a course."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student_a = make_user("a@test.local", User.ROLE_STUDENT, northwood)
+    student_b = make_user("b@test.local", User.ROLE_STUDENT, northwood)
+
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=course_teacher,
+        name="Physics 101",
+        subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student_a,
+        class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+    StudentEnrollment.objects.create(
+        student=student_b,
+        class_course=course,
+        joining_code="BBB222",
+        status=StudentEnrollment.STATUS_BLOCKED,
+    )
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/courses/{course.id}/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 2
+    emails = {row["student"]["email"] for row in body["results"]}
+    assert emails == {"a@test.local", "b@test.local"}
+    statuses = {row["student"]["email"]: row["status"] for row in body["results"]}
+    assert statuses["a@test.local"] == "active"
+    assert statuses["b@test.local"] == "blocked"
+
+
+def test_course_students_empty_for_course_with_no_enrollments(
+    northwood, course_teacher
+):
+    """Course with no enrollments returns empty results."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=course_teacher,
+        name="Physics 101",
+        subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.get(f"/api/v1/admin/courses/{course.id}/students/")
+    assert resp.status_code == 200
+    assert resp.json() == {"results": [], "count": 0}
+
+
+def test_course_students_404_for_other_institution(
+    northwood, riverdale, course_teacher_riverdale
+):
+    """Cross-institution access returns 404 (not 403)."""
+    admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
+    course_b = ClassCourse.objects.create(
+        institution=riverdale,
+        teacher=course_teacher_riverdale,
+        name="Riverdale Physics",
+        subject="Physics",
+    )
+
+    client = auth_client(admin_a)
+    resp = client.get(f"/api/v1/admin/courses/{course_b.id}/students/")
+    assert resp.status_code == 404
+
+
+def test_course_students_requires_authentication(northwood, course_teacher):
+    """Unauthenticated request is rejected."""
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=course_teacher,
+        name="Physics 101",
+        subject="Physics",
+    )
+
+    client = APIClient()  # no force_authenticate
+    resp = client.get(f"/api/v1/admin/courses/{course.id}/students/")
+    assert resp.status_code in (401, 403)    
