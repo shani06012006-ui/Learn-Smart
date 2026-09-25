@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import Button from "../../../components/ui/Button";
+import Input from "../../../components/ui/Input";
 import Pager from "../../../components/ui/Pager";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -18,18 +19,20 @@ const PAGE_SIZE = 20;
 export default function AdminCoursesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editCourse, setEditCourse] = useState(null);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, subjectFilter]);
+  }, [statusFilter, subjectFilter, search]);
 
   const queryParams = { page };
   if (statusFilter === "active") queryParams.is_archived = false;
   if (statusFilter === "archived") queryParams.is_archived = true;
   if (subjectFilter) queryParams.subject = subjectFilter;
+  if (search.trim()) queryParams.q = search.trim();
 
   const { data, isLoading, isError, error, refetch } =
     useGetAdminCoursesQuery(queryParams);
@@ -131,6 +134,19 @@ export default function AdminCoursesPage() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="relative min-w-[14rem] max-w-sm flex-1">
+          <Search
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+          />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by course name or subject"
+            className="pl-9"
+          />
         </div>
       </div>
 
