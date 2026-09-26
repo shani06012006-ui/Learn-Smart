@@ -37,7 +37,6 @@ import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPag
 import AdminTeachersPage from "./features/admin/pages/AdminTeachersPage";
 import AdminTeacherDetailPage from "./features/admin/pages/AdminTeacherDetailPage";
 import AdminAttendancePage from "./features/admin/pages/AdminAttendancePage";
-import AdminEnrollmentsPage from "./features/admin/pages/AdminEnrollmentsPage";
 
 
 
@@ -64,7 +63,6 @@ export default function App() {
           <Route path="students" element={<AdminStudentsPage />} />
           <Route path="students/:id" element={<AdminStudentDetailPage />} />
           <Route path="attendance" element={<AdminAttendancePage />} />
-          <Route path="enrollments" element={<AdminEnrollmentsPage />} />
           <Route path="audit" element={<AdminAuditLogPage />} />
           <Route path="sessions" element={<AdminSessionsPage />} />
         </Route>
