@@ -3,13 +3,15 @@ from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
-from classes.models import ClassCourse, StudentEnrollment
+from classes.models import ClassCourse, StudentEnrollment, TimetableEntry
 from core.models import AuditLog
 from institutions.models import Institution
+from core.audit import log_audit
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
 
@@ -26,6 +28,8 @@ from .serializers import (
     AuditLogSerializer,
     StudentAttendanceSerializer,
     TeacherAttendanceSerializer,
+    TimetableEntryReadSerializer,
+    TimetableEntryWriteSerializer,
 )
 
 
@@ -760,3 +764,305 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
             for e in qs
         ]
         return Response({"results": data, "count": len(data)})
+    
+
+
+class AdminTimetableViewSet(viewsets.GenericViewSet):
+    """
+    Admin CRUD for timetable entries.
+
+    Endpoints:
+        GET    /api/v1/admin/timetable/            list (paginated, filterable)
+        POST   /api/v1/admin/timetable/            create
+        GET    /api/v1/admin/timetable/<id>/       retrieve
+        PATCH  /api/v1/admin/timetable/<id>/       update
+        POST   /api/v1/admin/timetable/<id>/deactivate/   soft delete
+
+    Isolation:
+        - Superuser sees every institution's timetable.
+        - A regular admin sees only their own institution's entries.
+
+    Conflict rules (enforced in TimetableEntryWriteSerializer):
+        - Same teacher, same day, overlapping times.
+        - Same class_course, same day, overlapping times.
+        - Same room (non-blank), same day, overlapping times.
+    """
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def _scope_queryset(self, qs):
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        return qs.filter(institution=user.institution)
+
+    def get_queryset(self):
+        qs = (
+            TimetableEntry.objects.all()
+            .select_related("class_course", "class_course__teacher", "teacher", "institution")
+        )
+        qs = self._scope_queryset(qs)
+
+        # Optional ?teacher=<uuid>
+        teacher_id = self.request.query_params.get("teacher")
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)
+
+        # Optional ?class_id=<uuid>
+        class_id = self.request.query_params.get("class_id")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        # Optional ?day=0..6
+        day = self.request.query_params.get("day")
+        if day is not None:
+            try:
+                day_int = int(day)
+                if 0 <= day_int <= 6:
+                    qs = qs.filter(day_of_week=day_int)
+            except (TypeError, ValueError):
+                pass
+
+        # Optional ?institution=<uuid> (superuser only)
+        institution_id = self.request.query_params.get("institution")
+        user = self.request.user
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        # Optional ?active=true|false  (default: only active)
+        active_param = self.request.query_params.get("active")
+        if active_param is not None:
+            active_bool = active_param.lower() in {"true", "1", "yes"}
+            qs = qs.filter(is_active=active_bool)
+        else:
+            qs = qs.filter(is_active=True)
+
+        return qs.order_by("day_of_week", "start_time")
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self._scope_queryset(TimetableEntry.objects.all())
+        try:
+            return qs.get(pk=pk)
+        except TimetableEntry.DoesNotExist:
+            raise NotFound("Timetable entry not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = TimetableEntryReadSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(TimetableEntryReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        entry = self.get_object()
+        return Response(TimetableEntryReadSerializer(entry).data)
+
+    def create(self, request):
+        from core.audit import log_audit  # lazy import — avoids circular
+
+        serializer = TimetableEntryWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        course = data["_course"]
+        user = request.user
+
+        # Institution scoping: a non-superuser may only add rows to their
+        # own institution's classes.
+        if not user.is_superuser and course.institution_id != user.institution_id:
+            return Response(
+                {
+                    "error": {
+                        "detail": "Class is not in your institution.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Conflict check.
+        serializer.check_conflicts(
+            course=course,
+            day=data["day_of_week"],
+            start=data["start_time"],
+            end=data["end_time"],
+            room=data.get("room", ""),
+        )
+
+        entry = TimetableEntry.objects.create(
+            institution=course.institution,
+            class_course=course,
+            teacher=course.teacher,
+            day_of_week=data["day_of_week"],
+            start_time=data["start_time"],
+            end_time=data["end_time"],
+            room=data.get("room", ""),
+            is_active=data.get("is_active", True),
+        )
+
+        log_audit(
+            action="timetable.created",
+            request=request,
+            institution=course.institution,
+            resource_type="timetable",
+            resource_id=entry.id,
+            metadata={
+                "class_id": str(course.id),
+                "day": entry.day_of_week,
+                "start": entry.start_time.isoformat(),
+                "end": entry.end_time.isoformat(),
+                "room": entry.room,
+            },
+        )
+
+        return Response(
+            TimetableEntryReadSerializer(entry).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, pk=None):
+        from core.audit import log_audit
+
+        entry = self.get_object()
+        serializer = TimetableEntryWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Apply edits; fall back to current values when a field is missing.
+        new_course = data.get("_course", entry.class_course)
+        new_day = data.get("day_of_week", entry.day_of_week)
+        new_start = data.get("start_time", entry.start_time)
+        new_end = data.get("end_time", entry.end_time)
+        new_room = data.get("room", entry.room)
+        new_active = data.get("is_active", entry.is_active)
+
+        if new_end <= new_start:
+            return Response(
+                {
+                    "error": {
+                        "detail": "End time must be after start time.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        if not user.is_superuser and new_course.institution_id != user.institution_id:
+            return Response(
+                {
+                    "error": {
+                        "detail": "Class is not in your institution.",
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer.check_conflicts(
+            course=new_course,
+            day=new_day,
+            start=new_start,
+            end=new_end,
+            room=new_room,
+            exclude_id=entry.id,
+        )
+
+        entry.class_course = new_course
+        entry.teacher = new_course.teacher  # stay in sync
+        entry.institution = new_course.institution
+        entry.day_of_week = new_day
+        entry.start_time = new_start
+        entry.end_time = new_end
+        entry.room = new_room
+        entry.is_active = new_active
+        entry.save()
+
+        log_audit(
+            action="timetable.updated",
+            request=request,
+            institution=entry.institution,
+            resource_type="timetable",
+            resource_id=entry.id,
+            metadata={
+                "class_id": str(entry.class_course_id),
+                "day": entry.day_of_week,
+                "start": entry.start_time.isoformat(),
+                "end": entry.end_time.isoformat(),
+                "room": entry.room,
+                "is_active": entry.is_active,
+            },
+        )
+
+        return Response(TimetableEntryReadSerializer(entry).data)
+
+    @action(detail=True, methods=["post"], url_path="deactivate")
+    def deactivate(self, request, pk=None):
+        """Soft-delete: flip is_active=False. Idempotent."""
+        from core.audit import log_audit
+
+        entry = self.get_object()
+
+        if entry.is_active:
+            entry.is_active = False
+            entry.save(update_fields=["is_active", "updated_at"])
+
+            log_audit(
+                action="timetable.deleted",
+                request=request,
+                institution=entry.institution,
+                resource_type="timetable",
+                resource_id=entry.id,
+                metadata={"class_id": str(entry.class_course_id)},
+            )
+
+        return Response(TimetableEntryReadSerializer(entry).data)
+
+
+class TimetableView(APIView):
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = (
+            TimetableEntry.objects.all()
+            .select_related("class_course", "class_course__teacher", "teacher", "institution")
+        )
+
+        if user.role == "teacher":
+            qs = qs.filter(teacher=user)
+        elif user.role == "student":
+            enrolled_class_ids = StudentEnrollment.objects.filter(
+                student=user,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            ).values_list("class_course_id", flat=True)
+            qs = qs.filter(class_course_id__in=enrolled_class_ids)
+        else:
+            return Response(
+                {"detail": "Use /admin/timetable/ for admin access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Optional ?day=0..6
+        day = request.query_params.get("day")
+        if day is not None:
+            try:
+                day_int = int(day)
+                if 0 <= day_int <= 6:
+                    qs = qs.filter(day_of_week=day_int)
+            except (TypeError, ValueError):
+                pass
+
+        # Optional ?active=true|false (defaults to active only)
+        active_param = request.query_params.get("active")
+        if active_param is not None:
+            active_bool = active_param.lower() in {"true", "1", "yes"}
+            qs = qs.filter(is_active=active_bool)
+        else:
+            qs = qs.filter(is_active=True)
+
+        qs = qs.order_by("day_of_week", "start_time")
+        return Response(TimetableEntryReadSerializer(qs, many=True).data)    

@@ -1,5 +1,6 @@
-from django.urls import path
+﻿from django.urls import path
 
+from admin_api.views import TimetableView
 from .views import (
     ClassCourseDetailView,
     ClassCourseListCreateView,
@@ -18,4 +19,5 @@ urlpatterns = [
         name="class-student-detail",
     ),
     path("enrollments/join/", JoinClassView.as_view(), name="enrollment-join"),
+    path("timetable/", TimetableView.as_view(), name="timetable"),
 ]

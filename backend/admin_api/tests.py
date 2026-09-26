@@ -77,11 +77,11 @@ def _make_session(user, *, revoked=False, expired=False, label="Test Device"):
     """Helper: build a RefreshToken row with sensible defaults."""
     now = timezone.now()
     raw = f"{user.id}-{label}-{uuid.uuid4()}"
-    token_hash = hashlib.sha256(raw.encode()).hexdigest()  
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
     return RefreshToken.objects.create(
         user=user,
         token_hash=token_hash,
-        family_id=user.id, 
+        family_id=user.id,
         expires_at=now - timedelta(hours=1) if expired else now + timedelta(days=7),
         revoked_at=now if revoked else None,
         revoked_reason="admin_revoked" if revoked else "",
@@ -160,7 +160,7 @@ def test_admin_cannot_create_another_admin(northwood):
         {
             "email": "sneakyadmin@test.local",
             "password": "NewPass123!",
-            "role": "admin", 
+            "role": "admin",
         },
         format="json",
     )
@@ -169,7 +169,6 @@ def test_admin_cannot_create_another_admin(northwood):
 
 
 def test_admin_cannot_create_user_in_other_institution(northwood, riverdale):
-
     admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
     client = auth_client(admin_a)
 
@@ -234,7 +233,6 @@ def test_stats_scoped_to_institution(northwood, riverdale):
     resp = client.get("/api/v1/admin/stats/")
     assert resp.status_code == 200
     data = resp.json()
-    # Northwood has: 1 admin + 1 teacher + 1 student = 3
     assert data["users_total"] == 3
     assert data["users_teachers"] == 1
     assert data["users_students"] == 1
@@ -255,7 +253,6 @@ def test_non_admin_rejected(northwood):
 
 
 def test_teacher_classes_returns_own_classes(northwood):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
 
@@ -334,7 +331,6 @@ def test_student_enrollments_returns_own_enrollments(northwood):
 
 
 def test_enrollments_endpoint_400_for_non_student(northwood):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     teacher = make_user("teacher@test.local", User.ROLE_TEACHER, northwood)
 
@@ -345,7 +341,6 @@ def test_enrollments_endpoint_400_for_non_student(northwood):
 
 
 def test_enrollments_endpoint_404_for_other_institution(northwood, riverdale):
-
     admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
     student_b = make_user("student.b@test.local", User.ROLE_STUDENT, riverdale)
 
@@ -366,7 +361,6 @@ def test_classes_empty_for_teacher_with_no_classes(northwood):
 
 
 def test_enrollments_empty_for_student_with_no_enrollments(northwood):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     student = make_user("student@test.local", User.ROLE_STUDENT, northwood)
 
@@ -662,7 +656,7 @@ def test_course_students_requires_authentication(northwood, course_teacher):
         subject="Physics",
     )
 
-    client = APIClient()  # no force_authenticate
+    client = APIClient()
     resp = client.get(f"/api/v1/admin/courses/{course.id}/students/")
     assert resp.status_code in (401, 403)
 
@@ -693,7 +687,6 @@ def test_audit_list_scoped_to_institution(northwood, riverdale):
 
 
 def test_audit_list_superuser_sees_all(northwood, riverdale):
-
     su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
     admin_a = make_user("a@test.local", User.ROLE_ADMIN, northwood)
     admin_b = make_user("b@test.local", User.ROLE_ADMIN, riverdale)
@@ -714,7 +707,6 @@ def test_audit_list_superuser_sees_all(northwood, riverdale):
 
 
 def test_audit_list_filter_by_action(northwood):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
 
     AuditLog.objects.create(
@@ -765,7 +757,7 @@ def test_audit_actions_endpoint_returns_distinct(northwood):
     )
     AuditLog.objects.create(
         actor=admin, actor_type="user", institution=northwood,
-        action="user.created", 
+        action="user.created",
     )
     AuditLog.objects.create(
         actor=admin, actor_type="user", institution=northwood,
@@ -787,6 +779,7 @@ def test_audit_list_requires_authentication(northwood):
 
 
 # ----------------------------------------------------------------- sessions
+
 
 def test_sessions_list_scoped_to_institution(northwood, riverdale):
     """Institution admin sees only sessions for users in their institution."""
@@ -900,6 +893,7 @@ def test_session_revoke_idempotent(northwood):
 
 # ----------------------------------------------------------------- enrollments
 
+
 def test_enrollments_list_scoped_to_institution(northwood, riverdale, course_teacher, course_teacher_riverdale):
     """Institution admin sees only enrollments for classes in their institution."""
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
@@ -942,7 +936,6 @@ def test_enrollments_list_scoped_to_institution(northwood, riverdale, course_tea
 
 
 def test_enrollments_list_superuser_sees_all(northwood, riverdale, course_teacher, course_teacher_riverdale):
-
     su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
     student_a = make_user("sa@test.local", User.ROLE_STUDENT, northwood)
     student_b = make_user("sb@test.local", User.ROLE_STUDENT, riverdale)
@@ -976,7 +969,6 @@ def test_enrollments_filter_by_status(northwood, course_teacher):
     course = ClassCourse.objects.create(
         institution=northwood, teacher=course_teacher, name="P", subject="Physics"
     )
-
     StudentEnrollment.objects.create(
         student=student_a, class_course=course,
         joining_code="AAA111", status=StudentEnrollment.STATUS_ACTIVE,
@@ -998,7 +990,6 @@ def test_enrollments_filter_by_status(northwood, course_teacher):
 
 
 def test_enrollments_filter_by_class(northwood, course_teacher):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
 
@@ -1026,7 +1017,6 @@ def test_enrollments_filter_by_class(northwood, course_teacher):
 
 
 def test_enrollments_search_by_student_or_class(northwood, course_teacher):
-
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     student = make_user("alice@test.local", User.ROLE_STUDENT, northwood)
 
@@ -1048,7 +1038,6 @@ def test_enrollments_search_by_student_or_class(northwood, course_teacher):
 
     no_match = client.get("/api/v1/admin/enrollments/?q=xyz123").json()
     assert no_match["count"] == 0
-    
 
 
 # ----------------------------------------------------------------- attendance
@@ -1221,19 +1210,16 @@ def test_attendance_teacher_and_student_are_separate(northwood, course_teacher):
         status=StudentEnrollment.STATUS_ACTIVE,
     )
 
-    # Call teacher service with student ID — should NOT create student attendance.
     touch_teacher_attendance(student.id)
     assert TeacherAttendance.objects.count() == 0
     assert StudentAttendance.objects.count() == 0
 
-    # Call student service with teacher ID — should NOT create teacher attendance.
     touch_student_attendance(teacher.id)
     assert TeacherAttendance.objects.count() == 0
     assert StudentAttendance.objects.count() == 0
 
 
 def test_teacher_attendance_list_scoped_to_institution(northwood, riverdale, course_teacher, course_teacher_riverdale):
-    """Admin sees only own-institution teacher attendance."""
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
 
     _make_teacher_attendance(course_teacher)
@@ -1248,7 +1234,6 @@ def test_teacher_attendance_list_scoped_to_institution(northwood, riverdale, cou
 
 
 def test_teacher_attendance_list_superuser_sees_all(northwood, riverdale, course_teacher, course_teacher_riverdale):
-    """Superuser sees teacher attendance across institutions."""
     su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
     _make_teacher_attendance(course_teacher)
     _make_teacher_attendance(course_teacher_riverdale)
@@ -1260,7 +1245,6 @@ def test_teacher_attendance_list_superuser_sees_all(northwood, riverdale, course
 
 
 def test_student_attendance_list_scoped_to_institution(northwood, riverdale, course_teacher, course_teacher_riverdale):
-    """Admin sees only own-institution student attendance."""
     admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
     student_nw = make_user("snw@test.local", User.ROLE_STUDENT, northwood)
     student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
@@ -1283,7 +1267,6 @@ def test_student_attendance_list_scoped_to_institution(northwood, riverdale, cou
 
 
 def test_attendance_requires_authentication(northwood):
-    """Unauthenticated request is rejected."""
     client = APIClient()
     resp = client.get("/api/v1/admin/attendance/teachers/")
     assert resp.status_code in (401, 403)
@@ -1309,12 +1292,295 @@ def test_attendance_filters_by_date(northwood, course_teacher):
 
     client = auth_client(admin)
 
-    # Default = today
     resp_today = client.get("/api/v1/admin/attendance/teachers/")
     assert resp_today.json()["count"] == 1
 
-    # Explicit yesterday
     resp_yest = client.get(
         f"/api/v1/admin/attendance/teachers/?date={yesterday.isoformat()}"
     )
-    assert resp_yest.json()["count"] == 1    
+    assert resp_yest.json()["count"] == 1
+
+
+# ----------------------------------------------------------------- timetable
+
+
+def _make_timetable_entry(course, *, day=0, start="09:00", end="10:00", room="", is_active=True):
+    """Helper: build a TimetableEntry row directly."""
+    from datetime import time
+
+    from classes.models import TimetableEntry
+
+    def _t(s):
+        hh, mm = s.split(":")
+        return time(int(hh), int(mm))
+
+    return TimetableEntry.objects.create(
+        institution=course.institution,
+        class_course=course,
+        teacher=course.teacher,
+        day_of_week=day,
+        start_time=_t(start),
+        end_time=_t(end),
+        room=room,
+        is_active=is_active,
+    )
+
+
+def test_timetable_admin_can_create_entry(northwood, course_teacher):
+    """Admin can create a valid timetable entry."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 0,
+            "start_time": "09:00",
+            "end_time": "10:00",
+            "room": "R101",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    body = resp.json()
+    assert body["day_of_week"] == 0
+    assert body["room"] == "R101"
+    assert body["is_active"] is True
+    assert body["class_course"]["id"] == str(course.id)
+
+
+def test_timetable_rejects_end_before_start(northwood, course_teacher):
+    """end_time <= start_time is rejected."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 0,
+            "start_time": "10:00",
+            "end_time": "09:00",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_timetable_teacher_conflict(northwood, course_teacher):
+    """Same teacher cannot have two overlapping entries on the same day."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course_a = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics A", subject="Physics",
+    )
+    course_b = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics B", subject="Physics",
+    )
+    _make_timetable_entry(course_a, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course_b.id),
+            "day_of_week": 0,
+            "start_time": "09:30",
+            "end_time": "10:30",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "time slot" in resp.json()["error"]["detail"][0]
+
+
+def test_timetable_class_conflict(northwood, course_teacher):
+    """Same class_course cannot have two overlapping entries on the same day."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    _make_timetable_entry(course, day=1, start="09:00", end="10:00")
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 1,
+            "start_time": "09:30",
+            "end_time": "10:30",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "time slot" in resp.json()["error"]["detail"][0]
+
+
+def test_timetable_room_conflict(northwood, course_teacher):
+    """Same non-blank room cannot be double-booked on the same day."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course_a = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics A", subject="Physics",
+    )
+    teacher_b = make_user("t.b@test.local", User.ROLE_TEACHER, northwood)
+    course_b = ClassCourse.objects.create(
+        institution=northwood, teacher=teacher_b,
+        name="Physics B", subject="Physics",
+    )
+    _make_timetable_entry(course_a, day=2, start="09:00", end="10:00", room="R101")
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course_b.id),
+            "day_of_week": 2,
+            "start_time": "09:30",
+            "end_time": "10:30",
+            "room": "R101",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+    assert "R101" in resp.json()["error"]["detail"][0]
+
+
+def test_timetable_adjacent_slots_are_allowed(northwood, course_teacher):
+    """Back-to-back slots do not conflict: [09,10) and [10,11) are fine."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    _make_timetable_entry(course, day=3, start="09:00", end="10:00")
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 3,
+            "start_time": "10:00",
+            "end_time": "11:00",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+
+
+def test_timetable_list_scoped_to_institution(
+    northwood, riverdale, course_teacher, course_teacher_riverdale
+):
+    """Admin sees only own-institution entries."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course_nw = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="NW Physics", subject="Physics",
+    )
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale,
+        name="RD Physics", subject="Physics",
+    )
+    _make_timetable_entry(course_nw, day=0, start="09:00", end="10:00")
+    _make_timetable_entry(course_rd, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/timetable/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["class_course"]["name"] == "NW Physics"
+
+
+def test_timetable_requires_authentication(northwood):
+    """Unauthenticated admin request is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/admin/timetable/")
+    assert resp.status_code in (401, 403)
+
+
+def test_timetable_admin_can_deactivate(northwood, course_teacher):
+    """Soft delete flips is_active=False and keeps the row."""
+    from classes.models import TimetableEntry
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    entry = _make_timetable_entry(course, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/timetable/{entry.id}/deactivate/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["is_active"] is False
+
+    assert TimetableEntry.objects.filter(pk=entry.id).exists()
+
+
+def test_timetable_teacher_sees_own_entries(northwood, course_teacher):
+    """Teacher /timetable/ returns only their own entries."""
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    _make_timetable_entry(course, day=0, start="09:00", end="10:00")
+
+    client = auth_client(course_teacher)
+    resp = client.get("/api/v1/timetable/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert isinstance(body, list)
+    assert len(body) == 1
+    assert body[0]["class_course"]["name"] == "Physics"
+
+
+def test_timetable_student_sees_enrolled_class_entries(
+    northwood, course_teacher
+):
+    """Student /timetable/ returns entries for enrolled classes only."""
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course_a = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    course_b = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Chemistry", subject="Chemistry",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course_a,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+    _make_timetable_entry(course_a, day=0, start="09:00", end="10:00")
+    _make_timetable_entry(course_b, day=0, start="11:00", end="12:00")
+
+    client = auth_client(student)
+    resp = client.get("/api/v1/timetable/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["class_course"]["name"] == "Physics"
+
+
+def test_timetable_admin_gets_403_on_role_view(northwood):
+    """Admin should use /admin/timetable/, not the role-aware endpoint."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    client = auth_client(admin)
+    resp = client.get("/api/v1/timetable/")
+    assert resp.status_code == 403

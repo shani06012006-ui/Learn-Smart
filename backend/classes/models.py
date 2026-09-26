@@ -98,3 +98,84 @@ class StudentEnrollment(TimeStampedModel):
 
     def __str__(self):
         return f"{self.student.email} -> {self.class_course.name} [{self.status}]"
+
+
+
+class TimetableEntry(TimeStampedModel):
+    """
+    A weekly timetable slot for a class. One row = (class, day, time range).
+
+    Soft-deleted via `is_active=False` so historical rows remain for
+    audits. Overlapping conflicts (same teacher / same class / same room
+    on the same day) are prevented at the serializer level — Django
+    UniqueConstraint cannot express interval overlap cleanly.
+
+    `room` is a free-text CharField. A dedicated Room model would be
+    added in a future phase if room inventory becomes a first-class
+    concept.
+    """
+
+    DAY_MONDAY = 0
+    DAY_TUESDAY = 1
+    DAY_WEDNESDAY = 2
+    DAY_THURSDAY = 3
+    DAY_FRIDAY = 4
+    DAY_SATURDAY = 5
+    DAY_SUNDAY = 6
+    DAY_CHOICES = [
+        (DAY_MONDAY, "Monday"),
+        (DAY_TUESDAY, "Tuesday"),
+        (DAY_WEDNESDAY, "Wednesday"),
+        (DAY_THURSDAY, "Thursday"),
+        (DAY_FRIDAY, "Friday"),
+        (DAY_SATURDAY, "Saturday"),
+        (DAY_SUNDAY, "Sunday"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.CASCADE,
+        related_name="timetable_entries",
+    )
+    class_course = models.ForeignKey(
+        ClassCourse,
+        on_delete=models.CASCADE,
+        related_name="timetable_entries",
+    )
+
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="timetable_entries",
+    )
+    day_of_week = models.PositiveSmallIntegerField(choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    room = models.CharField(max_length=100, blank=True, default="")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Soft-delete flag. Inactive rows are hidden from the UI.",
+    )
+
+    class Meta:
+        ordering = ["day_of_week", "start_time"]
+        indexes = [
+            models.Index(fields=["institution", "day_of_week"]),
+            models.Index(fields=["teacher", "day_of_week"]),
+            models.Index(fields=["class_course", "day_of_week"]),
+        ]
+        constraints = [
+
+            models.UniqueConstraint(
+                fields=["class_course", "day_of_week", "start_time"],
+                name="unique_timetable_class_slot",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.class_course.name} · {self.get_day_of_week_display()} "
+            f"{self.start_time:%H:%M}-{self.end_time:%H:%M}"
+        )
