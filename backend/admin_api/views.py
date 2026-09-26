@@ -33,7 +33,6 @@ from .serializers import (
 )
 
 
-
 class AdminTeacherAttendanceViewSet(viewsets.GenericViewSet):
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -133,7 +132,7 @@ class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
             serializer = StudentAttendanceSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(StudentAttendanceSerializer(qs, many=True).data)
-    
+
 
 class AdminEnrollmentViewSet(viewsets.GenericViewSet):
 
@@ -186,7 +185,6 @@ class AdminEnrollmentViewSet(viewsets.GenericViewSet):
             serializer = AdminEnrollmentSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(AdminEnrollmentSerializer(qs, many=True).data)
-
 
 
 class AdminUserViewSet(viewsets.GenericViewSet):
@@ -268,7 +266,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
             else:
-                institution = None  
+                institution = None
         else:
             institution = user.institution
 
@@ -299,7 +297,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
     def toggle_active(self, request, pk=None):
         user = self.get_object()
 
-
         if user.id == request.user.id:
             return Response(
                 {"error": {"detail": "You cannot change your own active status.", "status_code": 400}},
@@ -313,7 +310,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         user.save(update_fields=["is_active", "updated_at"])
         return Response(AdminUserSerializer(user).data)
 
-     # ------------------------------------------------------------------ relations
+    # ------------------------------------------------------------------ relations
 
     @action(detail=True, methods=["get"], url_path="classes")
     def classes(self, request, pk=None):
@@ -437,7 +434,6 @@ class AdminStatsView(APIView):
             "is_superuser_view": user.is_superuser,
         }
         return Response(AdminStatsSerializer(payload).data)
-    
 
 
 class AdminAuditLogViewSet(viewsets.GenericViewSet):
@@ -493,8 +489,6 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
             qs.values_list("action", flat=True).distinct().order_by("action")
         )
         return Response({"results": list(actions)})
-    
-
 
 
 class AdminSessionViewSet(viewsets.GenericViewSet):
@@ -558,7 +552,7 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
             session.save(update_fields=["revoked_at", "revoked_reason"])
 
         return Response(AdminRefreshTokenSerializer(session).data)
-            
+
 
 class InstitutionCourseViewSet(viewsets.GenericViewSet):
 
@@ -632,7 +626,6 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # Required fields on create
         for field in ("name", "subject", "teacher_id"):
             if field not in data:
                 return Response(
@@ -734,7 +727,7 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         course = self.get_object()
         course.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+
     # ------------------------------------------------------------------ relations
 
     @action(detail=True, methods=["get"], url_path="students")
@@ -764,29 +757,9 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
             for e in qs
         ]
         return Response({"results": data, "count": len(data)})
-    
 
 
 class AdminTimetableViewSet(viewsets.GenericViewSet):
-    """
-    Admin CRUD for timetable entries.
-
-    Endpoints:
-        GET    /api/v1/admin/timetable/            list (paginated, filterable)
-        POST   /api/v1/admin/timetable/            create
-        GET    /api/v1/admin/timetable/<id>/       retrieve
-        PATCH  /api/v1/admin/timetable/<id>/       update
-        POST   /api/v1/admin/timetable/<id>/deactivate/   soft delete
-
-    Isolation:
-        - Superuser sees every institution's timetable.
-        - A regular admin sees only their own institution's entries.
-
-    Conflict rules (enforced in TimetableEntryWriteSerializer):
-        - Same teacher, same day, overlapping times.
-        - Same class_course, same day, overlapping times.
-        - Same room (non-blank), same day, overlapping times.
-    """
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -803,17 +776,14 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         )
         qs = self._scope_queryset(qs)
 
-        # Optional ?teacher=<uuid>
         teacher_id = self.request.query_params.get("teacher")
         if teacher_id:
             qs = qs.filter(teacher_id=teacher_id)
 
-        # Optional ?class_id=<uuid>
         class_id = self.request.query_params.get("class_id")
         if class_id:
             qs = qs.filter(class_course_id=class_id)
 
-        # Optional ?day=0..6
         day = self.request.query_params.get("day")
         if day is not None:
             try:
@@ -823,13 +793,11 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             except (TypeError, ValueError):
                 pass
 
-        # Optional ?institution=<uuid> (superuser only)
         institution_id = self.request.query_params.get("institution")
         user = self.request.user
         if institution_id and user.is_superuser:
             qs = qs.filter(institution_id=institution_id)
 
-        # Optional ?active=true|false  (default: only active)
         active_param = self.request.query_params.get("active")
         if active_param is not None:
             active_bool = active_param.lower() in {"true", "1", "yes"}
@@ -861,6 +829,7 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
 
     def create(self, request):
         from core.audit import log_audit  # lazy import — avoids circular
+        from classes.services import materialize_upcoming_sessions
 
         serializer = TimetableEntryWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -869,8 +838,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         course = data["_course"]
         user = request.user
 
-        # Institution scoping: a non-superuser may only add rows to their
-        # own institution's classes.
         if not user.is_superuser and course.institution_id != user.institution_id:
             return Response(
                 {
@@ -882,7 +849,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Conflict check.
         serializer.check_conflicts(
             course=course,
             day=data["day_of_week"],
@@ -917,6 +883,9 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             },
         )
 
+        # Materialize upcoming LiveClass sessions for this slot.
+        materialize_upcoming_sessions(entry)
+
         return Response(
             TimetableEntryReadSerializer(entry).data,
             status=status.HTTP_201_CREATED,
@@ -924,13 +893,13 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
 
     def partial_update(self, request, pk=None):
         from core.audit import log_audit
+        from classes.services import regenerate_future_sessions
 
         entry = self.get_object()
         serializer = TimetableEntryWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        # Apply edits; fall back to current values when a field is missing.
         new_course = data.get("_course", entry.class_course)
         new_day = data.get("day_of_week", entry.day_of_week)
         new_start = data.get("start_time", entry.start_time)
@@ -971,7 +940,7 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         )
 
         entry.class_course = new_course
-        entry.teacher = new_course.teacher  # stay in sync
+        entry.teacher = new_course.teacher
         entry.institution = new_course.institution
         entry.day_of_week = new_day
         entry.start_time = new_start
@@ -996,18 +965,25 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             },
         )
 
+        # Regenerate future LiveClass sessions (delete + recreate).
+        regenerate_future_sessions(entry)
+
         return Response(TimetableEntryReadSerializer(entry).data)
 
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         """Soft-delete: flip is_active=False. Idempotent."""
         from core.audit import log_audit
+        from classes.services import cancel_future_sessions
 
         entry = self.get_object()
 
         if entry.is_active:
             entry.is_active = False
             entry.save(update_fields=["is_active", "updated_at"])
+
+            # Cancel upcoming LiveClass sessions for this slot.
+            cancel_future_sessions(entry)
 
             log_audit(
                 action="timetable.deleted",
@@ -1046,7 +1022,6 @@ class TimetableView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Optional ?day=0..6
         day = request.query_params.get("day")
         if day is not None:
             try:
@@ -1056,7 +1031,6 @@ class TimetableView(APIView):
             except (TypeError, ValueError):
                 pass
 
-        # Optional ?active=true|false (defaults to active only)
         active_param = request.query_params.get("active")
         if active_param is not None:
             active_bool = active_param.lower() in {"true", "1", "yes"}
@@ -1065,4 +1039,4 @@ class TimetableView(APIView):
             qs = qs.filter(is_active=True)
 
         qs = qs.order_by("day_of_week", "start_time")
-        return Response(TimetableEntryReadSerializer(qs, many=True).data)    
+        return Response(TimetableEntryReadSerializer(qs, many=True).data)

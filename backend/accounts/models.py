@@ -1,10 +1,11 @@
-import uuid
+﻿import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
 from institutions.models import Institution
 from core.models import TimeStampedModel
+
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -58,13 +59,8 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
-    # Presence: last time we saw this user interactively (updated by the
-    # WebSocket heartbeat, throttled to once per minute per user).
     last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
-    # Global access-token revocation epoch. When this is set, any access
-    # JWT with an `iat` earlier than this value is rejected on the next
-    # request. Used for admin force-logout and password reset.
     tokens_valid_after = models.DateTimeField(null=True, blank=True)
 
     objects = UserManager()
@@ -80,6 +76,7 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     def get_short_name(self):
         return self.first_name or self.email
+
 
 class StudentProfile(TimeStampedModel):
     user = models.OneToOneField(
@@ -104,14 +101,8 @@ class OnlineStatus(TimeStampedModel):
     def __str__(self):
         return f"{self.user.email} - {'Online' if self.is_online else 'Offline'}"
 
-class RefreshToken(models.Model):
-    """
-    Stateful, revocable refresh tokens with session-family tracking.
 
-    Every login creates a new family (family_id). Rotation issues a new
-    token in the same family and revokes the old one. If a rotated token
-    is presented again, the entire family is revoked (reuse detection).
-    """
+class RefreshToken(models.Model):
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="refresh_tokens"
@@ -151,13 +142,6 @@ class RefreshToken(models.Model):
 
 
 class PasswordResetToken(models.Model):
-    """
-    Single-use, hashed, expiring password-reset tokens.
-
-    Generated when an admin triggers a reset (or, later, when a self-service
-    flow exists). Consumed on first use. The plaintext is only ever returned
-    once and never stored.
-    """
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="password_reset_tokens"
@@ -186,24 +170,12 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"PasswordResetToken({self.user_id})"
-    
 
 
 # ---------------------------------------------------------------- attendance
 
 
 class TeacherAttendance(TimeStampedModel):
-    """
-    Daily attendance row for a teacher.
-
-    Created automatically the first time we see the teacher active on a
-    given day (via PresenceConsumer -> User.last_seen_at). Updated on
-    subsequent activity the same day; never duplicated thanks to the
-    (teacher, date) unique constraint.
-
-    No manual override yet — status is always "present" until a future
-    phase introduces late/half-day/leave rules.
-    """
 
     STATUS_PRESENT = "present"
     STATUS_CHOICES = [
@@ -219,6 +191,13 @@ class TeacherAttendance(TimeStampedModel):
     )
     institution = models.ForeignKey(
         "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="teacher_attendance",
+    )
+    live_class = models.ForeignKey(
+        "classes.LiveClass",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -251,17 +230,7 @@ class TeacherAttendance(TimeStampedModel):
 
 
 class StudentAttendance(TimeStampedModel):
-    """
-    Daily, per-class attendance row for a student.
-
-    Created automatically when an authenticated student connects to the
-    presence channel AND has an active enrollment in a class. The
-    (student, class_course, date) unique constraint prevents duplicates.
-
-    Joined_at is stamped on first attendance; left_at is best-effort and
-    may remain NULL. Duration is derived from (left_at or last_seen) -
-    joined_at when reliably known.
-    """
+    """Student attendance for a class on a given day."""
 
     STATUS_PRESENT = "present"
     STATUS_CHOICES = [
@@ -287,6 +256,13 @@ class StudentAttendance(TimeStampedModel):
     )
     institution = models.ForeignKey(
         "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_attendance",
+    )
+    live_class = models.ForeignKey(
+        "classes.LiveClass",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -321,4 +297,4 @@ class StudentAttendance(TimeStampedModel):
         ordering = ["-date", "-joined_at"]
 
     def __str__(self):
-        return f"{self.student.email} @ {self.class_course.name} on {self.date}"    
+        return f"{self.student.email} @ {self.class_course.name} on {self.date}"

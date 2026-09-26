@@ -233,3 +233,7 @@ CACHES = {
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
     },
 }
+
+# ---------------------------------------------------------------- live classes
+
+LIVE_CLASS_HORIZON_WEEKS = 4
