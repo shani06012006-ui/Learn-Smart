@@ -6,6 +6,7 @@ import {
   GraduationCap,
   LogOut,
   ScrollText,
+  Monitor,
 } from "lucide-react";
 
 import { useAdminAuth } from "../hooks/useAdminAuth";
@@ -15,7 +16,9 @@ const NAV_ITEMS = [
   { to: "/admin/courses", label: "Courses", icon: BookOpen },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
+  { to: "/admin/sessions", label: "Sessions", icon: Monitor },
 ];
+
 
 export default function AdminSidebar() {
   const { user, logout } = useAdminAuth();
