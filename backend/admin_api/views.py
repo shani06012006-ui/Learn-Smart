@@ -27,6 +27,7 @@ from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
 from .serializers import (
     AdminCourseReadSerializer,
     AdminCourseWriteSerializer,
+    AdminEnrollmentSerializer,
     AdminRefreshTokenSerializer,
     AdminStatsSerializer,
     AdminUserCreateSerializer,
@@ -37,17 +38,62 @@ from .serializers import (
 )
 
 
-class AdminUserViewSet(viewsets.GenericViewSet):
-    """
-    Admin-only user management, scoped to the caller's institution.
 
-    Endpoints:
-        GET    /api/v1/admin/users/            list (paginated, filterable)
-        POST   /api/v1/admin/users/            create teacher or student
-        GET    /api/v1/admin/users/<id>/       retrieve
-        PATCH  /api/v1/admin/users/<id>/       update first/last name
-        POST   /api/v1/admin/users/<id>/toggle-active/   activate/deactivate
-    """
+class AdminEnrollmentViewSet(viewsets.GenericViewSet):
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = (
+            StudentEnrollment.objects.all()
+            .select_related("student", "class_course", "class_course__teacher")
+            .order_by("-created_at")
+        )
+
+        if not user.is_superuser:
+            qs = qs.filter(class_course__institution=user.institution)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {
+            StudentEnrollment.STATUS_ACTIVE,
+            StudentEnrollment.STATUS_PENDING,
+            StudentEnrollment.STATUS_BLOCKED,
+            StudentEnrollment.STATUS_REMOVED,
+        }:
+            qs = qs.filter(status=status_filter)
+
+        class_id = self.request.query_params.get("class_id")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        student_id = self.request.query_params.get("student_id")
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(student__email__icontains=q)
+                | Q(student__first_name__icontains=q)
+                | Q(student__last_name__icontains=q)
+                | Q(class_course__name__icontains=q)
+                | Q(class_course__subject__icontains=q)
+            )
+
+        return qs
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = AdminEnrollmentSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(AdminEnrollmentSerializer(qs, many=True).data)
+
+
+
+class AdminUserViewSet(viewsets.GenericViewSet):
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -64,18 +110,15 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         qs = User.objects.all().select_related("institution").order_by("-created_at")
         qs = self._scope_queryset(qs)
 
-        # Optional ?role=teacher|student|admin filter
         role = self.request.query_params.get("role")
         if role in {User.ROLE_TEACHER, User.ROLE_STUDENT, User.ROLE_ADMIN}:
             qs = qs.filter(role=role)
 
-        # Optional ?is_active=true|false filter
         active = self.request.query_params.get("is_active")
         if active is not None:
             active_bool = active.lower() in {"true", "1", "yes"}
             qs = qs.filter(is_active=active_bool)
 
-        # Optional ?q= search on email / name
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(
@@ -118,8 +161,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         user = request.user
-        # Institution on the new user: superuser must supply one (from the
-        # body); a regular admin's institution is used implicitly.
         if user.is_superuser:
             institution_id = request.data.get("institution_id")
             if institution_id:
@@ -131,7 +172,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
             else:
-                institution = None  # superuser may create an unattached user
+                institution = None  
         else:
             institution = user.institution
 
@@ -162,8 +203,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
     def toggle_active(self, request, pk=None):
         user = self.get_object()
 
-        # Guardrail: an admin cannot deactivate themselves. Prevents a
-        # lockout scenario where the last admin turns off their own account.
+
         if user.id == request.user.id:
             return Response(
                 {"error": {"detail": "You cannot change your own active status.", "status_code": 400}},
@@ -181,12 +221,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["get"], url_path="classes")
     def classes(self, request, pk=None):
-        """
-        GET /api/v1/admin/users/<id>/classes/
 
-        Return the classes taught by this user. Only valid for teachers.
-        Respects institution isolation via get_object().
-        """
         user = self.get_object()
 
         if user.role != User.ROLE_TEACHER:
@@ -223,12 +258,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["get"], url_path="enrollments")
     def enrollments(self, request, pk=None):
-        """
-        GET /api/v1/admin/users/<id>/enrollments/
-
-        Return the classes this student is enrolled in. Only valid for
-        students. Respects institution isolation via get_object().
-        """
         user = self.get_object()
 
         if user.role != User.ROLE_STUDENT:
@@ -272,12 +301,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
 
 class AdminStatsView(APIView):
-    """
-    GET /api/v1/admin/stats/
-
-    Dashboard counts scoped to the caller's institution (or across all
-    institutions for superusers).
-    """
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -291,11 +314,8 @@ class AdminStatsView(APIView):
         if not user.is_superuser:
             users_qs = users_qs.filter(institution=user.institution)
             classes_qs = classes_qs.filter(institution=user.institution)
-            # Enrollments don't have a direct institution field Ã¢â‚¬â€ scope via
-            # the class the enrollment belongs to.
             enrollments_qs = enrollments_qs.filter(class_course__institution=user.institution)
 
-        # role counts
         role_counts = users_qs.aggregate(
             users_total=Count("id"),
             users_teachers=Count("id", filter=Q(role=User.ROLE_TEACHER)),
@@ -325,21 +345,6 @@ class AdminStatsView(APIView):
 
 
 class AdminAuditLogViewSet(viewsets.GenericViewSet):
-    """
-    Admin-only audit log reader.
-
-    Endpoints:
-        GET /api/v1/admin/audit/    list (paginated, filterable)
-
-    Read-only. AuditLog rows are append-only at the ORM and DB level,
-    so there are no create/update/delete paths here.
-
-    Isolation rule (same as the rest of admin_api):
-        - Superuser sees every institution's audit rows.
-        - A regular admin sees only rows where institution == their own.
-          Rows with institution IS NULL (e.g. system events, anonymous
-          logins before tenant resolution) are hidden from non-superusers.
-    """
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -350,23 +355,18 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
         if not user.is_superuser:
             qs = qs.filter(institution=user.institution)
 
-        # Optional ?action=user.created  (exact match; the whitelist is small)
         action = self.request.query_params.get("action")
         if action:
             qs = qs.filter(action=action)
 
-        # Optional ?resource_type=user  (exact match)
         resource_type = self.request.query_params.get("resource_type")
         if resource_type:
             qs = qs.filter(resource_type=resource_type)
 
-        # Optional ?actor_id=<uuid>
         actor_id = self.request.query_params.get("actor_id")
         if actor_id:
             qs = qs.filter(actor_id=actor_id)
 
-        # Optional ?since=<iso>&until=<iso> — passed straight through to
-        # the DateTimeField, which will raise a clean DRF error on bad input.
         since = self.request.query_params.get("since")
         if since:
             qs = qs.filter(occurred_at__gte=since)
@@ -375,7 +375,6 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
         if until:
             qs = qs.filter(occurred_at__lte=until)
 
-        # Optional ?q= free text — matches action or resource_type
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(Q(action__icontains=q) | Q(resource_type__icontains=q))
@@ -392,13 +391,7 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["get"], url_path="actions")
     def actions(self, request):
-        """
-        GET /api/v1/admin/audit/actions/
 
-        Return the distinct set of action codes that appear in the audit
-        trail, scoped to the caller. Used to populate the frontend filter
-        dropdown without hardcoding the whitelist in two places.
-        """
         qs = self.get_queryset()
         actions = (
             qs.values_list("action", flat=True).distinct().order_by("action")
@@ -409,23 +402,6 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
 
 
 class AdminSessionViewSet(viewsets.GenericViewSet):
-    """
-    Admin-only read/revoke for refresh-token sessions.
-
-    Endpoints:
-        GET  /api/v1/admin/sessions/                list (paginated, filterable)
-        POST /api/v1/admin/sessions/<id>/revoke/    revoke a single session
-
-    Isolation rule:
-        - Superuser sees every session.
-        - A regular admin sees only sessions belonging to users in their
-          own institution.
-
-    Security:
-        - `token_hash` is never serialized.
-        - Revocation is soft (sets revoked_at + revoked_reason); the row is
-          kept for the audit trail.
-    """
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -436,12 +412,10 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
         if not user.is_superuser:
             qs = qs.filter(user__institution=user.institution)
 
-        # Optional ?user_id=<uuid>
         user_id = self.request.query_params.get("user_id")
         if user_id:
             qs = qs.filter(user_id=user_id)
 
-        # Optional ?status=active|revoked|expired
         status_filter = self.request.query_params.get("status")
         if status_filter == "active":
             qs = qs.filter(revoked_at__isnull=True, expires_at__gt=timezone.now())
@@ -450,7 +424,6 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
         elif status_filter == "expired":
             qs = qs.filter(revoked_at__isnull=True, expires_at__lte=timezone.now())
 
-        # Optional ?q= search device_label / ip / user_agent / user email
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(
@@ -480,13 +453,7 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"], url_path="revoke")
     def revoke(self, request, pk=None):
-        """
-        POST /api/v1/admin/sessions/<id>/revoke/
 
-        Marks the session revoked. Idempotent: revoking an already-revoked
-        session returns 200 with the existing row unchanged (rather than
-        400), so the UI stays simple.
-        """
         session = self.get_object()
 
         if session.revoked_at is None:
@@ -498,23 +465,6 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
             
 
 class InstitutionCourseViewSet(viewsets.GenericViewSet):
-    """
-    Admin-only course management, scoped to the caller's institution.
-
-    Endpoints:
-        GET    /api/v1/admin/courses/                 list
-        POST   /api/v1/admin/courses/                 create
-        GET    /api/v1/admin/courses/<uuid>/          retrieve
-        PATCH  /api/v1/admin/courses/<uuid>/          update (name, subject, description, is_archived)
-        DELETE /api/v1/admin/courses/<uuid>/          soft delete
-
-    Isolation rules match AdminUserViewSet:
-        - Superuser sees every institution.
-        - Everyone else sees only courses where course.institution == user.institution.
-        - The institution on a new course is resolved server-side; the
-          client never supplies it (except superusers, who must supply it
-          because they have no institution of their own).
-    """
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -534,22 +484,18 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         )
         qs = self._scope_queryset(qs)
 
-        # Optional ?is_archived=true|false
         archived = self.request.query_params.get("is_archived")
         if archived is not None:
             qs = qs.filter(is_archived=archived.lower() in {"true", "1", "yes"})
 
-        # Optional ?subject=Physics
         subject = self.request.query_params.get("subject")
         if subject:
             qs = qs.filter(subject__iexact=subject)
 
-        # Optional ?q= search on name / subject
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(Q(name__icontains=q) | Q(subject__icontains=q))
 
-        # Annotate active student count for the read serializer
         qs = qs.annotate(
             student_count=Count(
                 "enrollments",
@@ -567,8 +513,6 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         try:
             return qs.get(pk=pk)
         except ClassCourse.DoesNotExist:
-            # 404 (not 403) per the cross-tenant policy: a resource that
-            # exists in another institution must not be discoverable.
             raise NotFound("Course not found.")
 
     # ------------------------------------------------------------------ read
@@ -605,7 +549,6 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Resolve the institution (never trust the client for non-superusers)
         user = request.user
         if user.is_superuser:
             institution_id = request.data.get("institution_id")
@@ -634,7 +577,6 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         else:
             institution = user.institution
 
-        # Resolve and validate the teacher
         try:
             teacher = User.objects.get(pk=data["teacher_id"])
         except User.DoesNotExist:
@@ -701,13 +643,7 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["get"], url_path="students")
     def students(self, request, pk=None):
-        """
-        GET /api/v1/admin/courses/<id>/students/
 
-        Return students enrolled in this course, newest first. Respects
-        institution isolation via get_object(). Includes blocked and
-        removed rows so the admin sees the full lifecycle.
-        """
         course = self.get_object()
 
         qs = (

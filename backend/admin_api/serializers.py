@@ -113,6 +113,71 @@ class AdminStatsSerializer(serializers.Serializer):
     
 
 
+
+# ---------------------------------------------------------------- enrollments
+
+
+class AdminEnrollmentStudentBriefSerializer(serializers.ModelSerializer):
+    """Compact student payload embedded in enrollment rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name", "is_active"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AdminEnrollmentClassBriefSerializer(serializers.ModelSerializer):
+    """Compact class payload embedded in enrollment rows."""
+
+    teacher = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClassCourse
+        fields = [
+            "id",
+            "name",
+            "subject",
+            "is_archived",
+            "teacher",
+        ]
+        read_only_fields = fields
+
+    def get_teacher(self, obj):
+        return {
+            "id": str(obj.teacher.id),
+            "email": obj.teacher.email,
+            "full_name": obj.teacher.get_full_name(),
+        }
+
+
+class AdminEnrollmentSerializer(serializers.ModelSerializer):
+    """
+    Read-only representation of a StudentEnrollment for the admin UI.
+    """
+
+    student = AdminEnrollmentStudentBriefSerializer(read_only=True)
+    class_course = AdminEnrollmentClassBriefSerializer(read_only=True)
+
+    class Meta:
+        model = StudentEnrollment
+        fields = [
+            "id",
+            "student",
+            "class_course",
+            "status",
+            "joined_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+
 # ---------------------------------------------------------------- sessions
 
 
