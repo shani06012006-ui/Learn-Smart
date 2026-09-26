@@ -12,6 +12,7 @@ from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableE
 from core.models import AuditLog
 from institutions.models import Institution
 from core.audit import log_audit
+from leaves.models import StudentLeave, TeacherLeave
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
 
@@ -26,10 +27,15 @@ from .serializers import (
     AdminUserToggleActiveSerializer,
     AdminUserUpdateSerializer,
     AuditLogSerializer,
+    LeaveReviewSerializer,
     LiveClassReadSerializer,
     LiveClassWriteSerializer,
     StudentAttendanceSerializer,
+    StudentLeaveReadSerializer,
+    StudentLeaveWriteSerializer,
     TeacherAttendanceSerializer,
+    TeacherLeaveReadSerializer,
+    TeacherLeaveWriteSerializer,
     TimetableEntryReadSerializer,
     TimetableEntryWriteSerializer,
 )
@@ -885,7 +891,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             },
         )
 
-        # Materialize upcoming LiveClass sessions for this slot.
         materialize_upcoming_sessions(entry)
 
         return Response(
@@ -967,7 +972,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             },
         )
 
-        # Regenerate future LiveClass sessions (delete + recreate).
         regenerate_future_sessions(entry)
 
         return Response(TimetableEntryReadSerializer(entry).data)
@@ -1087,8 +1091,6 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         if to_str:
             qs = qs.filter(scheduled_start__lte=to_str)
 
-        # ?status=upcoming|live|completed|cancelled — computed, so we
-        # filter in Python after DB narrowing by date if provided.
         status_filter = self.request.query_params.get("status")
 
         institution_id = self.request.query_params.get("institution")
@@ -1231,3 +1233,541 @@ class RoleAwareLiveClassView(APIView):
             qs = qs.filter(id__in=ids)
 
         return Response(LiveClassReadSerializer(qs, many=True).data)    
+    
+
+
+class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def _scope_queryset(self, qs):
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        return qs.filter(institution=user.institution)
+
+    def get_queryset(self):
+        qs = (
+            StudentLeave.objects.all()
+            .select_related("student", "institution", "reviewer")
+        )
+        qs = self._scope_queryset(qs)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {
+            StudentLeave.STATUS_PENDING,
+            StudentLeave.STATUS_APPROVED,
+            StudentLeave.STATUS_REJECTED,
+            StudentLeave.STATUS_CANCELLED,
+        }:
+            qs = qs.filter(status=status_filter)
+
+        leave_type = self.request.query_params.get("leave_type")
+        if leave_type in {
+            StudentLeave.LEAVE_SICK,
+            StudentLeave.LEAVE_CASUAL,
+            StudentLeave.LEAVE_VACATION,
+            StudentLeave.LEAVE_OTHER,
+        }:
+            qs = qs.filter(leave_type=leave_type)
+
+        student_id = self.request.query_params.get("student_id")
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        from_str = self.request.query_params.get("from")
+        if from_str:
+            qs = qs.filter(start_date__gte=from_str)
+
+        to_str = self.request.query_params.get("to")
+        if to_str:
+            qs = qs.filter(end_date__lte=to_str)
+
+        institution_id = self.request.query_params.get("institution")
+        user = self.request.user
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(student__email__icontains=q)
+                | Q(student__first_name__icontains=q)
+                | Q(student__last_name__icontains=q)
+                | Q(reason__icontains=q)
+            )
+
+        return qs.order_by("-applied_at")
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self._scope_queryset(StudentLeave.objects.all())
+        try:
+            return qs.get(pk=pk)
+        except StudentLeave.DoesNotExist:
+            raise NotFound("Leave not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = StudentLeaveReadSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(StudentLeaveReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        obj = self.get_object()
+        return Response(StudentLeaveReadSerializer(obj).data)
+
+    def create(self, request):
+        serializer = StudentLeaveWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = request.user
+        if user.is_superuser:
+            institution = None  # resolved below from the student
+            student = getattr(serializer, "_student", None)
+            if student is None:
+                return Response(
+                    {"error": {"detail": "student_id is required.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            institution = student.institution
+        else:
+            student = getattr(serializer, "_student", None)
+            if student is None:
+                return Response(
+                    {"error": {"detail": "student_id is required.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if student.institution_id != user.institution_id:
+                return Response(
+                    {"error": {"detail": "Student is not in your institution.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            institution = user.institution
+
+        # Overlap check (before create).
+        serializer.check_overlap(
+            StudentLeave,
+            "student",
+            student.id,
+            data["start_date"],
+            data["end_date"],
+        )
+
+        leave = StudentLeave.objects.create(
+            institution=institution,
+            student=student,
+            leave_type=data["leave_type"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            reason=data.get("reason", ""),
+        )
+
+        log_audit(
+            action="leave.created",
+            request=request,
+            institution=institution,
+            resource_type="student_leave",
+            resource_id=leave.id,
+            metadata={
+                "student_id": str(student.id),
+                "leave_type": leave.leave_type,
+                "start_date": leave.start_date.isoformat(),
+                "end_date": leave.end_date.isoformat(),
+                "days": leave.days,
+            },
+        )
+
+        return Response(
+            StudentLeaveReadSerializer(leave).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != StudentLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = StudentLeaveWriteSerializer(data=request.data, partial=True, instance=leave)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        new_start = data.get("start_date", leave.start_date)
+        new_end = data.get("end_date", leave.end_date)
+
+        serializer.check_overlap(
+            StudentLeave,
+            "student",
+            leave.student_id,
+            new_start,
+            new_end,
+            exclude_id=leave.id,
+        )
+
+        for field in ("leave_type", "start_date", "end_date", "reason"):
+            if field in data:
+                setattr(leave, field, data[field])
+        leave.save()
+
+        log_audit(
+            action="leave.updated",
+            request=request,
+            institution=leave.institution,
+            resource_type="student_leave",
+            resource_id=leave.id,
+            metadata={"student_id": str(leave.student_id)},
+        )
+
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != StudentLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be approved.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = StudentLeave.STATUS_APPROVED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.approved",
+            request=request,
+            institution=leave.institution,
+            resource_type="student_leave",
+            resource_id=leave.id,
+            metadata={"student_id": str(leave.student_id)},
+        )
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != StudentLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be rejected.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = StudentLeave.STATUS_REJECTED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.rejected",
+            request=request,
+            institution=leave.institution,
+            resource_type="student_leave",
+            resource_id=leave.id,
+            metadata={"student_id": str(leave.student_id)},
+        )
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status == StudentLeave.STATUS_CANCELLED:
+            return Response(
+                {"error": {"detail": "Leave is already cancelled.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = StudentLeave.STATUS_CANCELLED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.cancelled",
+            request=request,
+            institution=leave.institution,
+            resource_type="student_leave",
+            resource_id=leave.id,
+            metadata={"student_id": str(leave.student_id)},
+        )
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+
+class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def _scope_queryset(self, qs):
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        return qs.filter(institution=user.institution)
+
+    def get_queryset(self):
+        qs = (
+            TeacherLeave.objects.all()
+            .select_related("teacher", "institution", "reviewer")
+        )
+        qs = self._scope_queryset(qs)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {
+            TeacherLeave.STATUS_PENDING,
+            TeacherLeave.STATUS_APPROVED,
+            TeacherLeave.STATUS_REJECTED,
+            TeacherLeave.STATUS_CANCELLED,
+        }:
+            qs = qs.filter(status=status_filter)
+
+        leave_type = self.request.query_params.get("leave_type")
+        if leave_type in {
+            TeacherLeave.LEAVE_SICK,
+            TeacherLeave.LEAVE_CASUAL,
+            TeacherLeave.LEAVE_VACATION,
+            TeacherLeave.LEAVE_OTHER,
+        }:
+            qs = qs.filter(leave_type=leave_type)
+
+        teacher_id = self.request.query_params.get("teacher_id")
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)
+
+        from_str = self.request.query_params.get("from")
+        if from_str:
+            qs = qs.filter(start_date__gte=from_str)
+
+        to_str = self.request.query_params.get("to")
+        if to_str:
+            qs = qs.filter(end_date__lte=to_str)
+
+        institution_id = self.request.query_params.get("institution")
+        user = self.request.user
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(teacher__email__icontains=q)
+                | Q(teacher__first_name__icontains=q)
+                | Q(teacher__last_name__icontains=q)
+                | Q(reason__icontains=q)
+            )
+
+        return qs.order_by("-applied_at")
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self._scope_queryset(TeacherLeave.objects.all())
+        try:
+            return qs.get(pk=pk)
+        except TeacherLeave.DoesNotExist:
+            raise NotFound("Leave not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = TeacherLeaveReadSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(TeacherLeaveReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        obj = self.get_object()
+        return Response(TeacherLeaveReadSerializer(obj).data)
+
+    def create(self, request):
+        serializer = TeacherLeaveWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        user = request.user
+        teacher = getattr(serializer, "_teacher", None)
+        if teacher is None:
+            return Response(
+                {"error": {"detail": "teacher_id is required.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.is_superuser:
+            institution = teacher.institution
+        else:
+            if teacher.institution_id != user.institution_id:
+                return Response(
+                    {"error": {"detail": "Teacher is not in your institution.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            institution = user.institution
+
+        serializer.check_overlap(
+            TeacherLeave,
+            "teacher",
+            teacher.id,
+            data["start_date"],
+            data["end_date"],
+        )
+
+        leave = TeacherLeave.objects.create(
+            institution=institution,
+            teacher=teacher,
+            leave_type=data["leave_type"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            reason=data.get("reason", ""),
+        )
+
+        log_audit(
+            action="leave.created",
+            request=request,
+            institution=institution,
+            resource_type="teacher_leave",
+            resource_id=leave.id,
+            metadata={
+                "teacher_id": str(teacher.id),
+                "leave_type": leave.leave_type,
+                "start_date": leave.start_date.isoformat(),
+                "end_date": leave.end_date.isoformat(),
+                "days": leave.days,
+            },
+        )
+
+        return Response(
+            TeacherLeaveReadSerializer(leave).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != TeacherLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = TeacherLeaveWriteSerializer(data=request.data, partial=True, instance=leave)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        new_start = data.get("start_date", leave.start_date)
+        new_end = data.get("end_date", leave.end_date)
+
+        serializer.check_overlap(
+            TeacherLeave,
+            "teacher",
+            leave.teacher_id,
+            new_start,
+            new_end,
+            exclude_id=leave.id,
+        )
+
+        for field in ("leave_type", "start_date", "end_date", "reason"):
+            if field in data:
+                setattr(leave, field, data[field])
+        leave.save()
+
+        log_audit(
+            action="leave.updated",
+            request=request,
+            institution=leave.institution,
+            resource_type="teacher_leave",
+            resource_id=leave.id,
+            metadata={"teacher_id": str(leave.teacher_id)},
+        )
+
+        return Response(TeacherLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != TeacherLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be approved.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = TeacherLeave.STATUS_APPROVED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.approved",
+            request=request,
+            institution=leave.institution,
+            resource_type="teacher_leave",
+            resource_id=leave.id,
+            metadata={"teacher_id": str(leave.teacher_id)},
+        )
+        return Response(TeacherLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != TeacherLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be rejected.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = TeacherLeave.STATUS_REJECTED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.rejected",
+            request=request,
+            institution=leave.institution,
+            resource_type="teacher_leave",
+            resource_id=leave.id,
+            metadata={"teacher_id": str(leave.teacher_id)},
+        )
+        return Response(TeacherLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status == TeacherLeave.STATUS_CANCELLED:
+            return Response(
+                {"error": {"detail": "Leave is already cancelled.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = TeacherLeave.STATUS_CANCELLED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+
+        log_audit(
+            action="leave.cancelled",
+            request=request,
+            institution=leave.institution,
+            resource_type="teacher_leave",
+            resource_id=leave.id,
+            metadata={"teacher_id": str(leave.teacher_id)},
+        )
+        return Response(TeacherLeaveReadSerializer(leave).data)    

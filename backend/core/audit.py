@@ -1,4 +1,3 @@
-
 import logging
 from typing import Any, Optional
 
@@ -6,7 +5,6 @@ from .models import AuditLog
 
 
 logger = logging.getLogger("core.audit")
-
 
 
 AUDIT_ACTION_WHITELIST = frozenset({
@@ -46,10 +44,16 @@ AUDIT_ACTION_WHITELIST = frozenset({
     # Live classes
     "live_class.cancelled",
 
+    # Leave management
+    "leave.created",
+    "leave.updated",
+    "leave.approved",
+    "leave.rejected",
+    "leave.cancelled",
+
     # System / test
     "test.verify",
 })
-
 
 
 _SECRET_KEY_PATTERNS = (
@@ -168,7 +172,7 @@ def log_audit(
             user_agent=user_agent[:2000],  # cap UA to a sane length
         )
         return row
-    except Exception as exc:  # noqa: BLE001 — intentional broad catch
+    except Exception as exc:  
         logger.error(
             "audit.write_failed",
             extra={
