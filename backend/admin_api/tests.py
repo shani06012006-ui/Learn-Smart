@@ -1584,8 +1584,6 @@ def test_timetable_admin_gets_403_on_role_view(northwood):
     client = auth_client(admin)
     resp = client.get("/api/v1/timetable/")
     assert resp.status_code == 403
-    
-
 
 
 # ----------------------------------------------------------------- live classes
@@ -1723,14 +1721,17 @@ def test_live_class_status_is_derived(northwood, course_teacher):
     )
     assert live.computed_status() == LiveClass.STATUS_LIVE
 
+    # Shift the cancelled occurrence forward by 2 days so it does not
+    # collide with `live` on the unique (timetable_entry, scheduled_date)
+    # constraint.
     cancelled = LiveClass.objects.create(
         timetable_entry=entry,
         class_course=course,
         teacher=course_teacher,
         institution=northwood,
-        scheduled_date=timezone.localdate(),
-        scheduled_start=now - timedelta(minutes=10),
-        scheduled_end=now + timedelta(minutes=50),
+        scheduled_date=timezone.localdate() + timedelta(days=2),
+        scheduled_start=now + timedelta(days=2, minutes=-10),
+        scheduled_end=now + timedelta(days=2, minutes=50),
         stored_status=LiveClass.STATUS_CANCELLED,
     )
     assert cancelled.computed_status() == LiveClass.STATUS_CANCELLED
@@ -1906,7 +1907,6 @@ def test_touch_teacher_attendance_links_active_live_class(
     from accounts.models import TeacherAttendance
     from accounts.services import touch_teacher_attendance
     from classes.models import LiveClass
-    from classes.services import _combine
 
     course = ClassCourse.objects.create(
         institution=northwood, teacher=course_teacher, name="P", subject="X",
@@ -1986,4 +1986,4 @@ def test_touch_teacher_attendance_no_live_class_links_null(
     att = TeacherAttendance.objects.get(
         teacher=course_teacher, date=timezone.localdate()
     )
-    assert att.live_class_id is None    
+    assert att.live_class_id is None
