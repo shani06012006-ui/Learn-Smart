@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     AdminAuditLogViewSet,
+    AdminEnrollmentViewSet,
     AdminSessionViewSet,
     AdminStatsView,
     AdminUserViewSet,
@@ -14,6 +15,7 @@ router.register("users", AdminUserViewSet, basename="admin-user")
 router.register("courses", InstitutionCourseViewSet, basename="institution-course")
 router.register("audit", AdminAuditLogViewSet, basename="admin-audit")
 router.register("sessions", AdminSessionViewSet, basename="admin-session")
+router.register("enrollments", AdminEnrollmentViewSet, basename="admin-enrollment")
 
 urlpatterns = [
     path("", include(router.urls)),
