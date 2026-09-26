@@ -61,6 +61,7 @@ export const realApi = createApi({
     "AdminAudit",
     "AdminSession",
     "AdminEnrollment",
+    "AdminAttendance",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -251,6 +252,42 @@ export const realApi = createApi({
           : [{ type: "AdminEnrollment", id: "LIST" }],
     }),
 
+    // ---------- admin attendance -----------------------------------
+
+    getAdminTeacherAttendance: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.date) search.set("date", params.date);
+        if (params.status) search.set("status", params.status);
+        if (params.institution) search.set("institution", params.institution);
+        if (params.q) search.set("q", params.q);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs
+          ? `/admin/attendance/teachers/?${qs}`
+          : "/admin/attendance/teachers/";
+      },
+      providesTags: ["AdminAttendance"],
+    }),
+
+    getAdminStudentAttendance: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.date) search.set("date", params.date);
+        if (params.status) search.set("status", params.status);
+        if (params.class_id) search.set("class_id", params.class_id);
+        if (params.student_id) search.set("student_id", params.student_id);
+        if (params.institution) search.set("institution", params.institution);
+        if (params.q) search.set("q", params.q);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs
+          ? `/admin/attendance/students/?${qs}`
+          : "/admin/attendance/students/";
+      },
+      providesTags: ["AdminAttendance"],
+    }),
+
     // ---------- admin stats -----------------------------------------
 
     getAdminStats: builder.query({
@@ -344,4 +381,6 @@ export const {
   useGetAdminSessionsQuery,
   useRevokeAdminSessionMutation,
   useGetAdminEnrollmentsQuery,
+  useGetAdminTeacherAttendanceQuery,
+  useGetAdminStudentAttendanceQuery,
 } = realApi;
