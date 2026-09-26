@@ -1,27 +1,5 @@
-"""
-Presence consumers.
-
-Two WebSocket consumers share the same Redis presence state:
-
-  PresenceConsumer
-    - Any authenticated user connects here.
-    - Adds the user to the presence store with a 90-second TTL.
-    - On heartbeat, refreshes the TTL. Persists `last_seen_at` to the DB
-      at most once per 60 seconds per user.
-    - Broadcasts join/leave events to the institution's channel group.
-
-  AdminPresenceConsumer
-    - Institution admins subscribe here.
-    - Receives the current online-user snapshot on connect.
-    - Receives join/leave events for their institution only.
-
-Every consumer derives `institution_id` from `scope["user"]`, never from
-anything supplied by the client.
-
-Consumers are async. Any DB operation goes through
-`database_sync_to_async`.
-"""
 import json
+import logging
 from datetime import datetime, timezone as dt_timezone
 
 from channels.db import database_sync_to_async
@@ -30,6 +8,10 @@ from django.core.cache import cache
 from django.utils import timezone
 
 from .models import User
+from .services import touch_student_attendance, touch_teacher_attendance
+
+
+logger = logging.getLogger("accounts.consumers")
 
 
 # ---------------------------------------------------------------------------
@@ -68,11 +50,19 @@ def _last_seen_throttle_key(user_id):
 
 @database_sync_to_async
 def _persist_last_seen(user_id):
-    """
-    Write user.last_seen_at to the DB. Called only when the throttle key
-    permits. The `update()` form skips signals and is fast.
-    """
+
     User.objects.filter(pk=user_id).update(last_seen_at=timezone.now())
+
+    try:
+        user = User.objects.filter(pk=user_id).only("id", "role").first()
+        if user is None:
+            return
+        if user.role == User.ROLE_TEACHER:
+            touch_teacher_attendance(user.id)
+        elif user.role == User.ROLE_STUDENT:
+            touch_student_attendance(user.id)
+    except Exception:
+        logger.exception("attendance.touch_failed", extra={"user_id": str(user_id)})
 
 
 @database_sync_to_async

@@ -3,14 +3,18 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from accounts.models import RefreshToken, User
+from accounts.models import (
+    RefreshToken,
+    StudentAttendance,
+    TeacherAttendance,
+    User,
+)
 from classes.models import ClassCourse, StudentEnrollment
 from core.models import AuditLog
 from institutions.models import Institution
 
 
 class InstitutionBriefSerializer(serializers.ModelSerializer):
-    """Compact institution payload for embedding in user rows."""
 
     class Meta:
         model = Institution
@@ -78,14 +82,6 @@ class AdminUserCreateSerializer(serializers.Serializer):
 
 
 class AdminUserUpdateSerializer(serializers.Serializer):
-    """
-    Editable fields on an existing user. Deliberately narrow:
-    - Admins cannot change another user's email, role, or institution
-      through this endpoint. Those are stable identifiers, and changing
-      them via the API would break audit trails.
-    - is_active toggling is exposed separately via a dedicated action, not
-      this serializer, so the UI can render it as a distinct control.
-    """
 
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
@@ -196,15 +192,6 @@ class AdminSessionUserBriefSerializer(serializers.ModelSerializer):
 
 
 class AdminRefreshTokenSerializer(serializers.ModelSerializer):
-    """
-    Read-only representation of a refresh token for the admin UI.
-
-    SECURITY: `token_hash` is never exposed. The admin sees only the
-    session metadata needed to identify and revoke it.
-
-    `status` is a computed string: "active" | "revoked" | "expired".
-    `is_active` mirrors RefreshToken.is_active() for client-side filtering.
-    """
 
     user = AdminSessionUserBriefSerializer(read_only=True)
     status = serializers.SerializerMethodField()
@@ -259,13 +246,7 @@ class AdminCourseTeacherBriefSerializer(serializers.ModelSerializer):
 
 
 class AdminCourseReadSerializer(serializers.ModelSerializer):
-    """
-    Read representation of a course for the admin UI.
 
-    Mirrors the fields exposed by the teacher-facing ClassCourseSerializer
-    so the UI components can be shared, with teacher expanded into a
-    full brief object (rather than just the id) and institution included.
-    """
     teacher = AdminCourseTeacherBriefSerializer(read_only=True)
     institution = InstitutionBriefSerializer(read_only=True)
     student_count = serializers.SerializerMethodField()
@@ -287,8 +268,7 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_student_count(self, obj):
-        # Use the annotated value if the view provided one; fall back to
-        # a query otherwise (for single-object retrieves).
+
         count = getattr(obj, "student_count", None)
         if count is not None:
             return count
@@ -296,16 +276,7 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
 
 
 class AdminCourseWriteSerializer(serializers.Serializer):
-    """
-    Create + update payload for the admin course endpoints.
 
-    - On create: name, subject, teacher_id are required. The institution is
-      resolved server-side from the caller (or from an explicit
-      institution_id for superusers).
-    - On update: only name, subject, description, is_archived are accepted.
-      teacher_id is not changeable here (a separate operation if needed
-      later).
-    """
     name = serializers.CharField(max_length=255, required=False)
     subject = serializers.CharField(max_length=100, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
@@ -366,3 +337,87 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
     def get_resource_id(self, obj):
         return str(obj.resource_id) if obj.resource_id else None    
+    
+
+
+# ---------------------------------------------------------------- attendance
+
+
+class AttendanceStudentBriefSerializer(serializers.ModelSerializer):
+    """Compact student payload embedded in attendance rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name", "is_active"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AttendanceTeacherBriefSerializer(serializers.ModelSerializer):
+    """Compact teacher payload embedded in attendance rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AttendanceClassBriefSerializer(serializers.ModelSerializer):
+    """Compact class payload embedded in student attendance rows."""
+
+    teacher = AttendanceTeacherBriefSerializer(read_only=True)
+
+    class Meta:
+        model = ClassCourse
+        fields = ["id", "name", "subject", "is_archived", "teacher"]
+        read_only_fields = fields
+
+
+class TeacherAttendanceSerializer(serializers.ModelSerializer):
+    """Read-only teacher attendance row for the admin UI."""
+
+    teacher = AttendanceTeacherBriefSerializer(read_only=True)
+
+    class Meta:
+        model = TeacherAttendance
+        fields = [
+            "id",
+            "teacher",
+            "date",
+            "first_seen_at",
+            "last_seen_at",
+            "status",
+            "duration_seconds",
+        ]
+        read_only_fields = fields
+
+
+class StudentAttendanceSerializer(serializers.ModelSerializer):
+    """Read-only student attendance row for the admin UI."""
+
+    student = AttendanceStudentBriefSerializer(read_only=True)
+    class_course = AttendanceClassBriefSerializer(read_only=True)
+
+    class Meta:
+        model = StudentAttendance
+        fields = [
+            "id",
+            "student",
+            "class_course",
+            "date",
+            "joined_at",
+            "left_at",
+            "status",
+            "duration_seconds",
+            "source",
+        ]
+        read_only_fields = fields    

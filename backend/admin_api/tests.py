@@ -1048,3 +1048,273 @@ def test_enrollments_search_by_student_or_class(northwood, course_teacher):
 
     no_match = client.get("/api/v1/admin/enrollments/?q=xyz123").json()
     assert no_match["count"] == 0
+    
+
+
+# ----------------------------------------------------------------- attendance
+
+
+def _make_teacher_attendance(teacher, *, date=None, status="present"):
+    """Helper: build a TeacherAttendance row directly."""
+    from accounts.models import TeacherAttendance
+    from django.utils import timezone
+
+    now = timezone.now()
+    return TeacherAttendance.objects.create(
+        teacher=teacher,
+        institution=teacher.institution,
+        date=date or timezone.localdate(),
+        first_seen_at=now,
+        last_seen_at=now,
+        status=status,
+        duration_seconds=0,
+    )
+
+
+def _make_student_attendance(student, course, *, date=None, status="present"):
+    """Helper: build a StudentAttendance row directly."""
+    from accounts.models import StudentAttendance
+    from django.utils import timezone
+
+    now = timezone.now()
+    return StudentAttendance.objects.create(
+        student=student,
+        class_course=course,
+        institution=course.institution or student.institution,
+        date=date or timezone.localdate(),
+        joined_at=now,
+        status=status,
+        duration_seconds=0,
+        source=StudentAttendance.SOURCE_AUTO,
+    )
+
+
+def test_teacher_attendance_service_creates_row(northwood):
+    """touch_teacher_attendance creates a row on first call."""
+    from accounts.models import TeacherAttendance
+    from accounts.services import touch_teacher_attendance
+
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+    assert TeacherAttendance.objects.filter(teacher=teacher).count() == 0
+
+    touch_teacher_attendance(teacher.id)
+
+    assert TeacherAttendance.objects.filter(teacher=teacher).count() == 1
+    row = TeacherAttendance.objects.get(teacher=teacher)
+    assert row.status == TeacherAttendance.STATUS_PRESENT
+    assert row.institution == northwood
+
+
+def test_teacher_attendance_service_is_idempotent(northwood):
+    """Second call updates the same row, doesn't create a new one."""
+    from accounts.models import TeacherAttendance
+    from accounts.services import touch_teacher_attendance
+
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+    touch_teacher_attendance(teacher.id)
+    touch_teacher_attendance(teacher.id)
+    touch_teacher_attendance(teacher.id)
+
+    assert TeacherAttendance.objects.filter(teacher=teacher).count() == 1
+
+
+def test_teacher_attendance_ignores_non_teachers(northwood):
+    """touch_teacher_attendance does nothing for a student."""
+    from accounts.models import TeacherAttendance
+    from accounts.services import touch_teacher_attendance
+
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    touch_teacher_attendance(student.id)
+
+    assert TeacherAttendance.objects.count() == 0
+
+
+def test_student_attendance_service_creates_for_active_enrollments(
+    northwood, course_teacher
+):
+    """touch_student_attendance creates a row per active enrollment."""
+    from accounts.models import StudentAttendance
+    from accounts.services import touch_student_attendance
+
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+
+    touch_student_attendance(student.id)
+
+    assert StudentAttendance.objects.filter(student=student).count() == 1
+    row = StudentAttendance.objects.get(student=student)
+    assert row.class_course == course
+    assert row.status == StudentAttendance.STATUS_PRESENT
+
+
+def test_student_attendance_skips_inactive_enrollments(
+    northwood, course_teacher
+):
+    """Enrollments that aren't ACTIVE do not produce attendance."""
+    from accounts.models import StudentAttendance
+    from accounts.services import touch_student_attendance
+
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_BLOCKED,
+    )
+
+    touch_student_attendance(student.id)
+
+    assert StudentAttendance.objects.count() == 0
+
+
+def test_student_attendance_is_idempotent(northwood, course_teacher):
+    """Multiple calls in one day keep a single row per class."""
+    from accounts.models import StudentAttendance
+    from accounts.services import touch_student_attendance
+
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+
+    touch_student_attendance(student.id)
+    touch_student_attendance(student.id)
+    touch_student_attendance(student.id)
+
+    assert StudentAttendance.objects.filter(student=student).count() == 1
+
+
+def test_attendance_teacher_and_student_are_separate(northwood, course_teacher):
+    """Teacher and student attendance never cross-contaminate."""
+    from accounts.models import StudentAttendance, TeacherAttendance
+    from accounts.services import (
+        touch_student_attendance,
+        touch_teacher_attendance,
+    )
+
+    teacher = course_teacher
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=teacher,
+        name="Physics", subject="Physics",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+
+    # Call teacher service with student ID — should NOT create student attendance.
+    touch_teacher_attendance(student.id)
+    assert TeacherAttendance.objects.count() == 0
+    assert StudentAttendance.objects.count() == 0
+
+    # Call student service with teacher ID — should NOT create teacher attendance.
+    touch_student_attendance(teacher.id)
+    assert TeacherAttendance.objects.count() == 0
+    assert StudentAttendance.objects.count() == 0
+
+
+def test_teacher_attendance_list_scoped_to_institution(northwood, riverdale, course_teacher, course_teacher_riverdale):
+    """Admin sees only own-institution teacher attendance."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    _make_teacher_attendance(course_teacher)
+    _make_teacher_attendance(course_teacher_riverdale)
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/attendance/teachers/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["teacher"]["email"] == "teacher.nw@test.local"
+
+
+def test_teacher_attendance_list_superuser_sees_all(northwood, riverdale, course_teacher, course_teacher_riverdale):
+    """Superuser sees teacher attendance across institutions."""
+    su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
+    _make_teacher_attendance(course_teacher)
+    _make_teacher_attendance(course_teacher_riverdale)
+
+    client = auth_client(su)
+    resp = client.get("/api/v1/admin/attendance/teachers/")
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 2
+
+
+def test_student_attendance_list_scoped_to_institution(northwood, riverdale, course_teacher, course_teacher_riverdale):
+    """Admin sees only own-institution student attendance."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student_nw = make_user("snw@test.local", User.ROLE_STUDENT, northwood)
+    student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
+
+    course_nw = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="A", subject="X",
+    )
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale, name="B", subject="X",
+    )
+    _make_student_attendance(student_nw, course_nw)
+    _make_student_attendance(student_rd, course_rd)
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/attendance/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["student"]["email"] == "snw@test.local"
+
+
+def test_attendance_requires_authentication(northwood):
+    """Unauthenticated request is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/admin/attendance/teachers/")
+    assert resp.status_code in (401, 403)
+
+    resp = client.get("/api/v1/admin/attendance/students/")
+    assert resp.status_code in (401, 403)
+
+
+def test_attendance_filters_by_date(northwood, course_teacher):
+    """?date= narrows to that day; default is today."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = course_teacher
+
+    today = timezone.localdate()
+    yesterday = today - timedelta(days=1)
+
+    _make_teacher_attendance(teacher, date=today)
+    _make_teacher_attendance(teacher, date=yesterday)
+
+    client = auth_client(admin)
+
+    # Default = today
+    resp_today = client.get("/api/v1/admin/attendance/teachers/")
+    assert resp_today.json()["count"] == 1
+
+    # Explicit yesterday
+    resp_yest = client.get(
+        f"/api/v1/admin/attendance/teachers/?date={yesterday.isoformat()}"
+    )
+    assert resp_yest.json()["count"] == 1    

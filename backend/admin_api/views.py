@@ -1,15 +1,3 @@
-"""
-Institution admin API views.
-
-Isolation rule (server-side, enforced here):
-
-- A superuser (is_superuser=True, role="admin") sees every institution.
-- Any other admin sees only rows where institution == their own institution.
-
-Every queryset is filtered by `_scope_queryset`. Every write sets the
-institution from `request.user` (never from client input). No view trusts
-a client-supplied institution id.
-"""
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -18,12 +6,13 @@ from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import RefreshToken, User
+from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
 from classes.models import ClassCourse, StudentEnrollment
 from core.models import AuditLog
 from institutions.models import Institution
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
+
 from .serializers import (
     AdminCourseReadSerializer,
     AdminCourseWriteSerializer,
@@ -35,9 +24,112 @@ from .serializers import (
     AdminUserToggleActiveSerializer,
     AdminUserUpdateSerializer,
     AuditLogSerializer,
+    StudentAttendanceSerializer,
+    TeacherAttendanceSerializer,
 )
 
 
+
+class AdminTeacherAttendanceViewSet(viewsets.GenericViewSet):
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = TeacherAttendance.objects.all().select_related("teacher", "institution")
+
+        if not user.is_superuser:
+            qs = qs.filter(institution=user.institution)
+
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            qs = qs.filter(date=date_str)
+        else:
+            qs = qs.filter(date=timezone.localdate())
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {TeacherAttendance.STATUS_PRESENT}:
+            qs = qs.filter(status=status_filter)
+
+        institution_id = self.request.query_params.get("institution")
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(teacher__email__icontains=q)
+                | Q(teacher__first_name__icontains=q)
+                | Q(teacher__last_name__icontains=q)
+            )
+
+        return qs.order_by("-date", "-first_seen_at")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = TeacherAttendanceSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(TeacherAttendanceSerializer(qs, many=True).data)
+
+
+class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = (
+            StudentAttendance.objects.all()
+            .select_related("student", "class_course", "class_course__teacher", "institution")
+        )
+
+        if not user.is_superuser:
+            qs = qs.filter(institution=user.institution)
+
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            qs = qs.filter(date=date_str)
+        else:
+            qs = qs.filter(date=timezone.localdate())
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {StudentAttendance.STATUS_PRESENT}:
+            qs = qs.filter(status=status_filter)
+
+        class_id = self.request.query_params.get("class_id")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        student_id = self.request.query_params.get("student_id")
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+
+        institution_id = self.request.query_params.get("institution")
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(student__email__icontains=q)
+                | Q(student__first_name__icontains=q)
+                | Q(student__last_name__icontains=q)
+                | Q(class_course__name__icontains=q)
+                | Q(class_course__subject__icontains=q)
+            )
+
+        return qs.order_by("-date", "-joined_at")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = StudentAttendanceSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(StudentAttendanceSerializer(qs, many=True).data)
+    
 
 class AdminEnrollmentViewSet(viewsets.GenericViewSet):
 
