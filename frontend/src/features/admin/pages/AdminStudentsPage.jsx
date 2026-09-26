@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, GraduationCap, Eye } from "lucide-react";
+import { Search, GraduationCap, Eye, Pencil, Plus, Shield, ShieldOff } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
@@ -10,7 +10,12 @@ import Pager from "../../../components/ui/Pager";
 import EmptyState from "../../../components/ui/EmptyState";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
-import { useGetAdminUsersQuery } from "../../../store/api/realApi";
+import CreateUserModal from "../components/CreateUserModal";
+import EditUserModal from "../components/EditUserModal";
+import {
+  useGetAdminUsersQuery,
+  useToggleAdminUserActiveMutation,
+} from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
 const PAGE_SIZE = 20;
@@ -28,6 +33,12 @@ export default function AdminStudentsPage() {
   const [activeFilter, setActiveFilter] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+
+  const [toggleActive, { isLoading: isToggling }] =
+    useToggleAdminUserActiveMutation();
+  const [pendingId, setPendingId] = useState(null);
 
   useEffect(() => {
     setPage(1);
@@ -44,6 +55,20 @@ export default function AdminStudentsPage() {
   const students = data?.results || [];
   const count = data?.count || 0;
 
+  const handleToggle = async (student) => {
+    setPendingId(student.id);
+    try {
+      await toggleActive({
+        id: student.id,
+        is_active: !student.is_active,
+      }).unwrap();
+    } catch {
+      // Silent — the row will reflect the server state on refetch.
+    } finally {
+      setPendingId(null);
+    }
+  };
+
   return (
     <div>
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -55,6 +80,10 @@ export default function AdminStudentsPage() {
             Manage students in your institution.
           </p>
         </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus size={16} />
+          Add student
+        </Button>
       </header>
 
       {/* Filters */}
@@ -105,7 +134,7 @@ export default function AdminStudentsPage() {
         <EmptyState
           icon={GraduationCap}
           title="No students yet"
-          message="Students appear here once they join a class using a joining code."
+          message="Add a student or wait for one to join using a class code."
         />
       )}
 
@@ -133,64 +162,96 @@ export default function AdminStudentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {students.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-ink-200 last:border-b-0 hover:bg-ink-100/30"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          userId={s.id}
-                          initials={
-                            (s.full_name || s.email || "?")
-                              .split(/\s+/)
-                              .slice(0, 2)
-                              .map((p) => p[0])
-                              .join("")
-                              .toUpperCase() || "?"
-                          }
-                          size="sm"
-                        />
-                        <div className="min-w-0">
-                          <Link
-                            to={`/admin/students/${s.id}`}
-                            className="focus-ring block truncate text-sm font-medium text-ink-900 hover:text-brand-600 hover:underline"
-                          >
-                            {s.full_name || "—"}
-                          </Link>
-                          <p className="truncate text-xs text-ink-500">
-                            {s.email}
-                          </p>
+                {students.map((s) => {
+                  const isPending = pendingId === s.id && isToggling;
+                  return (
+                    <tr
+                      key={s.id}
+                      className="border-b border-ink-200 last:border-b-0 hover:bg-ink-100/30"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            userId={s.id}
+                            initials={
+                              (s.full_name || s.email || "?")
+                                .split(/\s+/)
+                                .slice(0, 2)
+                                .map((p) => p[0])
+                                .join("")
+                                .toUpperCase() || "?"
+                            }
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <Link
+                              to={`/admin/students/${s.id}`}
+                              className="focus-ring block truncate text-sm font-medium text-ink-900 hover:text-brand-600 hover:underline"
+                            >
+                              {s.full_name || "—"}
+                            </Link>
+                            <p className="truncate text-xs text-ink-500">
+                              {s.email}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-ink-700">
-                      {s.institution?.name || (
-                        <span className="text-ink-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={s.is_active ? "success" : "danger"}
-                        dot
-                      >
-                        {s.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm text-ink-700">
-                      {formatDate(s.created_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link to={`/admin/students/${s.id}`}>
-                        <Button size="sm" variant="secondary">
-                          <Eye size={14} />
-                          View
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-ink-700">
+                        {s.institution?.name || (
+                          <span className="text-ink-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          variant={s.is_active ? "success" : "danger"}
+                          dot
+                        >
+                          {s.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-ink-700">
+                        {formatDate(s.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Link to={`/admin/students/${s.id}`}>
+                            <Button size="sm" variant="secondary">
+                              <Eye size={14} />
+                              View
+                            </Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setEditUser(s)}
+                          >
+                            <Pencil size={14} />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={s.is_active ? "secondary" : "primary"}
+                            disabled={isPending}
+                            loading={isPending}
+                            onClick={() => handleToggle(s)}
+                          >
+                            {s.is_active ? (
+                              <>
+                                <ShieldOff size={14} />
+                                Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <Shield size={14} />
+                                Activate
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -203,6 +264,21 @@ export default function AdminStudentsPage() {
           />
         </>
       )}
+
+      <CreateUserModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        defaultRole="student"
+      />
+
+      <EditUserModal
+        open={!!editUser}
+        user={editUser}
+        onClose={() => {
+          setEditUser(null);
+          refetch();
+        }}
+      />
     </div>
   );
 }

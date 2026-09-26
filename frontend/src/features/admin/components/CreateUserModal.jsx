@@ -13,9 +13,9 @@ const INITIAL = {
   role: "teacher",
 };
 
-export default function CreateUserModal({ open, onClose }) {
+export default function CreateUserModal({ open, onClose, defaultRole = "teacher" }) {
   const [createUser, { isLoading }] = useCreateAdminUserMutation();
-  const [form, setForm] = useState(INITIAL);
+  const [form, setForm] = useState({ ...INITIAL, role: defaultRole });
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
 
@@ -31,11 +31,11 @@ export default function CreateUserModal({ open, onClose }) {
   };
 
   const handleClose = () => {
-    if (isLoading) return;
-    setForm(INITIAL);
-    setErrors({});
-    setFormError(null);
-    onClose();
+  if (isLoading) return;
+  setForm({ ...INITIAL, role: defaultRole });
+  setErrors({});
+  setFormError(null);
+  onClose();
   };
 
   const handleSubmit = async (e) => {
