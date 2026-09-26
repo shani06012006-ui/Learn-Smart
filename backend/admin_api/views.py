@@ -11,13 +11,14 @@ institution from `request.user` (never from client input). No view trusts
 a client-supplied institution id.
 """
 from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import User
+from accounts.models import RefreshToken, User
 from classes.models import ClassCourse, StudentEnrollment
 from core.models import AuditLog
 from institutions.models import Institution
@@ -26,6 +27,7 @@ from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
 from .serializers import (
     AdminCourseReadSerializer,
     AdminCourseWriteSerializer,
+    AdminRefreshTokenSerializer,
     AdminStatsSerializer,
     AdminUserCreateSerializer,
     AdminUserSerializer,
@@ -403,7 +405,97 @@ class AdminAuditLogViewSet(viewsets.GenericViewSet):
         )
         return Response({"results": list(actions)})
     
-        
+
+
+
+class AdminSessionViewSet(viewsets.GenericViewSet):
+    """
+    Admin-only read/revoke for refresh-token sessions.
+
+    Endpoints:
+        GET  /api/v1/admin/sessions/                list (paginated, filterable)
+        POST /api/v1/admin/sessions/<id>/revoke/    revoke a single session
+
+    Isolation rule:
+        - Superuser sees every session.
+        - A regular admin sees only sessions belonging to users in their
+          own institution.
+
+    Security:
+        - `token_hash` is never serialized.
+        - Revocation is soft (sets revoked_at + revoked_reason); the row is
+          kept for the audit trail.
+    """
+
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = RefreshToken.objects.all().select_related("user")
+
+        if not user.is_superuser:
+            qs = qs.filter(user__institution=user.institution)
+
+        # Optional ?user_id=<uuid>
+        user_id = self.request.query_params.get("user_id")
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+
+        # Optional ?status=active|revoked|expired
+        status_filter = self.request.query_params.get("status")
+        if status_filter == "active":
+            qs = qs.filter(revoked_at__isnull=True, expires_at__gt=timezone.now())
+        elif status_filter == "revoked":
+            qs = qs.filter(revoked_at__isnull=False)
+        elif status_filter == "expired":
+            qs = qs.filter(revoked_at__isnull=True, expires_at__lte=timezone.now())
+
+        # Optional ?q= search device_label / ip / user_agent / user email
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(device_label__icontains=q)
+                | Q(ip_address__icontains=q)
+                | Q(user_agent__icontains=q)
+                | Q(user__email__icontains=q)
+            )
+
+        return qs.order_by("-issued_at")
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self.get_queryset()
+        try:
+            return qs.get(pk=pk)
+        except RefreshToken.DoesNotExist:
+            raise NotFound("Session not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = AdminRefreshTokenSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(AdminRefreshTokenSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["post"], url_path="revoke")
+    def revoke(self, request, pk=None):
+        """
+        POST /api/v1/admin/sessions/<id>/revoke/
+
+        Marks the session revoked. Idempotent: revoking an already-revoked
+        session returns 200 with the existing row unchanged (rather than
+        400), so the UI stays simple.
+        """
+        session = self.get_object()
+
+        if session.revoked_at is None:
+            session.revoked_at = timezone.now()
+            session.revoked_reason = "admin_revoked"
+            session.save(update_fields=["revoked_at", "revoked_reason"])
+
+        return Response(AdminRefreshTokenSerializer(session).data)
+            
 
 class InstitutionCourseViewSet(viewsets.GenericViewSet):
     """
