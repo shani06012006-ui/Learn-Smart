@@ -36,6 +36,7 @@ import AdminStudentsPage from "./features/admin/pages/AdminStudentsPage";
 import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPage";
 import AdminTeachersPage from "./features/admin/pages/AdminTeachersPage";
 import AdminTeacherDetailPage from "./features/admin/pages/AdminTeacherDetailPage";
+import AdminAttendancePage from "./features/admin/pages/AdminAttendancePage";
 
 
 
@@ -60,10 +61,12 @@ export default function App() {
           <Route path="teachers/:id" element={<AdminTeacherDetailPage />} />
           <Route path="students" element={<AdminStudentsPage />} />
           <Route path="students/:id" element={<AdminStudentDetailPage />} />
+          <Route path="attendance" element={<AdminAttendancePage />} />
           <Route path="audit" element={<AdminAuditLogPage />} />
           <Route path="sessions" element={<AdminSessionsPage />} />
         </Route>
       </Route>
+
 
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["teacher", "admin"]} />}>

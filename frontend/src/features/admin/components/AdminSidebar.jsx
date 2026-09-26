@@ -7,6 +7,7 @@ import {
   LogOut,
   ScrollText,
   Monitor,
+  ClipboardCheck,
 } from "lucide-react";
 
 import { useAdminAuth } from "../hooks/useAdminAuth";
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { to: "/admin/courses", label: "Courses", icon: BookOpen },
   { to: "/admin/teachers", label: "Teachers", icon: UserCog },
   { to: "/admin/students", label: "Students", icon: GraduationCap },
+  { to: "/admin/attendance", label: "Attendance", icon: ClipboardCheck },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
   { to: "/admin/sessions", label: "Sessions", icon: Monitor },
 ];
