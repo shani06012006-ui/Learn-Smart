@@ -1,16 +1,4 @@
-"""
-Audit log helper.
 
-`log_audit()` is the only sanctioned way to write to `AuditLog`. It:
-
-  - Rejects unknown action codes (typo protection). The whitelist is
-    below; new actions must be added explicitly.
-  - Sanitizes the `metadata` dict: any key matching a secret-shaped
-    name is dropped; long strings are truncated.
-  - Never raises. A failure to write an audit row must not break the
-    user's request. When a write fails, a structured ERROR is emitted
-    with a machine-readable event name so log aggregators can alert.
-"""
 import logging
 from typing import Any, Optional
 
@@ -20,9 +8,7 @@ from .models import AuditLog
 logger = logging.getLogger("core.audit")
 
 
-# The complete set of action codes that may be written. Adding a new
-# action requires editing this set and, if it needs its own shape, the
-# caller.
+
 AUDIT_ACTION_WHITELIST = frozenset({
     # Authentication
     "auth.login.success",
@@ -52,14 +38,17 @@ AUDIT_ACTION_WHITELIST = frozenset({
     "course.archived",
     "course.restored",
 
+    # Timetable
+    "timetable.created",
+    "timetable.updated",
+    "timetable.deleted",
+
     # System / test
     "test.verify",
 })
 
 
-# Any metadata key whose name contains one of these substrings is dropped
-# before storing. This is defense-in-depth: callers should never pass a
-# secret, but if they do, it does not reach the DB.
+
 _SECRET_KEY_PATTERNS = (
     "password",
     "token",

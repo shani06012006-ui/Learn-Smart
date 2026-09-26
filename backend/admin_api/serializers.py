@@ -1,4 +1,3 @@
-"""Serializers for the institution admin API."""
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -9,7 +8,7 @@ from accounts.models import (
     TeacherAttendance,
     User,
 )
-from classes.models import ClassCourse, StudentEnrollment
+from classes.models import ClassCourse, StudentEnrollment, TimetableEntry
 from core.models import AuditLog
 from institutions.models import Institution
 
@@ -51,15 +50,6 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
 
 class AdminUserCreateSerializer(serializers.Serializer):
-    """
-    Create a teacher or student. Admins cannot create other admins through
-    this endpoint Ã¢â‚¬â€ admin accounts are provisioned via the management
-    commands (create_institution_admin) or Django's createsuperuser, so
-    privilege escalation isn't possible via the API.
-
-    The institution is assigned server-side from request.user, never
-    accepted from the client.
-    """
 
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -106,8 +96,6 @@ class AdminStatsSerializer(serializers.Serializer):
     enrollments_active = serializers.IntegerField()
     institution = InstitutionBriefSerializer(allow_null=True)
     is_superuser_view = serializers.BooleanField()
-    
-
 
 
 # ---------------------------------------------------------------- enrollments
@@ -173,7 +161,6 @@ class AdminEnrollmentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-
 # ---------------------------------------------------------------- sessions
 
 
@@ -226,7 +213,8 @@ class AdminRefreshTokenSerializer(serializers.ModelSerializer):
         return "active"
 
     def get_is_active(self, obj):
-        return obj.is_active()    
+        return obj.is_active()
+
 
 # --------------------------------------------------------------------------
 # Course management
@@ -234,6 +222,7 @@ class AdminRefreshTokenSerializer(serializers.ModelSerializer):
 
 class AdminCourseTeacherBriefSerializer(serializers.ModelSerializer):
     """Compact teacher payload embedded in course rows."""
+
     full_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -268,7 +257,6 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_student_count(self, obj):
-
         count = getattr(obj, "student_count", None)
         if count is not None:
             return count
@@ -294,11 +282,8 @@ class AdminCourseWriteSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("This field is required.")
         return value
-    
-
 
 # ---------------------------------------------------------------- audit log
-
 
 class AuditActorBriefSerializer(serializers.ModelSerializer):
     """Compact actor payload embedded in audit rows."""
@@ -321,7 +306,7 @@ class AuditLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AuditLog
-        fields = [ 
+        fields = [
             "id",
             "occurred_at",
             "actor",
@@ -336,12 +321,10 @@ class AuditLogSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_resource_id(self, obj):
-        return str(obj.resource_id) if obj.resource_id else None    
-    
+        return str(obj.resource_id) if obj.resource_id else None
 
 
 # ---------------------------------------------------------------- attendance
-
 
 class AttendanceStudentBriefSerializer(serializers.ModelSerializer):
     """Compact student payload embedded in attendance rows."""
@@ -420,4 +403,112 @@ class StudentAttendanceSerializer(serializers.ModelSerializer):
             "duration_seconds",
             "source",
         ]
-        read_only_fields = fields    
+        read_only_fields = fields
+
+# ---------------------------------------------------------------- timetable
+
+class TimetableEntryReadSerializer(serializers.ModelSerializer):
+    """Read-only timetable row for admin + role-aware views."""
+
+    teacher = AdminCourseTeacherBriefSerializer(read_only=True)
+    class_course = AdminEnrollmentClassBriefSerializer(read_only=True)
+    day_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TimetableEntry
+        fields = [
+            "id",
+            "class_course",
+            "teacher",
+            "day_of_week",
+            "day_label",
+            "start_time",
+            "end_time",
+            "room",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_day_label(self, obj):
+        return obj.get_day_of_week_display()
+
+
+class TimetableEntryWriteSerializer(serializers.Serializer):
+
+    class_course_id = serializers.UUIDField()
+    day_of_week = serializers.IntegerField(min_value=0, max_value=6)
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+    room = serializers.CharField(max_length=100, allow_blank=True, required=False, default="")
+    is_active = serializers.BooleanField(required=False, default=True)
+
+    def validate(self, attrs):
+        start = attrs.get("start_time")
+        end = attrs.get("end_time")
+
+        if start and end and end <= start:
+            raise serializers.ValidationError(
+                {"end_time": "End time must be after start time."}
+            )
+
+        class_id = attrs.get("class_course_id")
+        try:
+            course = ClassCourse.objects.get(pk=class_id)
+        except ClassCourse.DoesNotExist:
+            raise serializers.ValidationError(
+                {"class_course_id": "No class matches this id."}
+            )
+
+        attrs["_course"] = course
+        return attrs
+
+    # ------------------------------------------------------------------ conflicts
+
+    def _overlapping_qs(self, *, day, start, end, exclude_id=None):
+        """
+        Return rows on the same day whose [start, end) interval overlaps
+        the requested one. Two intervals overlap iff
+            existing.start < new.end AND existing.end > new.start.
+        """
+        qs = TimetableEntry.objects.filter(
+            day_of_week=day,
+            is_active=True,
+            start_time__lt=end,
+            end_time__gt=start,
+        )
+        if exclude_id:
+            qs = qs.exclude(pk=exclude_id)
+        return qs
+
+    def check_conflicts(self, *, course, day, start, end, room, exclude_id=None):
+        """
+        Run the three conflict checks. Called from the viewset once the
+        caller's institution scope is known. Raises ValidationError on
+        the first conflict found.
+        """
+        base = self._overlapping_qs(
+            day=day, start=start, end=end, exclude_id=exclude_id
+        )
+
+        # 1. Teacher conflict — same teacher already booked in this slot.
+        teacher = course.teacher
+        if base.filter(teacher=teacher).exists():
+            raise serializers.ValidationError(
+                f"{teacher.get_full_name() or teacher.email} already has "
+                "a class in this time slot."
+            )
+
+        # 2. Class conflict — the same class already has a slot here.
+        if base.filter(class_course=course).exists():
+            raise serializers.ValidationError(
+                f"{course.name} already has a timetable entry in this time slot."
+            )
+
+        room_clean = (room or "").strip()
+        if room_clean:
+            if base.filter(room__iexact=room_clean).exists():
+                raise serializers.ValidationError(
+                    f"Room '{room_clean}' is already booked in this time slot."
+                )

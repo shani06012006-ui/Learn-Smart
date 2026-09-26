@@ -8,6 +8,7 @@ from .views import (
     AdminStatsView,
     AdminStudentAttendanceViewSet,
     AdminTeacherAttendanceViewSet,
+    AdminTimetableViewSet,
     AdminUserViewSet,
     InstitutionCourseViewSet,
 )
@@ -27,6 +28,11 @@ router.register(
     "attendance/students",
     AdminStudentAttendanceViewSet,
     basename="admin-student-attendance",
+)
+router.register(
+    "timetable",
+    AdminTimetableViewSet,
+    basename="admin-timetable",
 )
 
 urlpatterns = [
