@@ -8,7 +8,9 @@ from .views import (
     AdminSessionViewSet,
     AdminStatsView,
     AdminStudentAttendanceViewSet,
+    AdminStudentLeaveViewSet,
     AdminTeacherAttendanceViewSet,
+    AdminTeacherLeaveViewSet,
     AdminTimetableViewSet,
     AdminUserViewSet,
     InstitutionCourseViewSet,
@@ -39,6 +41,16 @@ router.register(
     "live-classes",
     AdminLiveClassViewSet,
     basename="admin-live-class",
+)
+router.register(
+    "leaves/students",
+    AdminStudentLeaveViewSet,
+    basename="admin-student-leave",
+)
+router.register(
+    "leaves/teachers",
+    AdminTeacherLeaveViewSet,
+    basename="admin-teacher-leave",
 )
 
 urlpatterns = [

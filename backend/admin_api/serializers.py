@@ -8,10 +8,11 @@ from accounts.models import (
     TeacherAttendance,
     User,
 )
+
 from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from core.models import AuditLog
 from institutions.models import Institution
-
+from leaves.models import StudentLeave, TeacherLeave
 
 class InstitutionBriefSerializer(serializers.ModelSerializer):
 
@@ -580,3 +581,178 @@ class LiveClassWriteSerializer(serializers.Serializer):
         choices=[LiveClass.STATUS_CANCELLED],
         required=False,
     )                
+    
+
+
+# ---------------------------------------------------------------- leaves
+
+
+class LeaveRequesterBriefSerializer(serializers.ModelSerializer):
+    """Compact user payload embedded in leave rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name", "role"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class LeaveReviewerBriefSerializer(serializers.ModelSerializer):
+    """Compact reviewer payload embedded in leave rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "full_name"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class LeaveReadMixin:
+    """Shared read-only fields for StudentLeave / TeacherLeave serializers."""
+
+    institution = InstitutionBriefSerializer(read_only=True)
+    reviewer = LeaveReviewerBriefSerializer(read_only=True)
+
+
+class StudentLeaveReadSerializer(LeaveReadMixin, serializers.ModelSerializer):
+    """Read-only representation of a StudentLeave."""
+
+    student = LeaveRequesterBriefSerializer(read_only=True)
+
+    class Meta:
+        model = StudentLeave
+        fields = [
+            "id",
+            "student",
+            "institution",
+            "leave_type",
+            "start_date",
+            "end_date",
+            "days",
+            "status",
+            "reason",
+            "applied_at",
+            "reviewed_at",
+            "reviewer",
+            "admin_remarks",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class TeacherLeaveReadSerializer(LeaveReadMixin, serializers.ModelSerializer):
+    """Read-only representation of a TeacherLeave."""
+
+    teacher = LeaveRequesterBriefSerializer(read_only=True)
+
+    class Meta:
+        model = TeacherLeave
+        fields = [
+            "id",
+            "teacher",
+            "institution",
+            "leave_type",
+            "start_date",
+            "end_date",
+            "days",
+            "status",
+            "reason",
+            "applied_at",
+            "reviewed_at",
+            "reviewer",
+            "admin_remarks",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class _LeaveWriteBase(serializers.Serializer):
+
+    leave_type = serializers.ChoiceField(choices=StudentLeave.LEAVE_TYPE_CHOICES)
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        instance = getattr(self, "instance", None)
+        start = attrs.get("start_date") or (instance.start_date if instance else None)
+        end = attrs.get("end_date") or (instance.end_date if instance else None)
+        if start and end and end < start:
+            raise serializers.ValidationError(
+                {"end_date": "End date cannot be before start date."}
+            )
+        return attrs
+
+    @staticmethod
+    def check_overlap(model, requester_field, requester_id, start, end, exclude_id=None):
+
+        qs = model.objects.filter(
+            **{requester_field: requester_id},
+            status__in=[model.STATUS_PENDING, model.STATUS_APPROVED],
+            start_date__lte=end,
+            end_date__gte=start,
+        )
+        if exclude_id:
+            qs = qs.exclude(pk=exclude_id)
+        if qs.exists():
+            raise serializers.ValidationError(
+                {
+                    "error": {
+                        "detail": (
+                            "An overlapping leave request already exists "
+                            "for this person."
+                        ),
+                        "status_code": 400,
+                    }
+                }
+            )
+
+
+class StudentLeaveWriteSerializer(_LeaveWriteBase):
+    """Create/update payload for a StudentLeave."""
+
+    student_id = serializers.UUIDField(required=False)
+
+    def validate_student_id(self, value):
+        try:
+            user = User.objects.get(pk=value, role=User.ROLE_STUDENT)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                "student_id does not match a student."
+            )
+        self._student = user
+        return value
+
+
+class TeacherLeaveWriteSerializer(_LeaveWriteBase):
+    """Create/update payload for a TeacherLeave."""
+
+    teacher_id = serializers.UUIDField(required=False)
+
+    def validate_teacher_id(self, value):
+        try:
+            user = User.objects.get(pk=value, role=User.ROLE_TEACHER)
+        except User.DoesNotExist:
+            raise serializers.ValidationError(
+                "teacher_id does not match a teacher."
+            )
+        self._teacher = user
+        return value
+
+
+class LeaveReviewSerializer(serializers.Serializer):
+    """Payload for approve/reject actions."""
+
+    admin_remarks = serializers.CharField(
+        required=False, allow_blank=True, default=""
+    )    
