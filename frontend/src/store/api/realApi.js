@@ -62,6 +62,7 @@ export const realApi = createApi({
     "AdminSession",
     "AdminEnrollment",
     "AdminAttendance",
+    "AdminTimetable",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -288,6 +289,66 @@ export const realApi = createApi({
       providesTags: ["AdminAttendance"],
     }),
 
+    // ---------- admin timetable ------------------------------------
+
+    getAdminTimetable: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.teacher) search.set("teacher", params.teacher);
+        if (params.class_id) search.set("class_id", params.class_id);
+        if (params.day !== undefined && params.day !== "")
+          search.set("day", String(params.day));
+        if (params.institution) search.set("institution", params.institution);
+        if (params.active !== undefined)
+          search.set("active", String(params.active));
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/timetable/?${qs}` : "/admin/timetable/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((t) => ({
+                type: "AdminTimetable",
+                id: t.id,
+              })),
+              { type: "AdminTimetable", id: "LIST" },
+            ]
+          : [{ type: "AdminTimetable", id: "LIST" }],
+    }),
+
+    createAdminTimetable: builder.mutation({
+      query: (body) => ({
+        url: "/admin/timetable/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "AdminTimetable", id: "LIST" }],
+    }),
+
+    updateAdminTimetable: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/admin/timetable/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "AdminTimetable", id },
+        { type: "AdminTimetable", id: "LIST" },
+      ],
+    }),
+
+    deactivateAdminTimetable: builder.mutation({
+      query: (id) => ({
+        url: `/admin/timetable/${id}/deactivate/`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "AdminTimetable", id },
+        { type: "AdminTimetable", id: "LIST" },
+      ],
+    }),
+
     // ---------- admin stats -----------------------------------------
 
     getAdminStats: builder.query({
@@ -383,4 +444,8 @@ export const {
   useGetAdminEnrollmentsQuery,
   useGetAdminTeacherAttendanceQuery,
   useGetAdminStudentAttendanceQuery,
+  useGetAdminTimetableQuery,
+  useCreateAdminTimetableMutation,
+  useUpdateAdminTimetableMutation,
+  useDeactivateAdminTimetableMutation,
 } = realApi;

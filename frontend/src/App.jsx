@@ -37,6 +37,7 @@ import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPag
 import AdminTeachersPage from "./features/admin/pages/AdminTeachersPage";
 import AdminTeacherDetailPage from "./features/admin/pages/AdminTeacherDetailPage";
 import AdminAttendancePage from "./features/admin/pages/AdminAttendancePage";
+import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
 
 
 
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="students" element={<AdminStudentsPage />} />
           <Route path="students/:id" element={<AdminStudentDetailPage />} />
           <Route path="attendance" element={<AdminAttendancePage />} />
+          <Route path="timetable" element={<AdminTimetablePage />} />
           <Route path="audit" element={<AdminAuditLogPage />} />
           <Route path="sessions" element={<AdminSessionsPage />} />
         </Route>
@@ -101,8 +103,7 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Unknown routes â†’ land on the public entry (RootRoute will then
-          decide: landing page or role-based dashboard redirect). */}
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
