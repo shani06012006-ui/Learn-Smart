@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from accounts.models import User
+from accounts.models import RefreshToken, User
 from classes.models import ClassCourse, StudentEnrollment
 from core.models import AuditLog
 from institutions.models import Institution
@@ -110,6 +110,71 @@ class AdminStatsSerializer(serializers.Serializer):
     enrollments_active = serializers.IntegerField()
     institution = InstitutionBriefSerializer(allow_null=True)
     is_superuser_view = serializers.BooleanField()
+    
+
+
+# ---------------------------------------------------------------- sessions
+
+
+class AdminSessionUserBriefSerializer(serializers.ModelSerializer):
+    """Compact user payload embedded in session rows."""
+
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "first_name", "last_name", "full_name", "role"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class AdminRefreshTokenSerializer(serializers.ModelSerializer):
+    """
+    Read-only representation of a refresh token for the admin UI.
+
+    SECURITY: `token_hash` is never exposed. The admin sees only the
+    session metadata needed to identify and revoke it.
+
+    `status` is a computed string: "active" | "revoked" | "expired".
+    `is_active` mirrors RefreshToken.is_active() for client-side filtering.
+    """
+
+    user = AdminSessionUserBriefSerializer(read_only=True)
+    status = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RefreshToken
+        fields = [
+            "id",
+            "user",
+            "device_label",
+            "ip_address",
+            "user_agent",
+            "issued_at",
+            "expires_at",
+            "last_used_at",
+            "used_at",
+            "revoked_at",
+            "revoked_reason",
+            "status",
+            "is_active",
+        ]
+        read_only_fields = fields
+
+    def get_status(self, obj):
+        from django.utils import timezone
+
+        if obj.revoked_at is not None:
+            return "revoked"
+        if obj.expires_at <= timezone.now():
+            return "expired"
+        return "active"
+
+    def get_is_active(self, obj):
+        return obj.is_active()    
 
 # --------------------------------------------------------------------------
 # Course management

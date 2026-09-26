@@ -15,7 +15,7 @@ What's covered:
 import pytest
 from rest_framework.test import APIClient
 
-from accounts.models import User
+from accounts.models import RefreshToken, User
 from classes.models import ClassCourse, StudentEnrollment
 from core.models import AuditLog
 from institutions.models import Institution
@@ -146,7 +146,146 @@ def test_enrollments_empty_for_student_with_no_enrollments(northwood):
     resp = client.get(f"/api/v1/admin/users/{student.id}/enrollments/")
     assert resp.status_code == 200
     assert resp.json() == {"results": [], "count": 0}
-    
+
+
+
+# ----------------------------------------------------------------- sessions
+
+
+def _make_session(user, *, revoked=False, expired=False, label="Test Device"):
+    """Helper: build a RefreshToken row with sensible defaults."""
+    import hashlib
+    import uuid
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    now = timezone.now()
+    # token_hash must fit in 64 chars (CharField max_length=64).
+    raw = f"{user.id}-{label}-{uuid.uuid4()}"
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()  # exactly 64 chars
+    return RefreshToken.objects.create(
+        user=user,
+        token_hash=token_hash,
+        family_id=user.id,  # doesn't need to be unique across tests
+        expires_at=now - timedelta(hours=1) if expired else now + timedelta(days=7),
+        revoked_at=now if revoked else None,
+        revoked_reason="admin_revoked" if revoked else "",
+        device_label=label,
+        ip_address="127.0.0.1",
+        user_agent="pytest/1.0",
+    )
+
+
+def test_sessions_list_scoped_to_institution(northwood, riverdale):
+    """Institution admin sees only sessions for users in their institution."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher_a = make_user("ta@test.local", User.ROLE_TEACHER, northwood)
+    teacher_b = make_user("tb@test.local", User.ROLE_TEACHER, riverdale)
+
+    _make_session(teacher_a)
+    _make_session(teacher_b)
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/sessions/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["user"]["email"] == "ta@test.local"
+
+
+def test_sessions_list_superuser_sees_all(northwood, riverdale):
+    """Superuser sees sessions across every institution."""
+    su = make_user("root@test.local", User.ROLE_ADMIN, None, is_superuser=True)
+    teacher_a = make_user("ta@test.local", User.ROLE_TEACHER, northwood)
+    teacher_b = make_user("tb@test.local", User.ROLE_TEACHER, riverdale)
+
+    _make_session(teacher_a)
+    _make_session(teacher_b)
+
+    client = auth_client(su)
+    resp = client.get("/api/v1/admin/sessions/")
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 2
+
+
+def test_sessions_filter_by_status(northwood):
+    """?status=active|revoked|expired narrows the list."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+
+    _make_session(teacher, label="Active")
+    _make_session(teacher, revoked=True, label="Revoked")
+    _make_session(teacher, expired=True, label="Expired")
+
+    client = auth_client(admin)
+
+    active = client.get("/api/v1/admin/sessions/?status=active").json()
+    assert active["count"] == 1
+    assert active["results"][0]["status"] == "active"
+
+    revoked = client.get("/api/v1/admin/sessions/?status=revoked").json()
+    assert revoked["count"] == 1
+    assert revoked["results"][0]["status"] == "revoked"
+
+    expired = client.get("/api/v1/admin/sessions/?status=expired").json()
+    assert expired["count"] == 1
+    assert expired["results"][0]["status"] == "expired"
+
+
+def test_sessions_never_expose_token_hash(northwood):
+    """The serializer must not leak token_hash."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+    _make_session(teacher)
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/sessions/")
+    assert resp.status_code == 200
+    row = resp.json()["results"][0]
+    assert "token_hash" not in row
+
+
+def test_session_revoke_sets_revoked_at(northwood):
+    """POST /revoke/ marks the session revoked and returns the updated row."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+    session = _make_session(teacher, label="ToRevoke")
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/sessions/{session.id}/revoke/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "revoked"
+    assert body["revoked_reason"] == "admin_revoked"
+
+    session.refresh_from_db()
+    assert session.revoked_at is not None
+    assert session.revoked_reason == "admin_revoked"
+
+
+def test_session_revoke_404_for_other_institution(northwood, riverdale):
+    """Cross-institution revoke returns 404 (not 403)."""
+    admin_a = make_user("admin.a@test.local", User.ROLE_ADMIN, northwood)
+    teacher_b = make_user("tb@test.local", User.ROLE_TEACHER, riverdale)
+    session_b = _make_session(teacher_b)
+
+    client = auth_client(admin_a)
+    resp = client.post(f"/api/v1/admin/sessions/{session_b.id}/revoke/")
+    assert resp.status_code == 404
+
+
+def test_session_revoke_idempotent(northwood):
+    """Revoking an already-revoked session returns 200 with same row."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    teacher = make_user("t@test.local", User.ROLE_TEACHER, northwood)
+    session = _make_session(teacher, revoked=True, label="AlreadyRevoked")
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/sessions/{session.id}/revoke/")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "revoked"
+        
     
 # ----------------------------------------------------------------- helpers
 
