@@ -1584,3 +1584,406 @@ def test_timetable_admin_gets_403_on_role_view(northwood):
     client = auth_client(admin)
     resp = client.get("/api/v1/timetable/")
     assert resp.status_code == 403
+    
+
+
+
+# ----------------------------------------------------------------- live classes
+
+
+def _make_live_class(entry, *, date_offset=0, cancelled=False):
+    """Helper: materialize one LiveClass for a TimetableEntry."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from classes.models import LiveClass
+    from classes.services import _combine
+
+    today = timezone.localdate()
+    scheduled_date = today + timedelta(days=date_offset)
+    return LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=entry.class_course,
+        teacher=entry.teacher,
+        institution=entry.institution,
+        scheduled_date=scheduled_date,
+        scheduled_start=_combine(scheduled_date, entry.start_time),
+        scheduled_end=_combine(scheduled_date, entry.end_time),
+        room=entry.room,
+        stored_status=(
+            LiveClass.STATUS_CANCELLED if cancelled else LiveClass.STATUS_UPCOMING
+        ),
+    )
+
+
+def _make_timetable_entry_for(course, *, day=0, start="09:00", end="10:00"):
+    """Helper: build a TimetableEntry directly."""
+    from datetime import time
+
+    from classes.models import TimetableEntry
+
+    def _t(s):
+        hh, mm = s.split(":")
+        return time(int(hh), int(mm))
+
+    return TimetableEntry.objects.create(
+        institution=course.institution,
+        class_course=course,
+        teacher=course.teacher,
+        day_of_week=day,
+        start_time=_t(start),
+        end_time=_t(end),
+        room="",
+        is_active=True,
+    )
+
+
+def test_materialize_creates_live_class_rows(northwood, course_teacher):
+    """materialize_upcoming_sessions creates N rows for N weeks."""
+    from classes.models import LiveClass
+    from classes.services import materialize_upcoming_sessions
+
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    entry = _make_timetable_entry_for(course)
+
+    created = materialize_upcoming_sessions(entry, weeks=3)
+    assert created == 3
+    assert LiveClass.objects.filter(timetable_entry=entry).count() == 3
+
+
+def test_materialize_is_idempotent(northwood, course_teacher):
+    """Calling materialize twice does not duplicate rows."""
+    from classes.models import LiveClass
+    from classes.services import materialize_upcoming_sessions
+
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    entry = _make_timetable_entry_for(course)
+
+    materialize_upcoming_sessions(entry, weeks=2)
+    second = materialize_upcoming_sessions(entry, weeks=2)
+    assert second == 0
+    assert LiveClass.objects.filter(timetable_entry=entry).count() == 2
+
+
+def test_live_class_status_is_derived(northwood, course_teacher):
+    """computed_status derives from the scheduled window."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from classes.models import LiveClass
+
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    entry = _make_timetable_entry_for(course)
+    now = timezone.now()
+
+    past = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=timezone.localdate() - timedelta(days=1),
+        scheduled_start=now - timedelta(hours=2),
+        scheduled_end=now - timedelta(hours=1),
+        stored_status=LiveClass.STATUS_UPCOMING,
+    )
+    assert past.computed_status() == LiveClass.STATUS_COMPLETED
+
+    future = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=timezone.localdate() + timedelta(days=1),
+        scheduled_start=now + timedelta(hours=1),
+        scheduled_end=now + timedelta(hours=2),
+        stored_status=LiveClass.STATUS_UPCOMING,
+    )
+    assert future.computed_status() == LiveClass.STATUS_UPCOMING
+
+    live = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=timezone.localdate(),
+        scheduled_start=now - timedelta(minutes=10),
+        scheduled_end=now + timedelta(minutes=50),
+        stored_status=LiveClass.STATUS_UPCOMING,
+    )
+    assert live.computed_status() == LiveClass.STATUS_LIVE
+
+    cancelled = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=timezone.localdate(),
+        scheduled_start=now - timedelta(minutes=10),
+        scheduled_end=now + timedelta(minutes=50),
+        stored_status=LiveClass.STATUS_CANCELLED,
+    )
+    assert cancelled.computed_status() == LiveClass.STATUS_CANCELLED
+
+
+def test_cancel_future_sessions_marks_upcoming(northwood, course_teacher):
+    """cancel_future_sessions flips future rows to cancelled, keeps past."""
+    from classes.models import LiveClass
+    from classes.services import cancel_future_sessions
+
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher,
+        name="Physics", subject="Physics",
+    )
+    entry = _make_timetable_entry_for(course)
+
+    past = _make_live_class(entry, date_offset=-7)
+    future_1 = _make_live_class(entry, date_offset=7)
+    future_2 = _make_live_class(entry, date_offset=14)
+
+    updated = cancel_future_sessions(entry)
+    assert updated == 2
+
+    past.refresh_from_db()
+    future_1.refresh_from_db()
+    future_2.refresh_from_db()
+    assert past.stored_status == LiveClass.STATUS_UPCOMING  # untouched
+    assert future_1.stored_status == LiveClass.STATUS_CANCELLED
+    assert future_2.stored_status == LiveClass.STATUS_CANCELLED
+
+
+def test_admin_can_list_live_classes_scoped_to_institution(
+    northwood, riverdale, course_teacher, course_teacher_riverdale
+):
+    """Admin sees only own-institution live classes."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    course_nw = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="NW", subject="X",
+    )
+    entry_nw = _make_timetable_entry_for(course_nw)
+    _make_live_class(entry_nw)
+
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale, name="RD", subject="X",
+    )
+    entry_rd = _make_timetable_entry_for(course_rd)
+    _make_live_class(entry_rd)
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/live-classes/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["class_course"]["name"] == "NW"
+
+
+def test_admin_can_cancel_live_class(northwood, course_teacher):
+    """POST /cancel/ flips stored_status and audits."""
+    from classes.models import LiveClass
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="P", subject="X",
+    )
+    entry = _make_timetable_entry_for(course)
+    live = _make_live_class(entry, date_offset=7)
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/live-classes/{live.id}/cancel/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "cancelled"
+
+    live.refresh_from_db()
+    assert live.stored_status == LiveClass.STATUS_CANCELLED
+
+
+def test_admin_cannot_retrieve_other_institution_live_class(
+    northwood, riverdale, course_teacher_riverdale
+):
+    """Cross-institution access returns 404."""
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale, teacher=course_teacher_riverdale, name="R", subject="X",
+    )
+    entry_rd = _make_timetable_entry_for(course_rd)
+    live = _make_live_class(entry_rd)
+
+    client = auth_client(admin_nw)
+    resp = client.get(f"/api/v1/admin/live-classes/{live.id}/")
+    assert resp.status_code == 404
+
+
+def test_teacher_sees_own_live_classes(northwood, course_teacher):
+    """Teacher /live-classes/ returns only their own sessions."""
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="P", subject="X",
+    )
+    entry = _make_timetable_entry_for(course)
+    _make_live_class(entry, date_offset=1)
+    _make_live_class(entry, date_offset=2)
+
+    client = auth_client(course_teacher)
+    resp = client.get("/api/v1/live-classes/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 2
+
+
+def test_student_sees_live_classes_for_enrolled_classes_only(
+    northwood, course_teacher
+):
+    """Student sees sessions for their enrolled classes only."""
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course_a = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="A", subject="X",
+    )
+    course_b = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="B", subject="Y",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course_a,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+
+    entry_a = _make_timetable_entry_for(course_a)
+    entry_b = _make_timetable_entry_for(course_b, day=1)
+    _make_live_class(entry_a, date_offset=1)
+    _make_live_class(entry_b, date_offset=1)
+
+    client = auth_client(student)
+    resp = client.get("/api/v1/live-classes/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body) == 1
+    assert body[0]["class_course"]["name"] == "A"
+
+
+def test_live_classes_requires_authentication(northwood):
+    """Unauthenticated request is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/live-classes/")
+    assert resp.status_code in (401, 403)
+    resp = client.get("/api/v1/admin/live-classes/")
+    assert resp.status_code in (401, 403)
+
+
+def test_admin_live_classes_are_403_for_teacher(northwood, course_teacher):
+    """Teacher cannot use the admin live-class endpoint."""
+    client = auth_client(course_teacher)
+    resp = client.get("/api/v1/admin/live-classes/")
+    assert resp.status_code == 403
+
+
+def test_role_aware_live_classes_403_for_admin(northwood):
+    """Admin cannot use the role-aware live-class endpoint."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    client = auth_client(admin)
+    resp = client.get("/api/v1/live-classes/")
+    assert resp.status_code == 403
+
+
+def test_touch_teacher_attendance_links_active_live_class(
+    northwood, course_teacher
+):
+    """touch_teacher_attendance links a live LiveClass session."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from accounts.models import TeacherAttendance
+    from accounts.services import touch_teacher_attendance
+    from classes.models import LiveClass
+    from classes.services import _combine
+
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="P", subject="X",
+    )
+    entry = _make_timetable_entry_for(course)
+
+    now = timezone.now()
+    today = timezone.localdate()
+    live = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=today,
+        scheduled_start=now - timedelta(minutes=10),
+        scheduled_end=now + timedelta(minutes=50),
+        stored_status=LiveClass.STATUS_UPCOMING,
+    )
+
+    touch_teacher_attendance(course_teacher.id)
+
+    att = TeacherAttendance.objects.get(teacher=course_teacher, date=today)
+    assert att.live_class_id == live.id
+
+
+def test_touch_student_attendance_links_active_live_class(
+    northwood, course_teacher
+):
+    """touch_student_attendance links the live LiveClass session."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from accounts.models import StudentAttendance
+    from accounts.services import touch_student_attendance
+    from classes.models import LiveClass
+
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood, teacher=course_teacher, name="P", subject="X",
+    )
+    StudentEnrollment.objects.create(
+        student=student, class_course=course,
+        joining_code="AAA111",
+        status=StudentEnrollment.STATUS_ACTIVE,
+    )
+    entry = _make_timetable_entry_for(course)
+
+    now = timezone.now()
+    today = timezone.localdate()
+    live = LiveClass.objects.create(
+        timetable_entry=entry,
+        class_course=course,
+        teacher=course_teacher,
+        institution=northwood,
+        scheduled_date=today,
+        scheduled_start=now - timedelta(minutes=10),
+        scheduled_end=now + timedelta(minutes=50),
+        stored_status=LiveClass.STATUS_UPCOMING,
+    )
+
+    touch_student_attendance(student.id)
+
+    att = StudentAttendance.objects.get(student=student, date=today)
+    assert att.live_class_id == live.id
+
+
+def test_touch_teacher_attendance_no_live_class_links_null(
+    northwood, course_teacher
+):
+    """When no live class is running, live_class stays NULL."""
+    from accounts.models import TeacherAttendance
+    from accounts.services import touch_teacher_attendance
+    from django.utils import timezone
+
+    touch_teacher_attendance(course_teacher.id)
+    att = TeacherAttendance.objects.get(
+        teacher=course_teacher, date=timezone.localdate()
+    )
+    assert att.live_class_id is None    

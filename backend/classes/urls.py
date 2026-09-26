@@ -1,6 +1,6 @@
 ﻿from django.urls import path
 
-from admin_api.views import TimetableView
+from admin_api.views import RoleAwareLiveClassView, TimetableView
 from .views import (
     ClassCourseDetailView,
     ClassCourseListCreateView,
@@ -20,4 +20,5 @@ urlpatterns = [
     ),
     path("enrollments/join/", JoinClassView.as_view(), name="enrollment-join"),
     path("timetable/", TimetableView.as_view(), name="timetable"),
+    path("live-classes/", RoleAwareLiveClassView.as_view(), name="live-classes"),
 ]

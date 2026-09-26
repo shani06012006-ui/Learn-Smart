@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
-from classes.models import ClassCourse, StudentEnrollment, TimetableEntry
+from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from core.models import AuditLog
 from institutions.models import Institution
 from core.audit import log_audit
@@ -26,6 +26,8 @@ from .serializers import (
     AdminUserToggleActiveSerializer,
     AdminUserUpdateSerializer,
     AuditLogSerializer,
+    LiveClassReadSerializer,
+    LiveClassWriteSerializer,
     StudentAttendanceSerializer,
     TeacherAttendanceSerializer,
     TimetableEntryReadSerializer,
@@ -1040,3 +1042,192 @@ class TimetableView(APIView):
 
         qs = qs.order_by("day_of_week", "start_time")
         return Response(TimetableEntryReadSerializer(qs, many=True).data)
+    
+
+
+class AdminLiveClassViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def _scope_queryset(self, qs):
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        return qs.filter(institution=user.institution)
+
+    def get_queryset(self):
+        qs = (
+            LiveClass.objects.all()
+            .select_related(
+                "timetable_entry",
+                "class_course",
+                "class_course__teacher",
+                "teacher",
+                "institution",
+            )
+        )
+        qs = self._scope_queryset(qs)
+
+        teacher_id = self.request.query_params.get("teacher")
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)
+
+        class_id = self.request.query_params.get("class_id")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            qs = qs.filter(scheduled_date=date_str)
+
+        from_str = self.request.query_params.get("from")
+        if from_str:
+            qs = qs.filter(scheduled_start__gte=from_str)
+
+        to_str = self.request.query_params.get("to")
+        if to_str:
+            qs = qs.filter(scheduled_start__lte=to_str)
+
+        # ?status=upcoming|live|completed|cancelled — computed, so we
+        # filter in Python after DB narrowing by date if provided.
+        status_filter = self.request.query_params.get("status")
+
+        institution_id = self.request.query_params.get("institution")
+        user = self.request.user
+        if institution_id and user.is_superuser:
+            qs = qs.filter(institution_id=institution_id)
+
+        qs = qs.order_by("-scheduled_start")
+
+        if status_filter in {
+            LiveClass.STATUS_UPCOMING,
+            LiveClass.STATUS_LIVE,
+            LiveClass.STATUS_COMPLETED,
+            LiveClass.STATUS_CANCELLED,
+        }:
+            # Filter in Python — status is derived.
+            ids = [
+                row.id
+                for row in qs
+                if row.computed_status() == status_filter
+            ]
+            qs = qs.filter(id__in=ids)
+
+        return qs
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        qs = self._scope_queryset(LiveClass.objects.all())
+        try:
+            return qs.get(pk=pk)
+        except LiveClass.DoesNotExist:
+            raise NotFound("Live class not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = LiveClassReadSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        return Response(LiveClassReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        obj = self.get_object()
+        return Response(LiveClassReadSerializer(obj).data)
+
+    def partial_update(self, request, pk=None):
+        obj = self.get_object()
+        serializer = LiveClassWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        for field in ("room", "meeting_url", "recording_url", "stored_status"):
+            if field in serializer.validated_data:
+                setattr(obj, field, serializer.validated_data[field])
+        obj.save()
+
+        return Response(LiveClassReadSerializer(obj).data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        """Idempotent: set stored_status=cancelled."""
+        from core.audit import log_audit
+
+        obj = self.get_object()
+
+        if obj.stored_status != LiveClass.STATUS_CANCELLED:
+            obj.stored_status = LiveClass.STATUS_CANCELLED
+            obj.save(update_fields=["stored_status", "updated_at"])
+
+            log_audit(
+                action="live_class.cancelled",
+                request=request,
+                institution=obj.institution,
+                resource_type="live_class",
+                resource_id=obj.id,
+                metadata={
+                    "class_id": str(obj.class_course_id),
+                    "scheduled_date": obj.scheduled_date.isoformat(),
+                },
+            )
+
+        return Response(LiveClassReadSerializer(obj).data)
+
+
+class RoleAwareLiveClassView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = (
+            LiveClass.objects.all()
+            .select_related(
+                "timetable_entry",
+                "class_course",
+                "class_course__teacher",
+                "teacher",
+                "institution",
+            )
+        )
+
+        if user.role == "teacher":
+            qs = qs.filter(teacher=user)
+        elif user.role == "student":
+            enrolled_class_ids = StudentEnrollment.objects.filter(
+                student=user,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            ).values_list("class_course_id", flat=True)
+            qs = qs.filter(class_course_id__in=enrolled_class_ids)
+        else:
+            return Response(
+                {"detail": "Use /admin/live-classes/ for admin access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        class_id = request.query_params.get("class_id")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        from_str = request.query_params.get("from")
+        if from_str:
+            qs = qs.filter(scheduled_start__gte=from_str)
+
+        to_str = request.query_params.get("to")
+        if to_str:
+            qs = qs.filter(scheduled_start__lte=to_str)
+
+        qs = qs.order_by("scheduled_start")
+
+        status_filter = request.query_params.get("status")
+        if status_filter in {
+            LiveClass.STATUS_UPCOMING,
+            LiveClass.STATUS_LIVE,
+            LiveClass.STATUS_COMPLETED,
+            LiveClass.STATUS_CANCELLED,
+        }:
+            ids = [
+                row.id
+                for row in qs
+                if row.computed_status() == status_filter
+            ]
+            qs = qs.filter(id__in=ids)
+
+        return Response(LiveClassReadSerializer(qs, many=True).data)    
