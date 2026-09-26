@@ -1,5 +1,12 @@
 import { NavLink, Link } from "react-router-dom";
-import { LayoutDashboard, Users, BookOpen, GraduationCap, LogOut } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  GraduationCap,
+  LogOut,
+  ScrollText,
+} from "lucide-react";
 
 import { useAdminAuth } from "../hooks/useAdminAuth";
 
@@ -7,6 +14,7 @@ const NAV_ITEMS = [
   { to: "/admin", end: true, label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/courses", label: "Courses", icon: BookOpen },
   { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 
 export default function AdminSidebar() {
