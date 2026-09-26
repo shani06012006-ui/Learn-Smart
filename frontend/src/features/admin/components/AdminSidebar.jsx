@@ -1,7 +1,7 @@
 import { NavLink, Link } from "react-router-dom";
 import {
   LayoutDashboard,
-  Users,
+  UserCog,
   BookOpen,
   GraduationCap,
   LogOut,
@@ -14,7 +14,7 @@ import { useAdminAuth } from "../hooks/useAdminAuth";
 const NAV_ITEMS = [
   { to: "/admin", end: true, label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/courses", label: "Courses", icon: BookOpen },
-  { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/teachers", label: "Teachers", icon: UserCog },
   { to: "/admin/students", label: "Students", icon: GraduationCap },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
   { to: "/admin/sessions", label: "Sessions", icon: Monitor },
