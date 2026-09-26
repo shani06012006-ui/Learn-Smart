@@ -1,4 +1,4 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+﻿import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import {
   adminAccessTokenRotated,
@@ -60,6 +60,7 @@ export const realApi = createApi({
     "AdminCourse",
     "AdminAudit",
     "AdminSession",
+    "AdminEnrollment",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -225,6 +226,31 @@ export const realApi = createApi({
       ],
     }),
 
+    // ---------- admin enrollments ----------------------------------
+
+    getAdminEnrollments: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.status) search.set("status", params.status);
+        if (params.class_id) search.set("class_id", params.class_id);
+        if (params.student_id) search.set("student_id", params.student_id);
+        if (params.q) search.set("q", params.q);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/enrollments/?${qs}` : "/admin/enrollments/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((e) => ({
+                type: "AdminEnrollment",
+                id: e.id,
+              })),
+              { type: "AdminEnrollment", id: "LIST" },
+            ]
+          : [{ type: "AdminEnrollment", id: "LIST" }],
+    }),
+
     // ---------- admin stats -----------------------------------------
 
     getAdminStats: builder.query({
@@ -317,4 +343,5 @@ export const {
   useGetAdminAuditActionsQuery,
   useGetAdminSessionsQuery,
   useRevokeAdminSessionMutation,
+  useGetAdminEnrollmentsQuery,
 } = realApi;

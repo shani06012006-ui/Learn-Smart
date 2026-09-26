@@ -186,3 +186,139 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"PasswordResetToken({self.user_id})"
+    
+
+
+# ---------------------------------------------------------------- attendance
+
+
+class TeacherAttendance(TimeStampedModel):
+    """
+    Daily attendance row for a teacher.
+
+    Created automatically the first time we see the teacher active on a
+    given day (via PresenceConsumer -> User.last_seen_at). Updated on
+    subsequent activity the same day; never duplicated thanks to the
+    (teacher, date) unique constraint.
+
+    No manual override yet — status is always "present" until a future
+    phase introduces late/half-day/leave rules.
+    """
+
+    STATUS_PRESENT = "present"
+    STATUS_CHOICES = [
+        (STATUS_PRESENT, "Present"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="teacher_attendance",
+    )
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="teacher_attendance",
+    )
+    date = models.DateField(db_index=True)
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PRESENT,
+    )
+    duration_seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "date"],
+                name="unique_teacher_attendance_per_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["institution", "date"]),
+        ]
+        ordering = ["-date", "-first_seen_at"]
+
+    def __str__(self):
+        return f"{self.teacher.email} @ {self.date} [{self.status}]"
+
+
+class StudentAttendance(TimeStampedModel):
+    """
+    Daily, per-class attendance row for a student.
+
+    Created automatically when an authenticated student connects to the
+    presence channel AND has an active enrollment in a class. The
+    (student, class_course, date) unique constraint prevents duplicates.
+
+    Joined_at is stamped on first attendance; left_at is best-effort and
+    may remain NULL. Duration is derived from (left_at or last_seen) -
+    joined_at when reliably known.
+    """
+
+    STATUS_PRESENT = "present"
+    STATUS_CHOICES = [
+        (STATUS_PRESENT, "Present"),
+    ]
+
+    SOURCE_AUTO = "auto"
+    SOURCE_CHOICES = [
+        (SOURCE_AUTO, "Auto"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "student"},
+        related_name="student_attendance",
+    )
+    class_course = models.ForeignKey(
+        "classes.ClassCourse",
+        on_delete=models.CASCADE,
+        related_name="student_attendance",
+    )
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="student_attendance",
+    )
+    date = models.DateField(db_index=True)
+    joined_at = models.DateTimeField()
+    left_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PRESENT,
+    )
+    duration_seconds = models.PositiveIntegerField(default=0)
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_AUTO,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "class_course", "date"],
+                name="unique_student_attendance_per_class_per_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["institution", "date"]),
+            models.Index(fields=["class_course", "date"]),
+        ]
+        ordering = ["-date", "-joined_at"]
+
+    def __str__(self):
+        return f"{self.student.email} @ {self.class_course.name} on {self.date}"    
