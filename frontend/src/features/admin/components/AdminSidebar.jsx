@@ -8,7 +8,6 @@ import {
   ScrollText,
   Monitor,
   ClipboardCheck,
-  ClipboardList,
 } from "lucide-react";
 
 import { useAdminAuth } from "../hooks/useAdminAuth";
@@ -19,7 +18,6 @@ const NAV_ITEMS = [
   { to: "/admin/teachers", label: "Teachers", icon: UserCog },
   { to: "/admin/students", label: "Students", icon: GraduationCap },
   { to: "/admin/attendance", label: "Attendance", icon: ClipboardCheck },
-  { to: "/admin/enrollments", label: "Enrollments", icon: ClipboardList },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
   { to: "/admin/sessions", label: "Sessions", icon: Monitor },
 ];
