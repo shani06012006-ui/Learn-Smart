@@ -43,6 +43,9 @@ AUDIT_ACTION_WHITELIST = frozenset({
     "timetable.updated",
     "timetable.deleted",
 
+    # Live classes
+    "live_class.cancelled",
+
     # System / test
     "test.verify",
 })

@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AdminAuditLogViewSet,
     AdminEnrollmentViewSet,
+    AdminLiveClassViewSet,
     AdminSessionViewSet,
     AdminStatsView,
     AdminStudentAttendanceViewSet,
@@ -33,6 +34,11 @@ router.register(
     "timetable",
     AdminTimetableViewSet,
     basename="admin-timetable",
+)
+router.register(
+    "live-classes",
+    AdminLiveClassViewSet,
+    basename="admin-live-class",
 )
 
 urlpatterns = [

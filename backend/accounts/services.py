@@ -1,30 +1,44 @@
-"""
-Attendance services.
-
-Called from the presence consumer (accounts/consumers.py) when a user is
-seen active. These functions own the auto-creation / auto-update logic
-for TeacherAttendance and StudentAttendance rows.
-
-Design notes:
-
-- Only `present` status is supported for now. Manual overrides
-  (late / half-day / leave / absent) are a future phase.
-- Idempotent: calling twice in a second is harmless — the unique
-  constraints guarantee no duplicates, and the update path only touches
-  the `last_seen_at` / duration fields.
-- Institution scoping is implicit: it comes from the user's own
-  `institution` FK, never from client input.
-"""
 import logging
 
 from django.db import transaction
 from django.utils import timezone
 
-from classes.models import StudentEnrollment
+from classes.models import LiveClass, StudentEnrollment
 
 from .models import StudentAttendance, TeacherAttendance, User
 
 logger = logging.getLogger("accounts.attendance")
+
+
+# ----------------------------------------------------------------- helpers
+
+
+def _active_live_class_for_teacher(teacher, now):
+
+    return (
+        LiveClass.objects.filter(
+            teacher=teacher,
+            scheduled_start__lte=now,
+            scheduled_end__gte=now,
+        )
+        .exclude(stored_status=LiveClass.STATUS_CANCELLED)
+        .order_by("-scheduled_start")
+        .first()
+    )
+
+
+def _active_live_class_for_student_class(student, class_course, now):
+
+    return (
+        LiveClass.objects.filter(
+            class_course=class_course,
+            scheduled_start__lte=now,
+            scheduled_end__gte=now,
+        )
+        .exclude(stored_status=LiveClass.STATUS_CANCELLED)
+        .order_by("-scheduled_start")
+        .first()
+    )
 
 
 # ----------------------------------------------------------------- teacher
@@ -32,12 +46,7 @@ logger = logging.getLogger("accounts.attendance")
 
 @transaction.atomic
 def touch_teacher_attendance(teacher_id) -> None:
-    """
-    Called when a teacher is observed active. Creates today's row on
-    first call; updates `last_seen_at` / duration on subsequent calls.
 
-    No-op if the user is not a teacher or is missing.
-    """
     now = timezone.now()
     today = timezone.localdate()
 
@@ -49,6 +58,8 @@ def touch_teacher_attendance(teacher_id) -> None:
     if teacher is None:
         return
 
+    active_session = _active_live_class_for_teacher(teacher, now)
+
     att, created = TeacherAttendance.objects.get_or_create(
         teacher=teacher,
         date=today,
@@ -58,13 +69,18 @@ def touch_teacher_attendance(teacher_id) -> None:
             "last_seen_at": now,
             "status": TeacherAttendance.STATUS_PRESENT,
             "duration_seconds": 0,
+            "live_class": active_session,
         },
     )
 
     if created:
         logger.info(
             "attendance.teacher.created",
-            extra={"teacher_id": str(teacher.id), "date": str(today)},
+            extra={
+                "teacher_id": str(teacher.id),
+                "date": str(today),
+                "live_class_id": str(active_session.id) if active_session else None,
+            },
         )
         return
 
@@ -83,12 +99,7 @@ def touch_teacher_attendance(teacher_id) -> None:
 
 @transaction.atomic
 def touch_student_attendance(student_id) -> None:
-    """
-    Called when a student is observed active. Creates today's row for
-    every class where the student has an *active* enrollment.
 
-    No-op if the user is not a student or has no active enrollments.
-    """
     now = timezone.now()
     today = timezone.localdate()
 
@@ -112,6 +123,12 @@ def touch_student_attendance(student_id) -> None:
     created_count = 0
     for enrollment in enrollments:
         course = enrollment.class_course
+
+        # Look up an active LiveClass for this specific class.
+        active_session = _active_live_class_for_student_class(
+            student, course, now
+        )
+
         att, created = StudentAttendance.objects.get_or_create(
             student=student,
             class_course=course,
@@ -122,6 +139,7 @@ def touch_student_attendance(student_id) -> None:
                 "status": StudentAttendance.STATUS_PRESENT,
                 "source": StudentAttendance.SOURCE_AUTO,
                 "duration_seconds": 0,
+                "live_class": active_session,
             },
         )
 

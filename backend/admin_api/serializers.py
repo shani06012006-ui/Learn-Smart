@@ -8,7 +8,7 @@ from accounts.models import (
     TeacherAttendance,
     User,
 )
-from classes.models import ClassCourse, StudentEnrollment, TimetableEntry
+from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from core.models import AuditLog
 from institutions.models import Institution
 
@@ -512,3 +512,71 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     f"Room '{room_clean}' is already booked in this time slot."
                 )
+                
+
+
+# ---------------------------------------------------------------- live classes
+
+
+class LiveClassTimetableBriefSerializer(serializers.ModelSerializer):
+    """Compact timetable entry payload embedded in live-class rows."""
+
+    class Meta:
+        model = TimetableEntry
+        fields = ["id", "day_of_week", "start_time", "end_time", "room"]
+        read_only_fields = fields
+
+
+class LiveClassReadSerializer(serializers.ModelSerializer):
+    """
+    Read representation of a LiveClass session for the admin + role-aware
+    views.
+
+    `status` is derived via `computed_status()` — not a stored field.
+    """
+
+    timetable_entry = LiveClassTimetableBriefSerializer(read_only=True)
+    class_course = AdminEnrollmentClassBriefSerializer(read_only=True)
+    teacher = AdminCourseTeacherBriefSerializer(read_only=True)
+    institution = InstitutionBriefSerializer(read_only=True)
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LiveClass
+        fields = [
+            "id",
+            "timetable_entry",
+            "class_course",
+            "teacher",
+            "institution",
+            "scheduled_date",
+            "scheduled_start",
+            "scheduled_end",
+            "room",
+            "status",
+            "meeting_url",
+            "recording_url",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_status(self, obj):
+        return obj.computed_status()
+
+
+class LiveClassWriteSerializer(serializers.Serializer):
+    """
+    Update payload for live-class rows.
+
+    Admin can change room / meeting_url / recording_url. Cancellation is
+    a one-way status flip — only `cancelled` is accepted here.
+    """
+
+    room = serializers.CharField(max_length=100, allow_blank=True, required=False)
+    meeting_url = serializers.URLField(allow_blank=True, required=False)
+    recording_url = serializers.URLField(allow_blank=True, required=False)
+    stored_status = serializers.ChoiceField(
+        choices=[LiveClass.STATUS_CANCELLED],
+        required=False,
+    )                
