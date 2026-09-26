@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-
 import LoginPage from "./features/auth/LoginPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -32,6 +31,8 @@ import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminAuditLogPage from "./features/admin/pages/AdminAuditLogPage";
+import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
+
 
 
 export default function App() {
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="courses" element={<AdminCoursesPage />} />
           <Route path="courses/:id" element={<AdminCourseDetailPage />} />
           <Route path="audit" element={<AdminAuditLogPage />} />
+          <Route path="sessions" element={<AdminSessionsPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:id" element={<AdminUserDetailPage />} />
         </Route>

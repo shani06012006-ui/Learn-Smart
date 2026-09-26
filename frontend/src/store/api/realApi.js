@@ -5,8 +5,6 @@ import {
   adminLoggedOut,
 } from "../slices/adminAuthSlice";
 
-
-
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: "/api/v1",
   prepareHeaders: (headers, { getState }) => {
@@ -16,7 +14,6 @@ const rawBaseQuery = fetchBaseQuery({
     return headers;
   },
 });
-
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await rawBaseQuery(args, api, extraOptions);
@@ -56,7 +53,14 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const realApi = createApi({
   reducerPath: "realApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["AdminUser", "AdminStats", "AdminInstitution", "AdminCourse"],
+  tagTypes: [
+    "AdminUser",
+    "AdminStats",
+    "AdminInstitution",
+    "AdminCourse",
+    "AdminAudit",
+    "AdminSession",
+  ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
 
@@ -163,14 +167,6 @@ export const realApi = createApi({
       ],
     }),
 
-    
-    getAdminCourseStudents: builder.query({
-      query: (id) => `/admin/courses/${id}/students/`,
-      providesTags: (result, error, id) => [
-        { type: "AdminCourse", id: `students-${id}` },
-      ],
-    }),
-
     // ---------- admin audit log ------------------------------------
 
     getAdminAuditLogs: builder.query({
@@ -194,6 +190,40 @@ export const realApi = createApi({
       providesTags: ["AdminAudit"],
     }),
 
+    // ---------- admin sessions -------------------------------------
+
+    getAdminSessions: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.user_id) search.set("user_id", params.user_id);
+        if (params.status) search.set("status", params.status);
+        if (params.q) search.set("q", params.q);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/sessions/?${qs}` : "/admin/sessions/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((s) => ({
+                type: "AdminSession",
+                id: s.id,
+              })),
+              { type: "AdminSession", id: "LIST" },
+            ]
+          : [{ type: "AdminSession", id: "LIST" }],
+    }),
+
+    revokeAdminSession: builder.mutation({
+      query: (id) => ({
+        url: `/admin/sessions/${id}/revoke/`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "AdminSession", id },
+        { type: "AdminSession", id: "LIST" },
+      ],
+    }),
 
     // ---------- admin stats -----------------------------------------
 
@@ -256,6 +286,13 @@ export const realApi = createApi({
         { type: "AdminStats" },
       ],
     }),
+
+    getAdminCourseStudents: builder.query({
+      query: (id) => `/admin/courses/${id}/students/`,
+      providesTags: (result, error, id) => [
+        { type: "AdminCourse", id: `students-${id}` },
+      ],
+    }),
   }),
 });
 
@@ -278,4 +315,6 @@ export const {
   useGetAdminCourseStudentsQuery,
   useGetAdminAuditLogsQuery,
   useGetAdminAuditActionsQuery,
+  useGetAdminSessionsQuery,
+  useRevokeAdminSessionMutation,
 } = realApi;
