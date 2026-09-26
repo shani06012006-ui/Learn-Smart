@@ -31,6 +31,7 @@ import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
+import AdminAuditLogPage from "./features/admin/pages/AdminAuditLogPage";
 
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
           <Route index element={<AdminDashboardPage />} />
           <Route path="courses" element={<AdminCoursesPage />} />
           <Route path="courses/:id" element={<AdminCourseDetailPage />} />
+          <Route path="audit" element={<AdminAuditLogPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="users/:id" element={<AdminUserDetailPage />} />
         </Route>
