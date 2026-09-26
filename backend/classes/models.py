@@ -179,3 +179,122 @@ class TimetableEntry(TimeStampedModel):
             f"{self.class_course.name} · {self.get_day_of_week_display()} "
             f"{self.start_time:%H:%M}-{self.end_time:%H:%M}"
         )
+        
+
+
+class LiveClass(TimeStampedModel):
+    """
+    An actual class session for a scheduled timetable occurrence.
+
+    Design:
+      - One LiveClass per scheduled occurrence (not per student).
+      - Students are derived through active StudentEnrollment on the same
+        class_course — they are NOT stored on this model.
+      - Linked to a TimetableEntry so we know which recurring slot it
+        came from.
+
+    Lifecycle:
+      - status: upcoming -> live -> completed (or cancelled)
+      - `stored_status` is authoritative ONLY for `cancelled`.
+      - `computed_status()` derives upcoming/live/completed from the
+        scheduled window versus now.
+
+    Future extensions (not built now):
+      - meeting_url / stream_key for real-time
+      - recording_url / recording_duration
+      - started_at / ended_at (actual times vs scheduled)
+    """
+
+    STATUS_UPCOMING = "upcoming"
+    STATUS_LIVE = "live"
+    STATUS_COMPLETED = "completed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_UPCOMING, "Upcoming"),
+        (STATUS_LIVE, "Live"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_CANCELLED, "Cancelled"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    timetable_entry = models.ForeignKey(
+        TimetableEntry,
+        on_delete=models.CASCADE,
+        related_name="live_classes",
+        help_text="Recurring slot this session was materialized from.",
+    )
+    class_course = models.ForeignKey(
+        ClassCourse,
+        on_delete=models.CASCADE,
+        related_name="live_classes",
+    )
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="live_classes_teaching",
+    )
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.CASCADE,
+        related_name="live_classes",
+    )
+
+    # The actual calendar date for this occurrence (not the weekly slot).
+    scheduled_date = models.DateField(db_index=True)
+    scheduled_start = models.DateTimeField(db_index=True)
+    scheduled_end = models.DateTimeField()
+
+    room = models.CharField(max_length=100, blank=True, default="")
+
+    # Only 'cancelled' is authoritative in this field. The upcoming /
+    # live / completed states are derived from the scheduled window.
+    stored_status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_UPCOMING,
+    )
+
+    # Placeholder fields for a future real-time integration.
+    meeting_url = models.URLField(blank=True, default="")
+    recording_url = models.URLField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-scheduled_start"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["timetable_entry", "scheduled_date"],
+                name="unique_live_class_per_slot_per_day",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["institution", "scheduled_date"]),
+            models.Index(fields=["teacher", "scheduled_date"]),
+            models.Index(fields=["class_course", "scheduled_date"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.class_course.name} · "
+            f"{self.scheduled_start:%Y-%m-%d %H:%M}"
+        )
+
+    def computed_status(self):
+        """
+        Derive the effective status.
+
+        Only `cancelled` is authoritative from `stored_status`. Everything
+        else is computed from the scheduled window compared to `now`.
+        """
+        from django.utils import timezone
+
+        if self.stored_status == self.STATUS_CANCELLED:
+            return self.STATUS_CANCELLED
+
+        now = timezone.now()
+        if now < self.scheduled_start:
+            return self.STATUS_UPCOMING
+        if now <= self.scheduled_end:
+            return self.STATUS_LIVE
+        return self.STATUS_COMPLETED        
