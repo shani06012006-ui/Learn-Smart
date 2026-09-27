@@ -8,7 +8,9 @@ import {
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: "/api/v1",
   prepareHeaders: (headers, { getState }) => {
-    const token = getState().adminAuth.accessToken;
+    const state = getState();
+    const token =
+      state.adminAuth?.accessToken || state.auth?.accessToken || null;
     if (token) headers.set("Authorization", `Bearer ${token}`);
     headers.set("Content-Type", "application/json");
     return headers;
@@ -296,6 +298,19 @@ export const realApi = createApi({
           : [{ type: "AdminTimetable", id: "LIST" }],
     }),
 
+    getTimetable: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.day !== undefined && params.day !== "")
+          search.set("day", String(params.day));
+        if (params.active !== undefined)
+          search.set("active", String(params.active));
+        const qs = search.toString();
+        return qs ? `/timetable/?${qs}` : "/timetable/";
+      },
+      providesTags: ["AdminTimetable"],
+    }),
+
     createAdminTimetable: builder.mutation({
       query: (body) => ({
         url: "/admin/timetable/",
@@ -578,6 +593,7 @@ export const {
   useGetAdminTeacherAttendanceQuery,
   useGetAdminStudentAttendanceQuery,
   useGetAdminTimetableQuery,
+  useGetTimetableQuery,
   useCreateAdminTimetableMutation,
   useUpdateAdminTimetableMutation,
   useGetStudentLeavesQuery,
