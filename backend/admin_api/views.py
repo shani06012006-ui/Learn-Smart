@@ -914,13 +914,16 @@ class TimetableView(APIView):
         )
 
         if user.role == "teacher":
-            qs = qs.filter(teacher=user)
+            qs = qs.filter(teacher=user, institution=user.institution)
         elif user.role == "student":
             enrolled_class_ids = StudentEnrollment.objects.filter(
                 student=user,
                 status=StudentEnrollment.STATUS_ACTIVE,
             ).values_list("class_course_id", flat=True)
-            qs = qs.filter(class_course_id__in=enrolled_class_ids)
+            qs = qs.filter(
+                class_course_id__in=enrolled_class_ids,
+                institution=user.institution,
+            )
         else:
             return Response(
                 {"detail": "Use /admin/timetable/ for admin access."},
