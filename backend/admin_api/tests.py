@@ -1987,3 +1987,708 @@ def test_touch_teacher_attendance_no_live_class_links_null(
         teacher=course_teacher, date=timezone.localdate()
     )
     assert att.live_class_id is None
+
+# ----------------------------------------------------------------- leaves
+
+
+def _make_student_leave(student, *, start, end, status="pending", leave_type="sick"):
+    """Helper: build a StudentLeave row directly."""
+    from leaves.models import StudentLeave
+
+    return StudentLeave.objects.create(
+        institution=student.institution,
+        student=student,
+        leave_type=leave_type,
+        start_date=start,
+        end_date=end,
+        status=status,
+    )
+
+
+def _make_teacher_leave(teacher, *, start, end, status="pending", leave_type="sick"):
+    """Helper: build a TeacherLeave row directly."""
+    from leaves.models import TeacherLeave
+
+    return TeacherLeave.objects.create(
+        institution=teacher.institution,
+        teacher=teacher,
+        leave_type=leave_type,
+        start_date=start,
+        end_date=end,
+        status=status,
+    )
+
+
+def test_admin_can_list_student_leaves(northwood, course_teacher):
+    """Admin sees own-institution student leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 3))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["student"]["email"] == "s@test.local"
+    assert body["results"][0]["days"] == 3
+
+
+def test_admin_can_create_student_leave(northwood):
+    """POST creates a StudentLeave and audits."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-05",
+            "reason": "Flu",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    body = resp.json()
+    assert body["status"] == "pending"
+    assert body["days"] == 5
+    assert body["leave_type"] == "sick"
+
+
+def test_student_leave_rejects_invalid_date_range(northwood):
+    """end_date < start_date is rejected."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-05",
+            "end_date": "2026-10-01",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_student_leave_rejects_overlap(northwood):
+    """Overlapping pending/approved leaves are rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 5))
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-03",
+            "end_date": "2026-10-07",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_student_leave_allows_non_overlapping(northwood):
+    """Back-to-back leaves are fine: [1..3] and [4..6] do not overlap."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 3))
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-04",
+            "end_date": "2026-10-06",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+
+
+def test_cancelled_leave_does_not_block_new(northwood):
+    """Cancelled leaves are ignored for overlap checks."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 5), status="cancelled"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-03",
+            "end_date": "2026-10-07",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+
+
+def test_admin_can_approve_student_leave(northwood):
+    """Approve flips status, sets reviewer + reviewed_at, audits."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3)
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        f"/api/v1/admin/leaves/students/{leave.id}/approve/",
+        {"admin_remarks": "Get well soon"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "approved"
+    assert body["reviewer"]["email"] == "admin@test.local"
+
+    leave.refresh_from_db()
+    assert leave.status == "approved"
+    assert leave.reviewed_at is not None
+    assert leave.reviewer_id == admin.id
+    assert leave.admin_remarks == "Get well soon"
+
+
+def test_admin_can_reject_student_leave(northwood):
+    """Reject flips status to rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3)
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        f"/api/v1/admin/leaves/students/{leave.id}/reject/",
+        {"admin_remarks": "Too many absences"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"
+
+
+def test_approve_non_pending_returns_400(northwood):
+    """Approving an already-approved leave returns 400."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="approved"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/approve/", {}, format="json")
+    assert resp.status_code == 400
+
+
+def test_admin_can_cancel_any_status(northwood):
+    """Cancel flips status to cancelled, even from approved."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="approved"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/cancel/", {}, format="json")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "cancelled"
+
+
+def test_cancel_already_cancelled_returns_400(northwood):
+    """Double-cancel is rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="cancelled"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/cancel/", {}, format="json")
+    assert resp.status_code == 400
+
+
+def test_student_leave_list_scoped_to_institution(
+    northwood, riverdale
+):
+    """Admin sees only own-institution student leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student_nw = make_user("snw@test.local", User.ROLE_STUDENT, northwood)
+    student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
+
+    _make_student_leave(student_nw, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_student_leave(student_rd, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["student"]["email"] == "snw@test.local"
+
+
+def test_student_leave_404_for_other_institution(northwood, riverdale):
+    """Cross-institution access returns 404."""
+    from datetime import date
+
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
+    leave = _make_student_leave(student_rd, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin_nw)
+    resp = client.get(f"/api/v1/admin/leaves/students/{leave.id}/")
+    assert resp.status_code == 404
+
+
+def test_student_leaves_require_authentication(northwood):
+    """Unauthenticated access is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code in (401, 403)
+
+
+def test_admin_can_create_teacher_leave(northwood, course_teacher):
+    """Admin can create a TeacherLeave."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/teachers/",
+        {
+            "teacher_id": str(course_teacher.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-02",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    assert resp.json()["teacher"]["email"] == "teacher.nw@test.local"
+
+
+def test_teacher_leave_list_scoped_to_institution(
+    northwood, riverdale, course_teacher, course_teacher_riverdale
+):
+    """Admin sees only own-institution teacher leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    _make_teacher_leave(course_teacher, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_teacher_leave(course_teacher_riverdale, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/teachers/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["teacher"]["email"] == "teacher.nw@test.local"
+
+
+def test_student_and_teacher_leaves_are_separate(
+    northwood, course_teacher
+):
+    """Student leaves and teacher leaves never cross endpoints."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_teacher_leave(course_teacher, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+
+    students = client.get("/api/v1/admin/leaves/students/").json()
+    assert students["count"] == 1
+    assert "student" in students["results"][0]
+    assert "teacher" not in students["results"][0]
+
+    teachers = client.get("/api/v1/admin/leaves/teachers/").json()
+    assert teachers["count"] == 1
+    assert "teacher" in teachers["results"][0]
+    assert "student" not in teachers["results"][0]
+
+
+# ----------------------------------------------------------------- leaves
+
+
+def _make_student_leave(student, *, start, end, status="pending", leave_type="sick"):
+    """Helper: build a StudentLeave row directly."""
+    from leaves.models import StudentLeave
+
+    return StudentLeave.objects.create(
+        institution=student.institution,
+        student=student,
+        leave_type=leave_type,
+        start_date=start,
+        end_date=end,
+        status=status,
+    )
+
+
+def _make_teacher_leave(teacher, *, start, end, status="pending", leave_type="sick"):
+    """Helper: build a TeacherLeave row directly."""
+    from leaves.models import TeacherLeave
+
+    return TeacherLeave.objects.create(
+        institution=teacher.institution,
+        teacher=teacher,
+        leave_type=leave_type,
+        start_date=start,
+        end_date=end,
+        status=status,
+    )
+
+
+def test_admin_can_list_student_leaves(northwood, course_teacher):
+    """Admin sees own-institution student leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 3))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["student"]["email"] == "s@test.local"
+    assert body["results"][0]["days"] == 3
+
+
+def test_admin_can_create_student_leave(northwood):
+    """POST creates a StudentLeave and audits."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-05",
+            "reason": "Flu",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    body = resp.json()
+    assert body["status"] == "pending"
+    assert body["days"] == 5
+    assert body["leave_type"] == "sick"
+
+
+def test_student_leave_rejects_invalid_date_range(northwood):
+    """end_date < start_date is rejected."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-05",
+            "end_date": "2026-10-01",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_student_leave_rejects_overlap(northwood):
+    """Overlapping pending/approved leaves are rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 5))
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-03",
+            "end_date": "2026-10-07",
+        },
+        format="json",
+    )
+    assert resp.status_code == 400
+
+
+def test_student_leave_allows_non_overlapping(northwood):
+    """Back-to-back leaves are fine: [1..3] and [4..6] do not overlap."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 3))
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-04",
+            "end_date": "2026-10-06",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+
+
+def test_cancelled_leave_does_not_block_new(northwood):
+    """Cancelled leaves are ignored for overlap checks."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 5), status="cancelled"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/students/",
+        {
+            "student_id": str(student.id),
+            "leave_type": "sick",
+            "start_date": "2026-10-03",
+            "end_date": "2026-10-07",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+
+
+def test_admin_can_approve_student_leave(northwood):
+    """Approve flips status, sets reviewer + reviewed_at, audits."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3)
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        f"/api/v1/admin/leaves/students/{leave.id}/approve/",
+        {"admin_remarks": "Get well soon"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "approved"
+    assert body["reviewer"]["email"] == "admin@test.local"
+
+    leave.refresh_from_db()
+    assert leave.status == "approved"
+    assert leave.reviewed_at is not None
+    assert leave.reviewer_id == admin.id
+    assert leave.admin_remarks == "Get well soon"
+
+
+def test_admin_can_reject_student_leave(northwood):
+    """Reject flips status to rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3)
+    )
+
+    client = auth_client(admin)
+    resp = client.post(
+        f"/api/v1/admin/leaves/students/{leave.id}/reject/",
+        {"admin_remarks": "Too many absences"},
+        format="json",
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rejected"
+
+
+def test_approve_non_pending_returns_400(northwood):
+    """Approving an already-approved leave returns 400."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="approved"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/approve/", {}, format="json")
+    assert resp.status_code == 400
+
+
+def test_admin_can_cancel_any_status(northwood):
+    """Cancel flips status to cancelled, even from approved."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="approved"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/cancel/", {}, format="json")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "cancelled"
+
+
+def test_cancel_already_cancelled_returns_400(northwood):
+    """Double-cancel is rejected."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    leave = _make_student_leave(
+        student, start=date(2026, 10, 1), end=date(2026, 10, 3), status="cancelled"
+    )
+
+    client = auth_client(admin)
+    resp = client.post(f"/api/v1/admin/leaves/students/{leave.id}/cancel/", {}, format="json")
+    assert resp.status_code == 400
+
+
+def test_student_leave_list_scoped_to_institution(northwood, riverdale):
+    """Admin sees only own-institution student leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student_nw = make_user("snw@test.local", User.ROLE_STUDENT, northwood)
+    student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
+
+    _make_student_leave(student_nw, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_student_leave(student_rd, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["student"]["email"] == "snw@test.local"
+
+
+def test_student_leave_404_for_other_institution(northwood, riverdale):
+    """Cross-institution access returns 404."""
+    from datetime import date
+
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    student_rd = make_user("srd@test.local", User.ROLE_STUDENT, riverdale)
+    leave = _make_student_leave(student_rd, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin_nw)
+    resp = client.get(f"/api/v1/admin/leaves/students/{leave.id}/")
+    assert resp.status_code == 404
+
+
+def test_student_leaves_require_authentication(northwood):
+    """Unauthenticated access is rejected."""
+    client = APIClient()
+    resp = client.get("/api/v1/admin/leaves/students/")
+    assert resp.status_code in (401, 403)
+
+
+def test_admin_can_create_teacher_leave(northwood, course_teacher):
+    """Admin can create a TeacherLeave."""
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+
+    client = auth_client(admin)
+    resp = client.post(
+        "/api/v1/admin/leaves/teachers/",
+        {
+            "teacher_id": str(course_teacher.id),
+            "leave_type": "casual",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-02",
+        },
+        format="json",
+    )
+    assert resp.status_code == 201, resp.content
+    assert resp.json()["teacher"]["email"] == "teacher.nw@test.local"
+
+
+def test_teacher_leave_list_scoped_to_institution(
+    northwood, riverdale, course_teacher, course_teacher_riverdale
+):
+    """Admin sees only own-institution teacher leaves."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    _make_teacher_leave(course_teacher, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_teacher_leave(course_teacher_riverdale, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+    resp = client.get("/api/v1/admin/leaves/teachers/")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] == 1
+    assert body["results"][0]["teacher"]["email"] == "teacher.nw@test.local"
+
+
+def test_student_and_teacher_leaves_are_separate(northwood, course_teacher):
+    """Student leaves and teacher leaves never cross endpoints."""
+    from datetime import date
+
+    admin = make_user("admin@test.local", User.ROLE_ADMIN, northwood)
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    _make_student_leave(student, start=date(2026, 10, 1), end=date(2026, 10, 2))
+    _make_teacher_leave(course_teacher, start=date(2026, 10, 1), end=date(2026, 10, 2))
+
+    client = auth_client(admin)
+
+    students = client.get("/api/v1/admin/leaves/students/").json()
+    assert students["count"] == 1
+    assert "student" in students["results"][0]
+    assert "teacher" not in students["results"][0]
+
+    teachers = client.get("/api/v1/admin/leaves/teachers/").json()
+    assert teachers["count"] == 1
+    assert "teacher" in teachers["results"][0]
+    assert "student" not in teachers["results"][0]
