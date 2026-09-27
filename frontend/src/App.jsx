@@ -20,6 +20,7 @@ import StudentAnnouncementsPage from "./features/student/announcements/Announcem
 import PerformancePage from "./features/student/performance/PerformancePage";
 import JoinClassPage from "./features/student/join-class/JoinClassPage";
 import StudentLiveClassesPage from "./features/student/live-classes/LiveClassesPage";
+import StudentTimetableViewPage from "./features/student/timetable/TimetableViewPage";
 import LiveSessionPage from "./features/student/live-classes/LiveSessionPage";
 import ChatPage from "./features/chat/ChatPage";
 import FeaturesPage from "./features/features-page/FeaturesPage";
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="announcements" element={<StudentAnnouncementsPage />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="live-classes" element={<StudentLiveClassesPage />} />
+            <Route path="timetable" element={<StudentTimetableViewPage />} />
             <Route path="live-classes/:liveClassId" element={<LiveSessionPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="chat/:threadId" element={<ChatPage />} />
