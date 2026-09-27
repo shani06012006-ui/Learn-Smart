@@ -10,7 +10,6 @@ from rest_framework.views import APIView
 from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
 from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from institutions.models import Institution
-from core.audit import log_audit
 from leaves.models import StudentLeave, TeacherLeave
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
@@ -779,7 +778,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         return Response(TimetableEntryReadSerializer(entry).data)
 
     def create(self, request):
-        from core.audit import log_audit  # lazy import — avoids circular
         from classes.services import materialize_upcoming_sessions
 
         serializer = TimetableEntryWriteSerializer(data=request.data)
@@ -819,21 +817,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             is_active=data.get("is_active", True),
         )
 
-        log_audit(
-            action="timetable.created",
-            request=request,
-            institution=course.institution,
-            resource_type="timetable",
-            resource_id=entry.id,
-            metadata={
-                "class_id": str(course.id),
-                "day": entry.day_of_week,
-                "start": entry.start_time.isoformat(),
-                "end": entry.end_time.isoformat(),
-                "room": entry.room,
-            },
-        )
-
         materialize_upcoming_sessions(entry)
 
         return Response(
@@ -842,7 +825,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         )
 
     def partial_update(self, request, pk=None):
-        from core.audit import log_audit
         from classes.services import regenerate_future_sessions
 
         entry = self.get_object()
@@ -899,22 +881,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         entry.is_active = new_active
         entry.save()
 
-        log_audit(
-            action="timetable.updated",
-            request=request,
-            institution=entry.institution,
-            resource_type="timetable",
-            resource_id=entry.id,
-            metadata={
-                "class_id": str(entry.class_course_id),
-                "day": entry.day_of_week,
-                "start": entry.start_time.isoformat(),
-                "end": entry.end_time.isoformat(),
-                "room": entry.room,
-                "is_active": entry.is_active,
-            },
-        )
-
         regenerate_future_sessions(entry)
 
         return Response(TimetableEntryReadSerializer(entry).data)
@@ -922,7 +888,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         """Soft-delete: flip is_active=False. Idempotent."""
-        from core.audit import log_audit
         from classes.services import cancel_future_sessions
 
         entry = self.get_object()
@@ -933,15 +898,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
 
             # Cancel upcoming LiveClass sessions for this slot.
             cancel_future_sessions(entry)
-
-            log_audit(
-                action="timetable.deleted",
-                request=request,
-                institution=entry.institution,
-                resource_type="timetable",
-                resource_id=entry.id,
-                metadata={"class_id": str(entry.class_course_id)},
-            )
 
         return Response(TimetableEntryReadSerializer(entry).data)
 
@@ -1093,25 +1049,11 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
         """Idempotent: set stored_status=cancelled."""
-        from core.audit import log_audit
-
         obj = self.get_object()
 
         if obj.stored_status != LiveClass.STATUS_CANCELLED:
             obj.stored_status = LiveClass.STATUS_CANCELLED
             obj.save(update_fields=["stored_status", "updated_at"])
-
-            log_audit(
-                action="live_class.cancelled",
-                request=request,
-                institution=obj.institution,
-                resource_type="live_class",
-                resource_id=obj.id,
-                metadata={
-                    "class_id": str(obj.class_course_id),
-                    "scheduled_date": obj.scheduled_date.isoformat(),
-                },
-            )
 
         return Response(LiveClassReadSerializer(obj).data)
 
@@ -1307,21 +1249,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
             reason=data.get("reason", ""),
         )
 
-        log_audit(
-            action="leave.created",
-            request=request,
-            institution=institution,
-            resource_type="student_leave",
-            resource_id=leave.id,
-            metadata={
-                "student_id": str(student.id),
-                "leave_type": leave.leave_type,
-                "start_date": leave.start_date.isoformat(),
-                "end_date": leave.end_date.isoformat(),
-                "days": leave.days,
-            },
-        )
-
         return Response(
             StudentLeaveReadSerializer(leave).data,
             status=status.HTTP_201_CREATED,
@@ -1356,15 +1283,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
                 setattr(leave, field, data[field])
         leave.save()
 
-        log_audit(
-            action="leave.updated",
-            request=request,
-            institution=leave.institution,
-            resource_type="student_leave",
-            resource_id=leave.id,
-            metadata={"student_id": str(leave.student_id)},
-        )
-
         return Response(StudentLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -1384,14 +1302,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.approved",
-            request=request,
-            institution=leave.institution,
-            resource_type="student_leave",
-            resource_id=leave.id,
-            metadata={"student_id": str(leave.student_id)},
-        )
         return Response(StudentLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
@@ -1411,14 +1321,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.rejected",
-            request=request,
-            institution=leave.institution,
-            resource_type="student_leave",
-            resource_id=leave.id,
-            metadata={"student_id": str(leave.student_id)},
-        )
         return Response(StudentLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="cancel")
@@ -1438,14 +1340,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.cancelled",
-            request=request,
-            institution=leave.institution,
-            resource_type="student_leave",
-            resource_id=leave.id,
-            metadata={"student_id": str(leave.student_id)},
-        )
         return Response(StudentLeaveReadSerializer(leave).data)
 
 
@@ -1572,21 +1466,6 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
             reason=data.get("reason", ""),
         )
 
-        log_audit(
-            action="leave.created",
-            request=request,
-            institution=institution,
-            resource_type="teacher_leave",
-            resource_id=leave.id,
-            metadata={
-                "teacher_id": str(teacher.id),
-                "leave_type": leave.leave_type,
-                "start_date": leave.start_date.isoformat(),
-                "end_date": leave.end_date.isoformat(),
-                "days": leave.days,
-            },
-        )
-
         return Response(
             TeacherLeaveReadSerializer(leave).data,
             status=status.HTTP_201_CREATED,
@@ -1621,15 +1500,6 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
                 setattr(leave, field, data[field])
         leave.save()
 
-        log_audit(
-            action="leave.updated",
-            request=request,
-            institution=leave.institution,
-            resource_type="teacher_leave",
-            resource_id=leave.id,
-            metadata={"teacher_id": str(leave.teacher_id)},
-        )
-
         return Response(TeacherLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="approve")
@@ -1649,14 +1519,6 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.approved",
-            request=request,
-            institution=leave.institution,
-            resource_type="teacher_leave",
-            resource_id=leave.id,
-            metadata={"teacher_id": str(leave.teacher_id)},
-        )
         return Response(TeacherLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
@@ -1676,14 +1538,6 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.rejected",
-            request=request,
-            institution=leave.institution,
-            resource_type="teacher_leave",
-            resource_id=leave.id,
-            metadata={"teacher_id": str(leave.teacher_id)},
-        )
         return Response(TeacherLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="cancel")
@@ -1703,12 +1557,4 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
-        log_audit(
-            action="leave.cancelled",
-            request=request,
-            institution=leave.institution,
-            resource_type="teacher_leave",
-            resource_id=leave.id,
-            metadata={"teacher_id": str(leave.teacher_id)},
-        )
         return Response(TeacherLeaveReadSerializer(leave).data)
