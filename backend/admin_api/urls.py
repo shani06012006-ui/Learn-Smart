@@ -1,8 +1,7 @@
-﻿from django.urls import include, path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    AdminAuditLogViewSet,
     AdminEnrollmentViewSet,
     AdminLiveClassViewSet,
     AdminSessionViewSet,
@@ -19,7 +18,6 @@ from .views import (
 router = DefaultRouter()
 router.register("users", AdminUserViewSet, basename="admin-user")
 router.register("courses", InstitutionCourseViewSet, basename="institution-course")
-router.register("audit", AdminAuditLogViewSet, basename="admin-audit")
 router.register("sessions", AdminSessionViewSet, basename="admin-session")
 router.register("enrollments", AdminEnrollmentViewSet, basename="admin-enrollment")
 router.register(
