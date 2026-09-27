@@ -1468,6 +1468,155 @@ def test_timetable_admin_gets_403_on_role_view(northwood):
     assert resp.status_code == 403
 
 
+
+def test_timetable_admin_cannot_retrieve_other_institution_entry(
+    northwood, riverdale, course_teacher_riverdale
+):
+    """Admin A cannot retrieve an entry that belongs to Institution B."""
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale,
+        teacher=course_teacher_riverdale,
+        name="Riverdale Physics",
+        subject="Physics",
+    )
+    entry = _make_timetable_entry(course_rd, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin_nw)
+    resp = client.get(f"/api/v1/admin/timetable/{entry.id}/")
+    assert resp.status_code == 404
+
+
+def test_timetable_admin_cannot_update_other_institution_entry(
+    northwood, riverdale, course_teacher_riverdale
+):
+    """Admin A cannot PATCH an entry that belongs to Institution B."""
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale,
+        teacher=course_teacher_riverdale,
+        name="Riverdale Physics",
+        subject="Physics",
+    )
+    entry = _make_timetable_entry(course_rd, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin_nw)
+    resp = client.patch(
+        f"/api/v1/admin/timetable/{entry.id}/",
+        {"room": "HIJACKED"},
+        format="json",
+    )
+    assert resp.status_code == 404
+
+    entry.refresh_from_db()
+    assert entry.room != "HIJACKED"
+
+
+def test_timetable_admin_cannot_deactivate_other_institution_entry(
+    northwood, riverdale, course_teacher_riverdale
+):
+    """Admin A cannot deactivate an entry that belongs to Institution B."""
+    admin_nw = make_user("admin.nw@test.local", User.ROLE_ADMIN, northwood)
+    course_rd = ClassCourse.objects.create(
+        institution=riverdale,
+        teacher=course_teacher_riverdale,
+        name="Riverdale Physics",
+        subject="Physics",
+    )
+    entry = _make_timetable_entry(course_rd, day=0, start="09:00", end="10:00")
+
+    client = auth_client(admin_nw)
+    resp = client.post(f"/api/v1/admin/timetable/{entry.id}/deactivate/")
+    assert resp.status_code == 404
+
+    entry.refresh_from_db()
+    assert entry.is_active is True
+
+
+def test_timetable_teacher_cannot_write(northwood, course_teacher):
+    """A teacher must not be able to create, update, or deactivate entries."""
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=course_teacher,
+        name="Physics",
+        subject="Physics",
+    )
+    entry = _make_timetable_entry(course, day=0, start="09:00", end="10:00")
+
+    client = auth_client(course_teacher)
+
+    # POST create -> 403
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 1,
+            "start_time": "11:00",
+            "end_time": "12:00",
+        },
+        format="json",
+    )
+    assert resp.status_code == 403
+
+    # PATCH update -> 403
+    resp = client.patch(
+        f"/api/v1/admin/timetable/{entry.id}/",
+        {"room": "R999"},
+        format="json",
+    )
+    assert resp.status_code == 403
+
+    # POST deactivate -> 403
+    resp = client.post(f"/api/v1/admin/timetable/{entry.id}/deactivate/")
+    assert resp.status_code == 403
+
+    entry.refresh_from_db()
+    assert entry.room != "R999"
+    assert entry.is_active is True
+
+
+def test_timetable_student_cannot_write(northwood, course_teacher):
+    """A student must not be able to create, update, or deactivate entries."""
+    student = make_user("s@test.local", User.ROLE_STUDENT, northwood)
+    course = ClassCourse.objects.create(
+        institution=northwood,
+        teacher=course_teacher,
+        name="Physics",
+        subject="Physics",
+    )
+    entry = _make_timetable_entry(course, day=0, start="09:00", end="10:00")
+
+    client = auth_client(student)
+
+    # POST create -> 403
+    resp = client.post(
+        "/api/v1/admin/timetable/",
+        {
+            "class_course_id": str(course.id),
+            "day_of_week": 1,
+            "start_time": "11:00",
+            "end_time": "12:00",
+        },
+        format="json",
+    )
+    assert resp.status_code == 403
+
+    # PATCH update -> 403
+    resp = client.patch(
+        f"/api/v1/admin/timetable/{entry.id}/",
+        {"room": "R999"},
+        format="json",
+    )
+    assert resp.status_code == 403
+
+    # POST deactivate -> 403
+    resp = client.post(f"/api/v1/admin/timetable/{entry.id}/deactivate/")
+    assert resp.status_code == 403
+
+    entry.refresh_from_db()
+    assert entry.room != "R999"
+    assert entry.is_active is True
+
 # ----------------------------------------------------------------- live classes
 
 
