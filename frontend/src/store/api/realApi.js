@@ -58,7 +58,6 @@ export const realApi = createApi({
     "AdminStats",
     "AdminInstitution",
     "AdminCourse",
-    "AdminAudit",
     "AdminSession",
     "AdminEnrollment",
     "AdminAttendance",
@@ -173,27 +172,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin audit log ------------------------------------
-
-    getAdminAuditLogs: builder.query({
-      query: (params = {}) => {
-        const search = new URLSearchParams();
-        if (params.action) search.set("action", params.action);
-        if (params.resource_type) search.set("resource_type", params.resource_type);
-        if (params.actor_id) search.set("actor_id", params.actor_id);
-        if (params.since) search.set("since", params.since);
-        if (params.until) search.set("until", params.until);
-        if (params.q) search.set("q", params.q);
-        if (params.page) search.set("page", String(params.page));
-        const qs = search.toString();
-        return qs ? `/admin/audit/?${qs}` : "/admin/audit/";
-      },
-      providesTags: ["AdminAudit"],
-    }),
-
-    getAdminAuditActions: builder.query({
-      query: () => "/admin/audit/actions/",
-      providesTags: ["AdminAudit"],
-    }),
 
     // ---------- admin sessions -------------------------------------
 
@@ -595,8 +573,6 @@ export const {
   useGetAdminUserClassesQuery,
   useGetAdminUserEnrollmentsQuery,
   useGetAdminCourseStudentsQuery,
-  useGetAdminAuditLogsQuery,
-  useGetAdminAuditActionsQuery,
   useGetAdminSessionsQuery,
   useRevokeAdminSessionMutation,
   useGetAdminEnrollmentsQuery,

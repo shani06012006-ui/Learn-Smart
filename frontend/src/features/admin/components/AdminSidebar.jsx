@@ -5,7 +5,6 @@ import {
   BookOpen,
   GraduationCap,
   LogOut,
-  ScrollText,
   Monitor,
   ClipboardCheck,
   CalendarDays,
@@ -27,7 +26,6 @@ const NAV_ITEMS = [
   { to: "/admin/attendance", label: "Attendance", icon: ClipboardCheck },
   { to: "/admin/timetable", label: "Timetable", icon: CalendarDays },
   { to: "/admin/leaves", label: "Leaves", icon: CalendarX, badgeKey: "leaves" },
-  { to: "/admin/audit", label: "Audit log", icon: ScrollText },
   { to: "/admin/sessions", label: "Sessions", icon: Monitor },
 ];
 
