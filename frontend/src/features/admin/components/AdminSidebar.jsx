@@ -9,9 +9,15 @@ import {
   Monitor,
   ClipboardCheck,
   CalendarDays,
+  CalendarX,
 } from "lucide-react";
 
 import { useAdminAuth } from "../hooks/useAdminAuth";
+import Badge from "../../../components/ui/Badge";
+import {
+  useGetStudentLeavesQuery,
+  useGetTeacherLeavesQuery,
+} from "../../../store/api/realApi";
 
 const NAV_ITEMS = [
   { to: "/admin", end: true, label: "Dashboard", icon: LayoutDashboard },
@@ -20,6 +26,7 @@ const NAV_ITEMS = [
   { to: "/admin/students", label: "Students", icon: GraduationCap },
   { to: "/admin/attendance", label: "Attendance", icon: ClipboardCheck },
   { to: "/admin/timetable", label: "Timetable", icon: CalendarDays },
+  { to: "/admin/leaves", label: "Leaves", icon: CalendarX, badgeKey: "leaves" },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
   { to: "/admin/sessions", label: "Sessions", icon: Monitor },
 ];
@@ -27,6 +34,12 @@ const NAV_ITEMS = [
 
 export default function AdminSidebar() {
   const { user, logout } = useAdminAuth();
+
+  const { data: pendingStudentLeaves } = useGetStudentLeavesQuery({ status: "pending", page: 1 });
+  const { data: pendingTeacherLeaves } = useGetTeacherLeavesQuery({ status: "pending", page: 1 });
+  const pendingLeaves =
+    (pendingStudentLeaves?.count ?? 0) + (pendingTeacherLeaves?.count ?? 0);
+  const badgeCounts = { leaves: pendingLeaves };
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-ink-800 bg-ink-900 text-ink-100">
@@ -58,7 +71,7 @@ export default function AdminSidebar() {
       {/* Nav */}
       <nav className="flex-1 px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end, badgeKey }) => (
             <li key={to}>
               <NavLink
                 to={to}
@@ -71,7 +84,10 @@ export default function AdminSidebar() {
                 }
               >
                 <Icon size={16} />
-                {label}
+                <span className="flex-1 truncate">{label}</span>
+                {badgeKey && badgeCounts[badgeKey] > 0 && (
+                  <Badge variant="warning">{badgeCounts[badgeKey]}</Badge>
+                )}
               </NavLink>
             </li>
           ))}
