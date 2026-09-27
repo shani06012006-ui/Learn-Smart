@@ -22,8 +22,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.audit import log_audit
-
 from .models import User
 from .serializers import UserSerializer
 from .token_service import (
@@ -70,26 +68,12 @@ class LoginView(APIView):
         user = authenticate(request, username=email, password=password)
 
         if user is None:
-            log_audit(
-                action="auth.login.failed",
-                actor=None,
-                actor_type="anonymous",
-                metadata={"email": email},
-                request=request,
-            )
             return Response(
                 {"error": {"detail": "Invalid email or password.", "status_code": 401}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         if not user.is_active:
-            log_audit(
-                action="auth.login.blocked",
-                actor=user,
-                institution=user.institution,
-                metadata={"reason": "account_inactive"},
-                request=request,
-            )
             return Response(
                 {"error": {"detail": "This account has been deactivated.", "status_code": 403}},
                 status=status.HTTP_403_FORBIDDEN,
@@ -106,13 +90,6 @@ class LoginView(APIView):
             user_agent=_user_agent(request),
         )
         access = issue_access_token(user)
-
-        log_audit(
-            action="auth.login.success",
-            actor=user,
-            institution=user.institution,
-            request=request,
-        )
 
         return Response(
             {
@@ -149,13 +126,6 @@ class RefreshView(APIView):
                 user_agent=_user_agent(request),
             )
         except RefreshTokenError as e:
-            if e.reason == "reuse_detected":
-                log_audit(
-                    action="auth.refresh.reuse_detected",
-                    actor=e.user,
-                    institution=e.user.institution if e.user else None,
-                    request=request,
-                )
             return Response(
                 {"error": {"detail": "Invalid or expired refresh token.", "status_code": 401}},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -190,12 +160,6 @@ class LogoutView(APIView):
         if raw:
             revoke_one(raw, reason="logout")
 
-        log_audit(
-            action="auth.logout",
-            actor=request.user,
-            institution=request.user.institution,
-            request=request,
-        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -215,12 +179,6 @@ class WsTicketView(APIView):
 
     def post(self, request):
         ticket = mint_ticket(request.user)
-        log_audit(
-            action="auth.ws_ticket.issued",
-            actor=request.user,
-            institution=request.user.institution,
-            request=request,
-        )
         return Response({"ticket": ticket}, status=status.HTTP_200_OK)
 
 
