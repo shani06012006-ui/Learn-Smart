@@ -1046,7 +1046,6 @@ class TimetableView(APIView):
 
         qs = qs.order_by("day_of_week", "start_time")
         return Response(TimetableEntryReadSerializer(qs, many=True).data)
-    
 
 
 class AdminLiveClassViewSet(viewsets.GenericViewSet):
@@ -1232,8 +1231,7 @@ class RoleAwareLiveClassView(APIView):
             ]
             qs = qs.filter(id__in=ids)
 
-        return Response(LiveClassReadSerializer(qs, many=True).data)    
-    
+        return Response(LiveClassReadSerializer(qs, many=True).data)
 
 
 class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
@@ -1770,4 +1768,4 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
             resource_id=leave.id,
             metadata={"teacher_id": str(leave.teacher_id)},
         )
-        return Response(TeacherLeaveReadSerializer(leave).data)    
+        return Response(TeacherLeaveReadSerializer(leave).data)

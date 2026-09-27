@@ -1,4 +1,4 @@
-from django.contrib.auth.password_validation import validate_password
+﻿from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
@@ -493,7 +493,7 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
             day=day, start=start, end=end, exclude_id=exclude_id
         )
 
-        # 1. Teacher conflict — same teacher already booked in this slot.
+        # 1. Teacher conflict â€” same teacher already booked in this slot.
         teacher = course.teacher
         if base.filter(teacher=teacher).exists():
             raise serializers.ValidationError(
@@ -501,7 +501,7 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
                 "a class in this time slot."
             )
 
-        # 2. Class conflict — the same class already has a slot here.
+        # 2. Class conflict â€” the same class already has a slot here.
         if base.filter(class_course=course).exists():
             raise serializers.ValidationError(
                 f"{course.name} already has a timetable entry in this time slot."
@@ -533,7 +533,7 @@ class LiveClassReadSerializer(serializers.ModelSerializer):
     Read representation of a LiveClass session for the admin + role-aware
     views.
 
-    `status` is derived via `computed_status()` — not a stored field.
+    `status` is derived via `computed_status()` â€” not a stored field.
     """
 
     timetable_entry = LiveClassTimetableBriefSerializer(read_only=True)
@@ -571,7 +571,7 @@ class LiveClassWriteSerializer(serializers.Serializer):
     Update payload for live-class rows.
 
     Admin can change room / meeting_url / recording_url. Cancellation is
-    a one-way status flip — only `cancelled` is accepted here.
+    a one-way status flip â€” only `cancelled` is accepted here.
     """
 
     room = serializers.CharField(max_length=100, allow_blank=True, required=False)
@@ -622,10 +622,12 @@ class LeaveReadMixin:
     reviewer = LeaveReviewerBriefSerializer(read_only=True)
 
 
-class StudentLeaveReadSerializer(LeaveReadMixin, serializers.ModelSerializer):
+class StudentLeaveReadSerializer(serializers.ModelSerializer):
     """Read-only representation of a StudentLeave."""
 
     student = LeaveRequesterBriefSerializer(read_only=True)
+    institution = InstitutionBriefSerializer(read_only=True)
+    reviewer = LeaveReviewerBriefSerializer(read_only=True)
 
     class Meta:
         model = StudentLeave
@@ -649,10 +651,12 @@ class StudentLeaveReadSerializer(LeaveReadMixin, serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class TeacherLeaveReadSerializer(LeaveReadMixin, serializers.ModelSerializer):
+class TeacherLeaveReadSerializer(serializers.ModelSerializer):
     """Read-only representation of a TeacherLeave."""
 
     teacher = LeaveRequesterBriefSerializer(read_only=True)
+    institution = InstitutionBriefSerializer(read_only=True)
+    reviewer = LeaveReviewerBriefSerializer(read_only=True)
 
     class Meta:
         model = TeacherLeave
