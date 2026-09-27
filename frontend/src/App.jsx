@@ -32,6 +32,7 @@ import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminAuditLogPage from "./features/admin/pages/AdminAuditLogPage";
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
+import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
 import AdminStudentsPage from "./features/admin/pages/AdminStudentsPage";
 import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPage";
 import AdminTeachersPage from "./features/admin/pages/AdminTeachersPage";
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="timetable" element={<AdminTimetablePage />} />
           <Route path="audit" element={<AdminAuditLogPage />} />
           <Route path="sessions" element={<AdminSessionsPage />} />
+          <Route path="leaves" element={<AdminLeavesPage />} />
         </Route>
       </Route>
 
