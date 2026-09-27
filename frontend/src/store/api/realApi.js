@@ -1,4 +1,4 @@
-﻿import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import {
   adminAccessTokenRotated,
@@ -63,6 +63,8 @@ export const realApi = createApi({
     "AdminEnrollment",
     "AdminAttendance",
     "AdminTimetable",
+    "StudentLeave",
+    "TeacherLeave",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -417,6 +419,162 @@ export const realApi = createApi({
         { type: "AdminCourse", id: `students-${id}` },
       ],
     }),
+
+    // ---------- admin leaves (students) ----------------------------
+
+    getStudentLeaves: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.status) search.set("status", params.status);
+        if (params.leave_type) search.set("leave_type", params.leave_type);
+        if (params.student_id) search.set("student_id", params.student_id);
+        if (params.from) search.set("from", params.from);
+        if (params.to) search.set("to", params.to);
+        if (params.q) search.set("q", params.q);
+        if (params.institution) search.set("institution", params.institution);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/leaves/students/?${qs}` : "/admin/leaves/students/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((l) => ({ type: "StudentLeave", id: l.id })),
+              { type: "StudentLeave", id: "LIST" },
+            ]
+          : [{ type: "StudentLeave", id: "LIST" }],
+    }),
+
+    createStudentLeave: builder.mutation({
+      query: (body) => ({ url: "/admin/leaves/students/", method: "POST", body }),
+      invalidatesTags: [{ type: "StudentLeave", id: "LIST" }],
+    }),
+
+    updateStudentLeave: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/admin/leaves/students/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "StudentLeave", id },
+        { type: "StudentLeave", id: "LIST" },
+      ],
+    }),
+
+    approveStudentLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/students/${id}/approve/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "StudentLeave", id },
+        { type: "StudentLeave", id: "LIST" },
+      ],
+    }),
+
+    rejectStudentLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/students/${id}/reject/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "StudentLeave", id },
+        { type: "StudentLeave", id: "LIST" },
+      ],
+    }),
+
+    cancelStudentLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/students/${id}/cancel/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "StudentLeave", id },
+        { type: "StudentLeave", id: "LIST" },
+      ],
+    }),
+
+    // ---------- admin leaves (teachers) ----------------------------
+
+    getTeacherLeaves: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.status) search.set("status", params.status);
+        if (params.leave_type) search.set("leave_type", params.leave_type);
+        if (params.teacher_id) search.set("teacher_id", params.teacher_id);
+        if (params.from) search.set("from", params.from);
+        if (params.to) search.set("to", params.to);
+        if (params.q) search.set("q", params.q);
+        if (params.institution) search.set("institution", params.institution);
+        if (params.page) search.set("page", String(params.page));
+        const qs = search.toString();
+        return qs ? `/admin/leaves/teachers/?${qs}` : "/admin/leaves/teachers/";
+      },
+      providesTags: (result) =>
+        result
+          ? [
+              ...(result.results || []).map((l) => ({ type: "TeacherLeave", id: l.id })),
+              { type: "TeacherLeave", id: "LIST" },
+            ]
+          : [{ type: "TeacherLeave", id: "LIST" }],
+    }),
+
+    createTeacherLeave: builder.mutation({
+      query: (body) => ({ url: "/admin/leaves/teachers/", method: "POST", body }),
+      invalidatesTags: [{ type: "TeacherLeave", id: "LIST" }],
+    }),
+
+    updateTeacherLeave: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/admin/leaves/teachers/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "TeacherLeave", id },
+        { type: "TeacherLeave", id: "LIST" },
+      ],
+    }),
+
+    approveTeacherLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/teachers/${id}/approve/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "TeacherLeave", id },
+        { type: "TeacherLeave", id: "LIST" },
+      ],
+    }),
+
+    rejectTeacherLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/teachers/${id}/reject/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "TeacherLeave", id },
+        { type: "TeacherLeave", id: "LIST" },
+      ],
+    }),
+
+    cancelTeacherLeave: builder.mutation({
+      query: ({ id, admin_remarks }) => ({
+        url: `/admin/leaves/teachers/${id}/cancel/`,
+        method: "POST",
+        body: { admin_remarks },
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "TeacherLeave", id },
+        { type: "TeacherLeave", id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -447,5 +605,17 @@ export const {
   useGetAdminTimetableQuery,
   useCreateAdminTimetableMutation,
   useUpdateAdminTimetableMutation,
+  useGetStudentLeavesQuery,
+  useCreateStudentLeaveMutation,
+  useUpdateStudentLeaveMutation,
+  useApproveStudentLeaveMutation,
+  useRejectStudentLeaveMutation,
+  useCancelStudentLeaveMutation,
+  useGetTeacherLeavesQuery,
+  useCreateTeacherLeaveMutation,
+  useUpdateTeacherLeaveMutation,
+  useApproveTeacherLeaveMutation,
+  useRejectTeacherLeaveMutation,
+  useCancelTeacherLeaveMutation,
   useDeactivateAdminTimetableMutation,
 } = realApi;
