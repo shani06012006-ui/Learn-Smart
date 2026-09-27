@@ -171,7 +171,6 @@ export const realApi = createApi({
       ],
     }),
 
-    // ---------- admin audit log ------------------------------------
 
     // ---------- admin sessions -------------------------------------
 
