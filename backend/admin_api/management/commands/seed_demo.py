@@ -1,28 +1,4 @@
-"""
-Seed two demo institutions with admins, teachers, and students.
 
-Usage:
-    python manage.py seed_demo
-
-Idempotent â€” safe to run multiple times. Existing rows are updated, not
-duplicated. Development/testing only; do not run against production.
-
-Accounts created (all share the password defined in DEMO_PASSWORD):
-
-    Institution "Northwood Academy" (slug: northwood)
-      admin    admin@northwood.test
-      teacher  teacher1@northwood.test
-      student  student1@northwood.test
-
-    Institution "Riverdale Institute" (slug: riverdale)
-      admin    admin@riverdale.test
-      teacher  teacher1@riverdale.test
-      student  student1@riverdale.test
-
-The two institutions share no data. Logging in as admin@northwood.test
-should show only Northwood's users; admin@riverdale.test should show
-only Riverdale's. That's the isolation invariant to verify.
-"""
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -42,9 +18,9 @@ DEMO_DATA = [
         "admin_email": "admin@northwood.test",
         "admin_first": "Nora",
         "admin_last": "Northwood",
-        "teacher_email": "teacher1@northwood.test",
-        "teacher_first": "Tara",
-        "teacher_last": "Northwood",
+        "teacher_email": "anita.iyer@northwood.test",
+        "teacher_first": "Anita",
+        "teacher_last": "Iyer",
         "student_email": "student1@northwood.test",
         "student_first": "Sam",
         "student_last": "Northwood",
@@ -85,7 +61,8 @@ class Command(BaseCommand):
         user.role = role
         user.institution = institution
         user.is_staff = role == User.ROLE_ADMIN
-        user.set_password(password)
+        if created:
+            user.set_password(password)
         user.save()
         return user
 
