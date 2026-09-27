@@ -13,6 +13,7 @@ import ClassDetailPage from "./features/teacher/classes/ClassDetailPage";
 import MaterialsPage from "./features/teacher/materials/MaterialsPage";
 import AnnouncementsPage from "./features/teacher/announcements/AnnouncementsPage";
 import LiveClassesPage from "./features/teacher/live-classes/LiveClassesPage";
+import TeacherTimetableViewPage from "./features/teacher/timetable/TimetableViewPage";
 import StudentClassListPage from "./features/student/classes/ClassListPage";
 import StudentMaterialsPage from "./features/student/materials/MaterialsPage";
 import StudentAnnouncementsPage from "./features/student/announcements/AnnouncementsPage";
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="materials/:materialId" element={<MaterialDetailPage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
             <Route path="live-classes" element={<LiveClassesPage />} />
+            <Route path="timetable" element={<TeacherTimetableViewPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="chat/:threadId" element={<ChatPage />} />
           </Route>

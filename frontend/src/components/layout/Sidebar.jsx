@@ -1,4 +1,4 @@
-﻿import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import clsx from "clsx";
 import {
@@ -11,6 +11,7 @@ import {
   Video,
   Trophy,
   KeyRound,
+  CalendarDays,
 } from "lucide-react";
 
 import { sidebarClosed } from "../../store/slices/uiSlice";
@@ -18,6 +19,7 @@ import { sidebarClosed } from "../../store/slices/uiSlice";
 const TEACHER_ITEMS = [
   { label: "Dashboard", to: "/teacher", icon: LayoutDashboard, enabled: true, end: true },
   { label: "Classes", to: "/teacher/classes", icon: BookOpen, enabled: true },
+  { label: "Timetable", to: "/teacher/timetable", icon: CalendarDays, enabled: true },
   { label: "Materials", to: "/teacher/materials", icon: FileText, enabled: true },
   { label: "Announcements", to: "/teacher/announcements", icon: Megaphone, enabled: true },
   { label: "AI Insights", to: "/teacher/analytics", icon: BarChart3, enabled: false, note: "Module E" },
