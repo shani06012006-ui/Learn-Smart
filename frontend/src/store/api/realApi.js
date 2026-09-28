@@ -68,6 +68,8 @@ export const realApi = createApi({
     "TeacherLeave",
     "Class",
     "Enrollment",
+    "Material",
+    "Announcement",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
