@@ -45,6 +45,7 @@ LOCAL_APPS = [
     "classes",
     "leaves",
     "admin_api",
+    "chat",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
