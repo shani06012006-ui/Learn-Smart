@@ -1,4 +1,4 @@
-﻿import { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { UploadCloud, X } from "lucide-react";
 
 import { useUploadMaterialMutation } from "../../../../store/api/materialsApi";
@@ -45,22 +45,14 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
       return;
     }
 
-    // NOTE: in mock mode the local dispatcher expects a plain object with
-    // file metadata, not a FormData instance. When the real Django backend
-    // lands, this reverts to:
-    //
-    //   const formData = new FormData();
-    //   formData.append("title", title);
-    //   formData.append("description", description);
-    //   formData.append("file", file);
-    //   await uploadMaterial({ classId, formData }).unwrap();
+    // Real backend: multipart/form-data with title, description, file.
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("file", file);
+
     try {
-      await uploadMaterial({
-        classId,
-        title,
-        description,
-        file: { name: file.name, size: file.size, type: file.type },
-      }).unwrap();
+      await uploadMaterial({ classId, formData }).unwrap();
       reset();
       onClose();
     } catch (err) {
@@ -131,7 +123,7 @@ export default function UploadMaterialModal({ open, onClose, classId }) {
                 Choose a file to upload
               </span>
               <span className="text-xs text-ink-500">
-                PDF, image, or notes — up to 10 MB
+                PDF, image, or notes — up to 50 MB
               </span>
             </label>
           )}

@@ -1,4 +1,4 @@
-﻿import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   FileText,
@@ -82,7 +82,7 @@ export default function MaterialDetailPage() {
 
   const material = materialQuery.data;
   const materialClass = material
-    ? (classesQuery.data || []).find((c) => c.id === material.class_id)
+    ? (classesQuery.data || []).find((c) => c.id === material.class_course_id)
     : null;
 
   // Sibling materials from the same class. We fetch the list once we know
@@ -123,7 +123,7 @@ export default function MaterialDetailPage() {
   }
 
   const { Icon, tone } = iconForMaterial(material.mime_type);
-  const type = typeLabel(material.mime_type, material.original_filename);
+  const type = typeLabel(material.mime_type, material.file_name);
   const className = materialClass?.name || "Class";
   const classSubject = materialClass?.subject;
 
@@ -173,7 +173,7 @@ export default function MaterialDetailPage() {
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">{type}</Badge>
                 <span className="text-xs text-ink-500">
-                  {formatBytes(material.size_bytes)}
+                  {formatBytes(material.file_size)}
                 </span>
               </div>
               <h1 className="text-2xl font-semibold leading-tight tracking-tight text-ink-900 sm:text-3xl">
@@ -190,7 +190,7 @@ export default function MaterialDetailPage() {
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Calendar size={14} className="text-ink-400" />
-              {formatDate(material.uploaded_at)}
+              {formatDate(material.created_at)}
             </span>
           </div>
 
@@ -206,17 +206,17 @@ export default function MaterialDetailPage() {
               Details
             </h2>
             <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-              <Meta icon={FileType} label="File name" value={material.original_filename} />
+              <Meta icon={FileType} label="File name" value={material.file_name} />
               <Meta icon={FileType} label="Type" value={type} />
               <Meta
                 icon={HardDrive}
                 label="Size"
-                value={formatBytes(material.size_bytes)}
+                value={formatBytes(material.file_size)}
               />
               <Meta
                 icon={Calendar}
                 label="Uploaded"
-                value={formatDate(material.uploaded_at)}
+                value={formatDate(material.created_at)}
               />
             </dl>
           </div>
@@ -227,8 +227,14 @@ export default function MaterialDetailPage() {
           <Card className="sticky top-4 p-5">
             <div className="mb-4 flex items-center gap-3 border-b border-ink-200 pb-4">
               <Avatar
-                userId={material.uploaded_by_id}
-                initials={material.uploaded_by_initials}
+                userId={material.uploaded_by?.id}
+                initials={(material.uploaded_by?.full_name || "")
+                  .split(" ")
+                  .map((p) => p[0])
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .join("")
+                  .toUpperCase()}
                 size="md"
               />
               <div className="min-w-0">
@@ -236,13 +242,13 @@ export default function MaterialDetailPage() {
                   Shared by
                 </p>
                 <p className="truncate text-sm font-semibold text-ink-900">
-                  {material.uploaded_by_name}
+                  {material.uploaded_by?.full_name}
                 </p>
               </div>
             </div>
 
             <a
-              href={material.download_url}
+              href={material.file_url}
               onClick={(e) => e.preventDefault()}
               className="block"
               title="Download will be enabled when the real backend is wired up."
@@ -254,7 +260,7 @@ export default function MaterialDetailPage() {
             </a>
 
             <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-500">
-              {formatBytes(material.size_bytes)} · {type}
+              {formatBytes(material.file_size)} · {type}
             </p>
           </Card>
         </aside>
@@ -290,8 +296,8 @@ export default function MaterialDetailPage() {
                         {m.title}
                       </p>
                       <p className="mt-0.5 text-xs text-ink-500">
-                        {formatBytes(m.size_bytes)} ·{" "}
-                        {typeLabel(m.mime_type, m.original_filename)}
+                        {formatBytes(m.file_size)} ·{" "}
+                        {typeLabel(m.mime_type, m.file_name)}
                       </p>
                     </div>
                   </div>

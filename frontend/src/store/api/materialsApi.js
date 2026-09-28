@@ -1,6 +1,6 @@
-﻿import { apiSlice } from "./apiSlice";
+import { realApi } from "./realApi";
 
-export const materialsApi = apiSlice.injectEndpoints({
+export const materialsApi = realApi.injectEndpoints({
   endpoints: (builder) => ({
     // ---------- materials --------------------------------------------------
 

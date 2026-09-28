@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FileText, Download } from "lucide-react";
 
@@ -62,7 +62,7 @@ export default function MaterialsPage() {
       render: (row) => (
         <div>
           <p className="font-medium text-ink-900">{row.title}</p>
-          <p className="text-xs text-ink-500">{row.original_filename}</p>
+          <p className="text-xs text-ink-500">{row.file_name}</p>
         </div>
       ),
     },
@@ -70,14 +70,14 @@ export default function MaterialsPage() {
       key: "size",
       header: "Size",
       render: (row) => (
-        <span className="text-sm text-ink-700">{formatBytes(row.size_bytes)}</span>
+        <span className="text-sm text-ink-700">{formatBytes(row.file_size)}</span>
       ),
     },
     {
       key: "uploaded_at",
       header: "Uploaded",
       render: (row) => (
-        <span className="text-sm text-ink-700">{formatDate(row.uploaded_at)}</span>
+        <span className="text-sm text-ink-700">{formatDate(row.created_at)}</span>
       ),
     },
     {
@@ -92,7 +92,7 @@ export default function MaterialsPage() {
             View Details
           </Link>
           <a
-            href={row.download_url}
+            href={row.file_url}
             onClick={(e) => e.preventDefault()}
             className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-600 hover:bg-brand-50"
             title="Download will be enabled when the real backend is wired up."

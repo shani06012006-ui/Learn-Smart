@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Plus, FileText, Download, Trash2 } from "lucide-react";
 
@@ -79,7 +79,7 @@ export default function MaterialsPage() {
       render: (row) => (
         <div className="min-w-0">
           <p className="font-medium text-ink-900">{row.title}</p>
-          <p className="mt-0.5 text-xs text-ink-500">{row.original_filename}</p>
+          <p className="mt-0.5 text-xs text-ink-500">{row.file_name}</p>
         </div>
       ),
     },
@@ -88,7 +88,7 @@ export default function MaterialsPage() {
       header: "Size",
       render: (row) => (
         <span className="whitespace-nowrap text-sm text-ink-700">
-          {formatBytes(row.size_bytes)}
+          {formatBytes(row.file_size)}
         </span>
       ),
     },
@@ -97,7 +97,7 @@ export default function MaterialsPage() {
       header: "Uploaded",
       render: (row) => (
         <span className="whitespace-nowrap text-sm text-ink-700">
-          {formatDate(row.uploaded_at)}
+          {formatDate(row.created_at)}
         </span>
       ),
     },
@@ -113,7 +113,7 @@ export default function MaterialsPage() {
             View Details
           </Link>
           <a
-            href={row.download_url}
+            href={row.file_url}
             onClick={(e) => e.preventDefault()}
             className="focus-ring inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-brand-600 transition-colors hover:bg-brand-50"
             title="Download (mocked — see note below)"
