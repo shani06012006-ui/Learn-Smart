@@ -8,6 +8,8 @@ Route layout:
     /api/v1/admin/      Institution admin API (users, stats)
     /api/v1/            All other business endpoints (classes, institutions)
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
@@ -20,3 +22,6 @@ urlpatterns = [
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
