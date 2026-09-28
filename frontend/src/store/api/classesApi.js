@@ -1,6 +1,6 @@
-import { apiSlice } from "./apiSlice";
+import { realApi } from "./realApi";
 
-export const classesApi = apiSlice.injectEndpoints({
+export const classesApi = realApi.injectEndpoints({
   endpoints: (builder) => ({
     // GET /classes/ -- teacher: own classes, student: active enrollments
     getClasses: builder.query({
