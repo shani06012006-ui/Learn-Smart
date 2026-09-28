@@ -1,12 +1,15 @@
+import mimetypes
+
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.permissions import IsTeacher
 
 from . import services
-from .models import ClassCourse, StudentEnrollment
+from .models import ClassCourse, Material, StudentEnrollment
 from .permissions import CanViewClass, IsClassOwner
 from .serializers import (
     AddStudentSerializer,
@@ -14,6 +17,9 @@ from .serializers import (
     ClassCourseSerializer,
     EnrollmentStatusUpdateSerializer,
     JoinClassSerializer,
+    MaterialSerializer,
+    MaterialUpdateSerializer,
+    MaterialUploadSerializer,
     StudentEnrollmentSerializer,
 )
 
@@ -160,3 +166,139 @@ class JoinClassView(APIView):
                 "status": enrollment.status,
             }
         )
+
+
+class ClassMaterialsView(APIView):
+    """
+    GET  /api/v1/classes/{class_id}/materials/
+        -- teacher (owner) or actively enrolled student.
+    POST /api/v1/classes/{class_id}/materials/
+        -- teacher (owner) only. Accepts multipart/form-data with
+           title, optional description, and a file.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def _resolve_class(self, class_id, user, *, for_write):
+        class_course = get_object_or_404(ClassCourse, id=class_id)
+
+        if for_write:
+            if user.role != "teacher" or class_course.teacher_id != user.id:
+                self.permission_denied(
+                    self.request,
+                    message="You are not the teacher assigned to this class.",
+                )
+            return class_course
+
+        if user.role == "teacher" and class_course.teacher_id == user.id:
+            return class_course
+        if user.role == "student" and class_course.enrollments.filter(
+            student_id=user.id, status=StudentEnrollment.STATUS_ACTIVE
+        ).exists():
+            return class_course
+
+        self.permission_denied(
+            self.request, message="You do not have access to this class."
+        )
+
+    def get(self, request, class_id):
+        class_course = self._resolve_class(class_id, request.user, for_write=False)
+        materials = class_course.materials.select_related("uploaded_by").order_by(
+            "-created_at"
+        )
+        serializer = MaterialSerializer(
+            materials, many=True, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    def post(self, request, class_id):
+        class_course = self._resolve_class(class_id, request.user, for_write=True)
+
+        input_serializer = MaterialUploadSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        data = input_serializer.validated_data
+
+        file = data["file"]
+        material = Material.objects.create(
+            class_course=class_course,
+            uploaded_by=request.user,
+            title=data["title"],
+            description=data.get("description", ""),
+            file=file,
+            file_name=file.name,
+            file_size=file.size,
+            mime_type=mimetypes.guess_type(file.name)[0] or "application/octet-stream",
+        )
+
+        return Response(
+            MaterialSerializer(material, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MaterialDetailView(APIView):
+    """
+    GET    /api/v1/materials/{id}/  -- teacher (owner) or enrolled student.
+    PATCH  /api/v1/materials/{id}/  -- teacher (owner) only, title/description.
+    DELETE /api/v1/materials/{id}/  -- teacher (owner) only, soft delete.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _resolve_for_read(self, material_id, user):
+        material = get_object_or_404(Material, id=material_id)
+
+        if user.role == "teacher" and material.class_course.teacher_id == user.id:
+            return material
+        if user.role == "student" and material.class_course.enrollments.filter(
+            student_id=user.id, status=StudentEnrollment.STATUS_ACTIVE
+        ).exists():
+            return material
+
+        self.permission_denied(
+            self.request, message="You do not have access to this material."
+        )
+
+    def _resolve_for_write(self, material_id, user):
+        material = get_object_or_404(Material, id=material_id)
+        if material.class_course.teacher_id != user.id:
+            self.permission_denied(
+                self.request,
+                message="You are not the teacher assigned to this class.",
+            )
+        return material
+
+    def get(self, request, material_id):
+        material = self._resolve_for_read(material_id, request.user)
+        return Response(
+            MaterialSerializer(material, context={"request": request}).data
+        )
+
+    def patch(self, request, material_id):
+        material = self._resolve_for_write(material_id, request.user)
+
+        serializer = MaterialUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        update_fields = []
+        if "title" in data:
+            material.title = data["title"]
+            update_fields.append("title")
+        if "description" in data:
+            material.description = data["description"]
+            update_fields.append("description")
+
+        if update_fields:
+            update_fields.append("updated_at")
+            material.save(update_fields=update_fields)
+
+        return Response(
+            MaterialSerializer(material, context={"request": request}).data
+        )
+
+    def delete(self, request, material_id):
+        material = self._resolve_for_write(material_id, request.user)
+        material.soft_delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
