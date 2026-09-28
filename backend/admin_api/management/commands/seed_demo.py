@@ -55,7 +55,6 @@ class Command(BaseCommand):
                 "is_staff": role == User.ROLE_ADMIN,
             },
         )
-        # Keep values in sync on subsequent runs.
         user.first_name = first
         user.last_name = last
         user.role = role
