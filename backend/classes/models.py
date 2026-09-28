@@ -298,3 +298,49 @@ class LiveClass(TimeStampedModel):
         if now <= self.scheduled_end:
             return self.STATUS_LIVE
         return self.STATUS_COMPLETED        
+
+class Material(SoftDeleteModel, TimeStampedModel):
+    """
+    A file uploaded by a teacher for one of their classes.
+
+    Soft-deleted so that historical references (assignments, activity logs)
+    to a since-removed material remain resolvable via `.all_objects`.
+
+    File storage:
+        - Files land under MEDIA_ROOT/materials/<year>/<month>/<random>.<ext>
+        - The original filename is stored in `file_name` for UI display.
+        - `file_size` and `mime_type` are captured on upload for downstream use.
+
+    Validation (extension whitelist, 50 MB cap) lives in the upload
+    serializer -- not on the model -- so the model stays storage-mechanism
+    agnostic.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    class_course = models.ForeignKey(
+        ClassCourse,
+        on_delete=models.CASCADE,
+        related_name="materials",
+    )
+    uploaded_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="uploaded_materials",
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    file = models.FileField(upload_to="materials/%Y/%m/")
+    file_name = models.CharField(max_length=255, blank=True, default="")
+    file_size = models.PositiveBigIntegerField(default=0)
+    mime_type = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["class_course", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.class_course.name})"
