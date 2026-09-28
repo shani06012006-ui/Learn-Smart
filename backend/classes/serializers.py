@@ -1,8 +1,9 @@
 from rest_framework import serializers
 
+from accounts.models import User
 from accounts.serializers import UserPublicSerializer
 
-from .models import ClassCourse, StudentEnrollment
+from .models import ClassCourse, Material, StudentEnrollment
 
 
 class ClassCourseSerializer(serializers.ModelSerializer):
@@ -69,3 +70,109 @@ class EnrollmentStatusUpdateSerializer(serializers.Serializer):
 
 class JoinClassSerializer(serializers.Serializer):
     joining_code = serializers.CharField(max_length=6, min_length=6)
+
+
+# ---------------------------------------------------------------- materials
+
+
+ALLOWED_MATERIAL_EXTENSIONS = frozenset({
+    # documents
+    "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "txt", "csv",
+    # images
+    "png", "jpg", "jpeg", "gif", "webp",
+    # video
+    "mp4", "mov", "webm",
+    # audio
+    "mp3", "m4a", "wav",
+    # archives
+    "zip",
+})
+
+MAX_MATERIAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+
+
+class MaterialUploaderBriefSerializer(serializers.ModelSerializer):
+    """Compact uploader payload embedded in material rows."""
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "full_name"]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+
+class MaterialSerializer(serializers.ModelSerializer):
+    """Read representation of a Material row."""
+    uploaded_by = MaterialUploaderBriefSerializer(read_only=True)
+    class_course_id = serializers.UUIDField(source="class_course.id", read_only=True)
+    class_course_name = serializers.CharField(source="class_course.name", read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Material
+        fields = [
+            "id",
+            "class_course_id",
+            "class_course_name",
+            "uploaded_by",
+            "title",
+            "description",
+            "file",
+            "file_url",
+            "file_name",
+            "file_size",
+            "mime_type",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if not obj.file:
+            return None
+        url = obj.file.url
+        return request.build_absolute_uri(url) if request else url
+
+
+class MaterialUploadSerializer(serializers.Serializer):
+    """
+    Write payload for POST /api/v1/classes/{id}/materials/.
+
+    Validates:
+        - title present, non-blank, max 200 chars
+        - file present
+        - file extension in the allowed set
+        - file size <= 50 MB
+    """
+    title = serializers.CharField(max_length=200, allow_blank=False)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    file = serializers.FileField()
+
+    def validate_file(self, value):
+        name = value.name or ""
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        if ext not in ALLOWED_MATERIAL_EXTENSIONS:
+            allowed = ", ".join(sorted(ALLOWED_MATERIAL_EXTENSIONS))
+            raise serializers.ValidationError(
+                f"File type '.{ext}' is not allowed. Allowed: {allowed}."
+            )
+        if value.size > MAX_MATERIAL_FILE_SIZE:
+            raise serializers.ValidationError(
+                f"File is too large ({value.size // (1024*1024)} MB). "
+                f"Max is {MAX_MATERIAL_FILE_SIZE // (1024*1024)} MB."
+            )
+        return value
+
+
+class MaterialUpdateSerializer(serializers.Serializer):
+    """
+    Write payload for PATCH /api/v1/materials/{id}/.
+    File replacement is intentionally NOT supported here -- use
+    DELETE + re-upload.
+    """
+    title = serializers.CharField(max_length=200, allow_blank=False, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
