@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { GraduationCap, Menu, X } from "lucide-react";
 import clsx from "clsx";
@@ -89,7 +89,7 @@ export default function LandingNavbar() {
             </Button>
           </Link>
           <Link to="/register">
-            <Button size="sm">Get Started</Button>
+            <Button size="sm" variant="accent">Get Started</Button>
           </Link>
         </div>
 
@@ -139,7 +139,7 @@ export default function LandingNavbar() {
                 </Button>
               </Link>
               <Link to="/register" onClick={handleNavigate}>
-                <Button className="w-full">Get Started</Button>
+                <Button variant="accent" className="w-full">Get Started</Button>
               </Link>
             </div>
           </div>
