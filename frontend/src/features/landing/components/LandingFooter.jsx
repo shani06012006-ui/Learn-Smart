@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { GraduationCap, Globe, MessageCircle, Send, Share2 } from "lucide-react";
 
 const SECTIONS = [
@@ -46,7 +46,7 @@ export default function LandingFooter() {
           {/* Brand column */}
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue">
                 <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
               </div>
               <span className="text-lg font-bold tracking-tight text-cream-100">
@@ -63,7 +63,7 @@ export default function LandingFooter() {
                   key={label}
                   href="#"
                   aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-night-800/60 text-muted-400 transition-all hover:border-brand-400/40 hover:text-brand-300 hover:shadow-glow-teal"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-night-800/60 text-muted-400 transition-all hover:border-brand-400/40 hover:text-brand-300 hover:shadow-glow-blue"
                 >
                   <Icon size={16} />
                 </a>

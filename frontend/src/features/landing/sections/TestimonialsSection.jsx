@@ -1,4 +1,4 @@
-﻿import { Star, Quote } from "lucide-react";
+import { Star, Quote } from "lucide-react";
 import Reveal from "../components/Reveal";
 
 const TESTIMONIALS = [
@@ -10,29 +10,29 @@ const TESTIMONIALS = [
 const TONES = {
   brand: { avatar: "from-brand-400 to-brand-600 text-night-900", line: "bg-brand-400" },
   accent: { avatar: "from-accent-400 to-accent-600 text-night-900", line: "bg-accent-400" },
-  gold: { avatar: "from-gold-300 to-gold-500 text-night-900", line: "bg-gold-400" },
+  gold: { avatar: "from-accent-300 to-accent-500 text-night-900", line: "bg-accent-400" },
 };
 
 export default function TestimonialsSection() {
   return (
-    <section id="testimonials" className="relative py-24 md:py-32">
+    <section id="testimonials" className="relative py-20 md:py-24">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-gold-300">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-accent-300">
             Student voices
           </p>
           <h2 className="mt-4 text-3xl font-bold tracking-tight text-cream-100 sm:text-4xl md:text-5xl">
             What Our Students{" "}
-            <span className="bg-gradient-to-r from-gold-300 to-accent-300 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-accent-300 to-accent-300 bg-clip-text text-transparent">
               Say About Us
             </span>
           </h2>
-          <p className="mt-5 text-base leading-relaxed text-muted-300">
+          <p className="mt-4 text-base leading-relaxed text-muted-300">
             Real experiences from learners across institutions.
           </p>
         </Reveal>
 
-        <div className="mt-16 grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
           {TESTIMONIALS.map(({ initials, name, role, quote, tone }, i) => {
             const t = TONES[tone];
             return (
@@ -43,7 +43,7 @@ export default function TestimonialsSection() {
                   {/* decorative quote */}
                   <Quote size={40} className="absolute right-4 top-4 text-white/[0.04]" />
 
-                  <div className="mb-4 flex items-center gap-0.5 text-gold-400">
+                  <div className="mb-4 flex items-center gap-0.5 text-accent-400">
                     {[0, 1, 2, 3, 4].map((s) => (
                       <Star key={s} size={14} fill="currentColor" />
                     ))}

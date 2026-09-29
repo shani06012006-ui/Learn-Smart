@@ -27,8 +27,8 @@ export default {
           "100%": { transform: "rotate(360deg)" },
         },
         "pulse-glow": {
-          "0%,100%": { opacity: "0.5", transform: "scale(1)" },
-          "50%": { opacity: "0.9", transform: "scale(1.06)" },
+          "0%,100%": { opacity: "0.55", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.05)" },
         },
         "grid-flow": {
           "0%": { backgroundPosition: "0 0" },
@@ -45,96 +45,83 @@ export default {
         "grid-flow": "grid-flow 20s linear infinite",
       },
       colors: {
-        // ── Dark base: deep forest-black, not pure black ─────────────
-        // A slight green/teal shift makes it feel alive, not terminal.
+        // ── Soft charcoal slate — warmer than pure navy, milder than black
         night: {
-          50:  "#eef2f1",
-          100: "#d4dbd9",
-          200: "#a8b3b1",
-          300: "#7c8a87",
-          400: "#4d5a57",
-          500: "#2a3330",
-          600: "#1e2624",
-          700: "#16201c",  // card surface
-          800: "#111815",  // deeper surface
-          900: "#0a0f0d",  // page background
-          950: "#050807",  // deepest
+          50:  "#eef0f5",
+          100: "#d6d9e2",
+          200: "#aab0be",
+          300: "#7d8494",
+          400: "#565d70",
+          500: "#2f3545",
+          600: "#222634",
+          700: "#1c1f2a",
+          800: "#181a24",
+          900: "#14161e",  // page background — soft, not stark
+          950: "#0f1116",
         },
 
-        // ── Primary: neon teal ──────────────────────────────────────
+        // ── Muted periwinkle — calm, not electric
         brand: {
-          50:  "#e6fff9",
-          100: "#b9ffef",
-          200: "#7dffe1",
-          300: "#3df7d0",
-          400: "#2ee6c8",  // bright primary
-          500: "#14c9a9",
-          600: "#0da58a",
-          700: "#0d806c",
-          800: "#0e6053",
-          900: "#0d453e",
+          50:  "#eef0fe",
+          100: "#e0e3fc",
+          200: "#c7cdf9",
+          300: "#a8b0f4",
+          400: "#7c8af0",  // primary — gentle
+          500: "#6472e3",
+          600: "#4d5bc4",
+          700: "#3e4a9e",
+          800: "#333d7c",
+          900: "#2b3366",
         },
 
-        // ── Accent: warm coral ──────────────────────────────────────
+        // ── Soft warm amber — cozy, editorial
         accent: {
-          50:  "#fff4f0",
-          100: "#ffe4da",
-          200: "#ffc9b3",
-          300: "#ffa385",
-          400: "#ff7854",  // accent
-          500: "#ff5a3c",
-          600: "#ed3d20",
-          700: "#c22e15",
-          800: "#9c2814",
-          900: "#7e2413",
+          50:  "#fdf7ed",
+          100: "#f9ead0",
+          200: "#f2d6a3",
+          300: "#e8bd70",
+          400: "#e0b878",  // accent — muted, not bright gold
+          500: "#cfa050",
+          600: "#a87f3a",
+          700: "#856130",
+          800: "#6a4e2c",
+          900: "#594228",
         },
 
-        // ── Supporting ──────────────────────────────────────────────
-        gold: {
-          300: "#ffd966",
-          400: "#f2c14e",
-          500: "#e5a91a",
-        },
-        // For text — cream instead of clinical white
+        // ── Warm off-white text
         cream: {
-          50:  "#fbf9f5",
-          100: "#f5f1e8",
-          200: "#e8e2d5",
+          50:  "#f7f8fb",
+          100: "#eef0f5",
+          200: "#dfe2eb",
         },
-        // Muted text on dark — greenish grey
         muted: {
-          300: "#b7c2bf",
-          400: "#8a9b95",
-          500: "#5c6c68",
+          300: "#a8aebe",
+          400: "#8c92a4",  // muted text
+          500: "#5c6274",
         },
+        success: { 400: "#6ecf8e", 500: "#4caf6c" },
+        warning: { 400: "#e5b070", 500: "#cc8a3f" },
+        danger:  { 400: "#e08383", 500: "#c96060" },
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 0 rgb(0 0 0 / 0.4)",
-        landing: "0 8px 32px -8px rgb(0 0 0 / 0.6), 0 2px 8px -2px rgb(0 0 0 / 0.4)",
-        "landing-lg": "0 24px 64px -12px rgb(0 0 0 / 0.7), 0 6px 16px -4px rgb(0 0 0 / 0.5)",
-        // Neon glows — the star of the dark theme
-        "glow-teal": "0 0 40px -8px rgba(46,230,200,0.55)",
-        "glow-teal-lg": "0 0 60px -10px rgba(46,230,200,0.65)",
-        "glow-coral": "0 0 40px -8px rgba(255,120,84,0.5)",
-        "glow-coral-lg": "0 0 60px -10px rgba(255,120,84,0.6)",
-        "glow-gold": "0 0 40px -8px rgba(242,193,78,0.45)",
-        "inner-glow": "inset 0 1px 0 0 rgba(255,255,255,0.06)",
+        card: "0 1px 2px 0 rgb(0 0 0 / 0.2), 0 1px 3px 0 rgb(0 0 0 / 0.3)",
+        landing: "0 6px 24px -8px rgb(0 0 0 / 0.4), 0 2px 6px -2px rgb(0 0 0 / 0.25)",
+        "landing-lg": "0 16px 48px -12px rgb(0 0 0 / 0.5), 0 4px 12px -4px rgb(0 0 0 / 0.3)",
+        // Softer glows (lower opacity, bigger blur)
+        "glow-blue": "0 0 32px -8px rgba(124,138,240,0.4)",
+        "glow-blue-lg": "0 0 48px -10px rgba(124,138,240,0.5)",
+        "glow-gold": "0 0 32px -8px rgba(224,184,120,0.4)",
+        "glow-gold-lg": "0 0 48px -10px rgba(224,184,120,0.5)",
       },
       borderRadius: {
         card: "0.75rem",
       },
       backgroundImage: {
         "hero-mesh":
-          "radial-gradient(at 20% 20%, rgba(46,230,200,0.15) 0px, transparent 50%), radial-gradient(at 80% 10%, rgba(255,120,84,0.12) 0px, transparent 50%), radial-gradient(at 50% 90%, rgba(242,193,78,0.08) 0px, transparent 50%)",
-        "card-surface":
-          "linear-gradient(135deg, rgba(22,32,28,0.9) 0%, rgba(17,24,21,0.85) 100%)",
-        "grid-dark":
-          "linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)",
-        "cta-shine":
-          "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%)",
+          "radial-gradient(at 20% 20%, rgba(124,138,240,0.10) 0px, transparent 50%), radial-gradient(at 80% 15%, rgba(224,184,120,0.08) 0px, transparent 50%), radial-gradient(at 50% 90%, rgba(124,138,240,0.06) 0px, transparent 55%)",
       },
     },
   },

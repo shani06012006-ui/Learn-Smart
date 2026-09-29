@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { Menu, X, GraduationCap } from "lucide-react";
@@ -41,7 +41,7 @@ export default function LandingNavbar() {
           <motion.div
             layoutId="brand-logo"
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue"
           >
             <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
           </motion.div>
@@ -77,7 +77,7 @@ export default function LandingNavbar() {
           </Link>
           <Link
             to="/register"
-            className="group relative hidden overflow-hidden rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-5 py-2 text-sm font-semibold text-night-900 shadow-glow-teal transition-all hover:shadow-glow-teal-lg sm:inline-flex"
+            className="group relative hidden overflow-hidden rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-5 py-2 text-sm font-semibold text-night-900 shadow-glow-blue transition-all hover:shadow-glow-blue-lg sm:inline-flex"
           >
             <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             <span className="relative">Get Started</span>
@@ -120,7 +120,7 @@ export default function LandingNavbar() {
             <Link
               to="/register"
               onClick={() => setOpen(false)}
-              className="mt-2 rounded-xl bg-gradient-to-r from-brand-400 to-brand-500 px-3 py-2.5 text-center text-sm font-semibold text-night-900 shadow-glow-teal"
+              className="mt-2 rounded-xl bg-gradient-to-r from-brand-400 to-brand-500 px-3 py-2.5 text-center text-sm font-semibold text-night-900 shadow-glow-blue"
             >
               Get Started
             </Link>

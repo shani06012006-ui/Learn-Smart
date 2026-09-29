@@ -30,11 +30,10 @@ export default function CustomCursor() {
         ringRef.current.style.width = hovering ? "56px" : "32px";
         ringRef.current.style.height = hovering ? "56px" : "32px";
         ringRef.current.style.borderColor = hovering
-          ? "rgba(46,230,200,0.9)"
-          : "rgba(46,230,200,0.5)";
-        ringRef.current.style.boxShadow = hovering
-          ? "0 0 20px rgba(46,230,200,0.5)"
-          : "0 0 10px rgba(46,230,200,0.25)";
+          ? "rgba(91,124,250,0.9)"
+          : "rgba(91,124,250,0.5)";
+        ringRef.current.style.boxShadow = hovering          ? "0 0 20px rgba(91,124,250,0.5)"
+          : "0 0 10px rgba(91,124,250,0.25)";
       }
       requestAnimationFrame(tick);
     };
@@ -51,12 +50,12 @@ export default function CustomCursor() {
     <>
       <div
         ref={dotRef}
-        className="pointer-events-none fixed left-0 top-0 z-[200] hidden h-1.5 w-1.5 rounded-full bg-brand-400 shadow-glow-teal md:block"
+        className="pointer-events-none fixed left-0 top-0 z-[200] hidden h-1.5 w-1.5 rounded-full bg-brand-400 shadow-glow-blue md:block"
       />
       <div
         ref={ringRef}
         className="pointer-events-none fixed left-0 top-0 z-[199] hidden rounded-full border-2 transition-[width,height,border-color,box-shadow] duration-200 md:block"
-        style={{ width: 32, height: 32, borderColor: "rgba(46,230,200,0.5)" }}
+        style={{ width: 32, height: 32, borderColor: "rgba(91,124,250,0.5)" }}
       />
     </>
   );

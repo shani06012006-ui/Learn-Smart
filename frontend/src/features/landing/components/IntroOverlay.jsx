@@ -1,4 +1,4 @@
-﻿import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { GraduationCap } from "lucide-react";
 
@@ -49,7 +49,7 @@ export default function IntroOverlay({ onDone }) {
               <motion.div
                 layoutId="brand-logo"
                 transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal-lg"
+                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue-lg"
               >
                 <GraduationCap size={32} className="text-night-900" strokeWidth={2.5} />
               </motion.div>
