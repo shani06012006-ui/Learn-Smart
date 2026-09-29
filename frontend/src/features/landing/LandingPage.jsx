@@ -6,6 +6,7 @@ import IntroOverlay from "./components/IntroOverlay";
 import AnimatedBackground from "./components/AnimatedBackground";
 import CustomCursor from "./components/CustomCursor";
 import ScrollProgress from "./components/ScrollProgress";
+import SectionIndicator from "./components/SectionIndicator";
 import LiveTicker from "./components/LiveTicker";
 import TrustBar from "./sections/TrustBar";
 import FeaturesSection from "./sections/FeaturesSection";
@@ -22,6 +23,7 @@ export default function LandingPage() {
       <AnimatedBackground />
       <CustomCursor />
       <ScrollProgress />
+      <SectionIndicator />
 
       <div
         className={`relative transition-opacity duration-700 ${
