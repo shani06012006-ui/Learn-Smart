@@ -2,48 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Dark base ──────────────────────────────────────────────────── */
-:root {
-  color-scheme: dark;
-}
+:root { color-scheme: dark; }
 
 html, body {
-  background-color: #0a0f0d;
-  color: #f5f1e8;
+  background-color: #14161e;
+  color: #eef0f5;
 }
 
 body {
-  /* Subtle green-teal aurora in the background */
   background-image:
-    radial-gradient(at 20% 0%, rgba(46,230,200,0.08) 0px, transparent 50%),
-    radial-gradient(at 80% 100%, rgba(255,120,84,0.06) 0px, transparent 50%);
+    radial-gradient(at 15% 0%, rgba(124,138,240,0.06) 0px, transparent 50%),
+    radial-gradient(at 85% 100%, rgba(224,184,120,0.04) 0px, transparent 50%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar — dark themed */
+/* ── Tighten default section spacing ─────────────────────────── */
+@layer components {
+  .section-pad {
+    @apply py-20 md:py-24;
+  }
+  .section-heading-gap {
+    @apply mt-3;
+  }
+  .section-sub {
+    @apply mt-4;
+  }
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0a0f0d; }
+::-webkit-scrollbar-track { background: #14161e; }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #14c9a9, #0da58a);
+  background: linear-gradient(180deg, #7c8af0, #6472e3);
   border-radius: 10px;
-  border: 2px solid #0a0f0d;
+  border: 2px solid #14161e;
 }
-::-webkit-scrollbar-thumb:hover { background: #2ee6c8; }
+::-webkit-scrollbar-thumb:hover { background: #a8b0f4; }
 
-/* Selection */
 ::selection {
-  background: rgba(46,230,200,0.35);
-  color: #fbf9f5;
+  background: rgba(124,138,240,0.35);
+  color: #f7f8fb;
 }
 
-/* Focus ring — teal glow */
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #0a0f0d, 0 0 0 4px #2ee6c8;
+  box-shadow: 0 0 0 2px #14161e, 0 0 0 4px #7c8af0;
 }
 
-/* Lenis smooth scroll */
+/* Lenis */
 html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }

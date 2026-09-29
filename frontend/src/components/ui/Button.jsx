@@ -9,31 +9,21 @@ const sizes = {
 
 const variants = {
   primary:
-    "bg-brand-400 text-night-900 shadow-glow-teal hover:bg-brand-300 hover:shadow-glow-teal-lg",
+    "bg-brand-500 text-white shadow-glow-blue hover:bg-brand-400 hover:shadow-glow-blue-lg",
   accent:
-    "bg-gradient-to-r from-accent-400 to-accent-500 text-white shadow-glow-coral hover:from-accent-300 hover:to-accent-400 hover:shadow-glow-coral-lg",
+    "bg-gradient-to-r from-accent-400 to-accent-500 text-night-900 shadow-glow-gold hover:from-accent-300 hover:to-accent-400 hover:shadow-glow-gold-lg",
   secondary:
     "border border-white/10 bg-night-800/60 text-cream-100 backdrop-blur hover:border-brand-400/40 hover:bg-night-700/80 hover:text-brand-300",
-  ghost:
-    "text-cream-100 hover:bg-white/5",
+  ghost: "text-cream-100 hover:bg-white/5",
   danger:
     "bg-red-500 text-white shadow-[0_0_30px_-8px_rgba(239,68,68,0.6)] hover:bg-red-400",
 };
 
 export default function Button({
-  children,
-  variant = "primary",
-  size = "md",
-  className = "",
-  type = "button",
-  ...props
+  children, variant = "primary", size = "md", className = "", type = "button", ...props
 }) {
   return (
-    <button
-      type={type}
-      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
-      {...props}
-    >
+    <button type={type} className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props}>
       {children}
     </button>
   );

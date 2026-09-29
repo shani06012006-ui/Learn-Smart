@@ -4,13 +4,9 @@ export function LogoMark({ size = 40, className = "" }) {
   return (
     <div
       style={{ width: size, height: size }}
-      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal ${className}`}
+      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue ${className}`}
     >
-      <GraduationCap
-        className="text-night-900"
-        strokeWidth={2.5}
-        size={Math.round(size * 0.55)}
-      />
+      <GraduationCap className="text-white" strokeWidth={2.5} size={Math.round(size * 0.55)} />
     </div>
   );
 }

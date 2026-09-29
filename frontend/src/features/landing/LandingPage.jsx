@@ -4,7 +4,6 @@ import HeroSection from "./components/HeroSection";
 import LandingFooter from "./components/LandingFooter";
 import IntroOverlay from "./components/IntroOverlay";
 import AnimatedBackground from "./components/AnimatedBackground";
-import CursorGlow from "./components/CursorGlow";
 import CustomCursor from "./components/CustomCursor";
 import ScrollProgress from "./components/ScrollProgress";
 import LiveTicker from "./components/LiveTicker";
@@ -21,7 +20,6 @@ export default function LandingPage() {
     <>
       <IntroOverlay onDone={() => setReady(true)} />
       <AnimatedBackground />
-      <CursorGlow />
       <CustomCursor />
       <ScrollProgress />
 
