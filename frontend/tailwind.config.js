@@ -1,4 +1,4 @@
-﻿/** @type {import('tailwindcss').Config} */
+/** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
@@ -30,6 +30,18 @@ export default {
         success: { 50: "#f0fdf4", 500: "#22c55e", 700: "#15803d" },
         warning: { 50: "#fffbeb", 500: "#f59e0b", 700: "#b45309" },
         danger: { 50: "#fef2f2", 500: "#ef4444", 700: "#b91c1c" },
+        accent: {
+          50: "#fff5ed",
+          100: "#ffe8d5",
+          200: "#ffcfaa",
+          300: "#ffad74",
+          400: "#ff8040",
+          500: "#ff6b35",
+          600: "#f04d15",
+          700: "#c7360e",
+          800: "#9e2c12",
+          900: "#7f2812",
+        },
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
@@ -42,6 +54,9 @@ export default {
         card: "0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)",
         "card-hover":
           "0 4px 6px -1px rgb(15 23 42 / 0.06), 0 2px 4px -2px rgb(15 23 42 / 0.05)",
+        // Landing-page-specific card shadows
+        landing: "0 8px 24px -6px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.04)",
+        "landing-lg": "0 20px 40px -12px rgb(15 23 42 / 0.12), 0 4px 12px -4px rgb(15 23 42 / 0.06)",
       },
       borderRadius: {
         card: "0.75rem", // 12px

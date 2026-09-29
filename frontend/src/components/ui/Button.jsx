@@ -2,6 +2,7 @@ import clsx from "clsx";
 
 const VARIANTS = {
   primary: "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800",
+  accent: "bg-accent-500 text-white hover:bg-accent-600 active:bg-accent-700",
   secondary: "bg-white text-ink-700 border border-ink-300 hover:bg-ink-100",
   danger: "bg-danger-500 text-white hover:bg-danger-700",
   ghost: "bg-transparent text-ink-700 hover:bg-ink-100",
