@@ -1,106 +1,109 @@
 ﻿import { Link } from "react-router-dom";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Globe, MessageCircle, Send, Share2 } from "lucide-react";
 
-const PRODUCT_LINKS = [
-  { label: "Product", href: "#hero" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "Why Learn-Smart", href: "#why" },
+const SECTIONS = [
+  {
+    title: "Product",
+    links: [
+      { label: "Features", to: "#features" },
+      { label: "Categories", to: "#categories" },
+      { label: "Live Classes", to: "#" },
+      { label: "Pricing", to: "#" },
+    ],
+  },
+  {
+    title: "For Students",
+    links: [
+      { label: "Browse Courses", to: "#" },
+      { label: "Learning Paths", to: "#" },
+      { label: "Certificates", to: "#" },
+      { label: "Community", to: "#" },
+    ],
+  },
+  {
+    title: "For Teachers",
+    links: [
+      { label: "Create a Course", to: "#" },
+      { label: "Teaching Tools", to: "#" },
+      { label: "Analytics", to: "#" },
+      { label: "Resources", to: "#" },
+    ],
+  },
 ];
 
-const STUDENT_LINKS = [
-  { label: "My Classes", href: "/student/classes" },
-  { label: "Materials", href: "/student/materials" },
-  { label: "Quizzes", href: "/student/quizzes" },
-  { label: "Live Classes", href: "/student/live-classes" },
-];
-
-const TEACHER_LINKS = [
-  { label: "Classes", href: "/teacher/classes" },
-  { label: "Materials", href: "/teacher/materials" },
-  { label: "Announcements", href: "/teacher/announcements" },
-  { label: "Live Classes", href: "/teacher/live-classes" },
-];
-
-const RESOURCE_LINKS = [
-  { label: "Login", href: "/login" },
-  { label: "Get Started", href: "/register" },
+const SOCIALS = [
+  { icon: Globe, label: "Website" },
+  { icon: MessageCircle, label: "Chat" },
+  { icon: Send, label: "Telegram" },
+  { icon: Share2, label: "Share" },
 ];
 
 export default function LandingFooter() {
   return (
-    <footer className="border-t border-ink-200 bg-white">
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
+    <footer className="relative border-t border-white/[0.06] bg-night-950">
+      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           {/* Brand column */}
-          <div className="lg:col-span-2">
-            <Link
-              to="/"
-              className="focus-ring inline-flex items-center gap-2 rounded-md text-ink-900"
-            >
-              <GraduationCap size={20} className="text-brand-600" />
-              <span className="font-semibold">Learn Smart</span>
+          <div className="col-span-2">
+            <Link to="/" className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal">
+                <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
+              </div>
+              <span className="text-lg font-bold tracking-tight text-cream-100">
+                Learn<span className="text-brand-400">Smart</span>
+              </span>
             </Link>
-            <p className="mt-3 max-w-sm text-sm leading-relaxed text-ink-500">
-              An AI-assisted learning platform that connects classes,
-              materials, quizzes, live sessions, and progress in one place.
+            <p className="mt-5 max-w-xs text-sm leading-relaxed text-muted-400">
+              The home of your learning journey. Courses, live sessions,
+              progress, and community — all in one place.
             </p>
+            <div className="mt-6 flex items-center gap-2">
+              {SOCIALS.map(({ icon: Icon, label }) => (
+                <a
+                  key={label}
+                  href="#"
+                  aria-label={label}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-night-800/60 text-muted-400 transition-all hover:border-brand-400/40 hover:text-brand-300 hover:shadow-glow-teal"
+                >
+                  <Icon size={16} />
+                </a>
+              ))}
+            </div>
           </div>
 
-          <FooterColumn title="Product" links={PRODUCT_LINKS} />
-          <FooterColumn title="For Students" links={STUDENT_LINKS} />
-          <FooterColumn title="For Teachers" links={TEACHER_LINKS} />
+          {SECTIONS.map((section) => (
+            <div key={section.title}>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-400">
+                {section.title}
+              </h3>
+              <ul className="mt-5 space-y-3">
+                {section.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.to}
+                      className="text-sm text-muted-300 transition-colors hover:text-brand-300"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        {/* Lower row */}
-        <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-ink-200 pt-6 sm:flex-row sm:items-center">
-          <p className="text-xs text-ink-500">
+        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-white/[0.06] pt-8 sm:flex-row sm:items-center">
+          <p className="text-xs text-muted-400">
             © {new Date().getFullYear()} Learn Smart. All rights reserved.
           </p>
-          <div className="flex items-center gap-5 text-xs">
-            {RESOURCE_LINKS.map((r) => (
-              <Link
-                key={r.label}
-                to={r.href}
-                className="focus-ring text-ink-500 hover:text-ink-900"
-              >
-                {r.label}
-              </Link>
-            ))}
+          <div className="flex items-center gap-5 text-xs text-muted-400">
+            <a href="#" className="transition-colors hover:text-brand-300">Privacy</a>
+            <a href="#" className="transition-colors hover:text-brand-300">Terms</a>
+            <Link to="/login" className="transition-colors hover:text-brand-300">Login</Link>
+            <Link to="/register" className="transition-colors hover:text-brand-300">Get Started</Link>
           </div>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterColumn({ title, links }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-700">
-        {title}
-      </p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {links.map((l) => (
-          <li key={l.label}>
-            {l.href.startsWith("#") ? (
-              <a
-                href={l.href}
-                className="focus-ring text-sm text-ink-500 transition-colors hover:text-ink-900"
-              >
-                {l.label}
-              </a>
-            ) : (
-              <Link
-                to={l.href}
-                className="focus-ring text-sm text-ink-500 transition-colors hover:text-ink-900"
-              >
-                {l.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

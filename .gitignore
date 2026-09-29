@@ -55,3 +55,12 @@ backend/Learn-Smart-clean/
 
 # Local backup of dropped audit rows (removed 2026-09-27)
 backend/audit_backup.json
+
+# Editor/script backups
+*.bak-*
+*.bak
+
+
+node_modules/
+dist/
+.vite/

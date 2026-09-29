@@ -1,12 +1,11 @@
-import { Link } from "react-router-dom";
-import { Search, ChevronDown, Users, BookOpen, GraduationCap } from "lucide-react";
+﻿import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import confetti from "canvas-confetti";
+import { Search, ChevronDown, Users, BookOpen, GraduationCap, Sparkles } from "lucide-react";
 
 import Button from "../../../components/ui/Button";
-import { useScrollReveal } from "../../../hooks/useScrollReveal";
-
-// Hero image. If the file at /images/student.jpg exists it will be used;
-// otherwise the CSS gradient placeholder behind it becomes visible.
-const HERO_IMAGE_SRC = "/images/student.jpg";
+import ScrambleText from "./ScrambleText";
+import HeroFloatingCards from "./HeroFloatingCards";
 
 const STATS = [
   { icon: Users, value: "10,000+", label: "Students" },
@@ -14,143 +13,161 @@ const STATS = [
   { icon: GraduationCap, value: "50+", label: "Teachers" },
 ];
 
-export default function HeroSection() {
-  const { ref, revealed } = useScrollReveal();
+const EASE = [0.22, 1, 0.36, 1];
 
+function celebrate() {
+  confetti({
+    particleCount: 100,
+    spread: 80,
+    origin: { y: 0.4 },
+    colors: ["#2ee6c8", "#ff7854", "#f2c14e", "#0da58a"],
+  });
+}
+
+export default function HeroSection() {
   return (
     <section
       id="hero"
-      ref={ref}
-      className="relative overflow-hidden pt-12 pb-16 md:pt-20 md:pb-24"
+      className="relative overflow-hidden pt-16 pb-28 md:pt-24 md:pb-36"
     >
-      {/* Soft background wash */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-accent-50/70 via-white to-white" />
-        <div className="absolute -left-32 top-20 h-80 w-80 rounded-full bg-accent-100/60 blur-3xl" />
-        <div className="absolute -right-32 top-32 h-80 w-80 rounded-full bg-accent-100/40 blur-3xl" />
+      {/* ── Background layers ────────────────────────────────────── */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        {/* mesh */}
+        <div className="absolute inset-0 bg-hero-mesh" />
+        {/* animated grid */}
+        <div
+          className="absolute inset-0 animate-grid-flow opacity-[0.5]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(46,230,200,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(46,230,200,0.06) 1px, transparent 1px)",
+            backgroundSize: "64px 64px",
+            maskImage: "radial-gradient(ellipse at 50% 40%, black 25%, transparent 75%)",
+            WebkitMaskImage: "radial-gradient(ellipse at 50% 40%, black 25%, transparent 75%)",
+          }}
+        />
+        {/* glow blobs */}
+        <div className="absolute -left-40 top-20 h-[32rem] w-[32rem] animate-blob rounded-full bg-brand-400/15 blur-[100px]" />
+        <div className="absolute -right-40 top-40 h-[32rem] w-[32rem] animate-blob rounded-full bg-accent-400/12 blur-[100px] [animation-delay:6s]" />
+        {/* bottom vignette */}
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-night-900" />
       </div>
 
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
-          {/* LEFT — copy + search + stats */}
-          <div
-            className={`lg:col-span-6 landing-reveal ${revealed ? "is-visible" : ""}`}
+      {/* ── Floating cards ───────────────────────────────────────── */}
+      <HeroFloatingCards />
+
+      {/* ── Centered content ─────────────────────────────────────── */}
+      <div className="relative mx-auto max-w-4xl px-6 text-center lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="inline-flex items-center gap-2 rounded-full border border-brand-400/30 bg-brand-400/5 px-3.5 py-1.5 text-xs font-medium text-brand-300 shadow-glow-teal backdrop-blur"
+        >
+          <span className="flex h-1.5 w-1.5 animate-pulse-glow rounded-full bg-brand-400" />
+          AI-Powered · Personalized · Interactive
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
+          className="mt-8 text-5xl font-bold leading-[1.02] tracking-tight text-cream-100 sm:text-6xl lg:text-7xl"
+        >
+          The Home of Your
+          <br />
+          <span className="bg-gradient-to-r from-brand-300 via-brand-400 to-accent-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(46,230,200,0.35)]">
+            <ScrambleText text="Learning Journey" delay={400} />
+          </span>
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.25, ease: EASE }}
+          className="mx-auto mt-7 max-w-2xl text-base leading-relaxed text-muted-300 sm:text-lg"
+        >
+          Find the right courses, track your progress, and learn from expert
+          teachers — all in one place.
+        </motion.p>
+
+        {/* Floating search pill */}
+        <motion.form
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.4, ease: EASE }}
+          onSubmit={(e) => e.preventDefault()}
+          className="mx-auto mt-10 flex w-full max-w-2xl items-stretch overflow-hidden rounded-full border border-white/10 bg-night-800/70 p-1.5 shadow-landing-lg backdrop-blur-xl"
+        >
+          <button
+            type="button"
+            className="flex shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-300 transition-colors hover:bg-white/5 hover:text-cream-100"
           >
-            {/* Eyebrow */}
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent-200 bg-white px-3 py-1 text-xs font-medium text-accent-700 shadow-sm">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-accent-500" />
-              AI-Powered · Personalized · Interactive
-            </div>
+            Category
+            <ChevronDown size={14} className="text-muted-400" />
+          </button>
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-400"
+            />
+            <input
+              type="text"
+              placeholder="Search courses, subjects, teachers..."
+              className="h-full w-full bg-transparent py-3 pl-10 pr-4 text-sm text-cream-100 placeholder:text-muted-400 focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            className="shrink-0 rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-6 text-sm font-semibold text-night-900 shadow-glow-teal transition-all hover:shadow-glow-teal-lg"
+          >
+            Search
+          </button>
+        </motion.form>
 
-            {/* Headline */}
-            <h1 className="text-4xl font-bold leading-[1.05] tracking-tight text-ink-900 sm:text-5xl lg:text-6xl">
-              The Home of Your
-              <br />
-              <span className="text-accent-500">Learning Journey</span>
-            </h1>
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.55, ease: EASE }}
+          className="mt-8 flex flex-wrap items-center justify-center gap-3"
+        >
+          <Link to="/login" onClick={celebrate}>
+            <Button size="lg" variant="accent">
+              <Sparkles size={16} className="mr-1.5" />
+              Get Started
+            </Button>
+          </Link>
+          <Link to="/features">
+            <Button size="lg" variant="secondary">
+              Learn More
+            </Button>
+          </Link>
+        </motion.div>
 
-            {/* Subtitle */}
-            <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-500 sm:text-lg">
-              Find the right courses, track your progress, and learn from expert
-              teachers — all in one place.
-            </p>
-
-            {/* Search bar */}
-            <form
-              className="mt-8 flex w-full max-w-xl items-stretch overflow-hidden rounded-full border border-ink-200 bg-white shadow-landing"
-              onSubmit={(e) => e.preventDefault()}
+        {/* Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.7, ease: EASE }}
+          className="mt-14 flex flex-wrap items-center justify-center gap-3"
+        >
+          {STATS.map(({ icon: Icon, value, label }) => (
+            <div
+              key={label}
+              className="flex items-center gap-2.5 rounded-full border border-white/10 bg-night-800/60 px-4 py-2 shadow-landing backdrop-blur"
             >
-              <button
-                type="button"
-                className="flex shrink-0 items-center gap-1.5 border-r border-ink-200 px-4 text-sm font-medium text-ink-700 hover:bg-ink-100"
-              >
-                Category
-                <ChevronDown size={14} className="text-ink-500" />
-              </button>
-              <div className="relative flex-1">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
-                />
-                <input
-                  type="text"
-                  placeholder="Search courses, subjects, teachers..."
-                  className="h-full w-full bg-transparent pl-10 pr-4 py-3 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none"
-                />
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-400/15 text-brand-300">
+                <Icon size={14} />
+              </span>
+              <div className="flex flex-col text-left leading-tight">
+                <span className="text-sm font-semibold text-cream-100">{value}</span>
+                <span className="text-[10px] uppercase tracking-wide text-muted-400">
+                  {label}
+                </span>
               </div>
-              <button
-                type="submit"
-                className="shrink-0 bg-accent-500 px-6 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
-              >
-                Search
-              </button>
-            </form>
-
-            {/* Stats pills */}
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              {STATS.map(({ icon: Icon, value, label }) => (
-                <div
-                  key={label}
-                  className="flex items-center gap-2.5 rounded-full border border-ink-200 bg-white px-4 py-2 shadow-sm"
-                >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-50 text-accent-600">
-                    <Icon size={14} />
-                  </span>
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-sm font-semibold text-ink-900">{value}</span>
-                    <span className="text-[10px] uppercase tracking-wide text-ink-500">
-                      {label}
-                    </span>
-                  </div>
-                </div>
-              ))}
             </div>
-
-            {/* CTAs */}
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link to="/login">
-                <Button size="lg" variant="accent">
-                  Get Started
-                </Button>
-              </Link>
-              <Link to="/features">
-                <Button size="lg" variant="secondary">
-                  Learn More
-                </Button>
-              </Link>
-            </div>
-          </div>
-
-          {/* RIGHT — hero illustration */}
-          <div
-            className={`lg:col-span-6 landing-reveal landing-reveal-delay-1 ${revealed ? "is-visible" : ""}`}
-          >
-            <div className="relative mx-auto flex max-w-md justify-center">
-              {/* Decorative glow */}
-              <div
-                aria-hidden="true"
-                className="absolute inset-8 rounded-full bg-accent-200/50 blur-3xl"
-              />
-              {/* Gradient placeholder (shows if image missing) */}
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 rounded-[2rem] bg-gradient-to-br from-accent-100 via-accent-50 to-white"
-              />
-              {/* The image itself. If /images/student.jpg doesn't exist, the
-                  gradient behind it shows through. */}
-              <img
-                src={HERO_IMAGE_SRC}
-                alt="Student learning"
-                loading="eager"
-                decoding="async"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-                className="relative z-10 h-auto w-full max-w-sm object-contain"
-              />
-            </div>
-          </div>
-        </div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );
