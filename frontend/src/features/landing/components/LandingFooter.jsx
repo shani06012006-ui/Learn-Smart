@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
 import { GraduationCap, Globe, MessageCircle, Send, Share2 } from "lucide-react";
 
 const SECTIONS = [
@@ -39,9 +41,19 @@ const SOCIALS = [
 ];
 
 export default function LandingFooter() {
+  const footerRef = useRef(null);
+  const inView = useInView(footerRef, { once: true, margin: "-100px" });
   return (
-    <footer className="relative border-t border-white/[0.06] bg-night-950">
-      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+    <footer
+      ref={footerRef}
+      className="relative overflow-hidden border-t border-white/[0.06] bg-night-950"
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 60 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        className="mx-auto max-w-7xl px-6 py-16 lg:px-8"
+      >
         <div className="grid grid-cols-2 gap-10 md:grid-cols-5">
           {/* Brand column */}
           <div className="col-span-2">
@@ -103,7 +115,7 @@ export default function LandingFooter() {
             <Link to="/register" className="transition-colors hover:text-brand-300">Get Started</Link>
           </div>
         </div>
-      </div>
+      </motion.div>
     </footer>
   );
 }
