@@ -1,4 +1,6 @@
-﻿const INSTITUTIONS = [
+﻿import Reveal from "../components/Reveal";
+
+const INSTITUTIONS = [
   "Greenwood High",
   "Northwood Academy",
   "Riverdale Institute",
@@ -12,23 +14,26 @@ export default function TrustBar() {
     <section
       id="trust"
       aria-label="Trusted by institutions"
-      className="border-y border-ink-200 bg-accent-50/40 py-12"
+      className="relative border-y border-white/[0.06] bg-night-800/40 py-14 backdrop-blur-sm"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <p className="text-center text-xs font-medium uppercase tracking-[0.2em] text-ink-500">
-          Trusted by 200+ institutions worldwide
-        </p>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
-          {INSTITUTIONS.map((name) => (
-            <span
-              key={name}
-              className="select-none text-base font-semibold tracking-tight text-ink-500 opacity-60 transition-opacity hover:opacity-100 sm:text-lg"
-            >
-              {name}
-            </span>
-          ))}
-        </div>
+        <Reveal>
+          <p className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-400">
+            Trusted by <span className="text-brand-300">200+</span> institutions worldwide
+          </p>
+        </Reveal>
+        <Reveal delay={0.15}>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            {INSTITUTIONS.map((name) => (
+              <span
+                key={name}
+                className="select-none text-base font-semibold tracking-tight text-muted-400 opacity-60 transition-all hover:text-brand-300 hover:opacity-100 sm:text-lg"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </Reveal>
       </div>
     </section>
   );

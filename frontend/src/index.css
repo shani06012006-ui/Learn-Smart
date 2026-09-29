@@ -1,327 +1,55 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    @apply antialiased;
-  }
-  body {
-    @apply bg-ink-100 text-ink-900;
-  }
+/* ── Dark base ──────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
 }
 
-@layer utilities {
-  .focus-ring {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2;
-  }
+html, body {
+  background-color: #0a0f0d;
+  color: #f5f1e8;
 }
 
-/* ===== Landing page utilities ===== */
-/* Everything below this line is scoped to the landing page. None of these
-   classes are used anywhere else in the app; removing them would have no
-   effect on existing screens. */
-
-/* Faint background grid */
-.landing-grid {
+body {
+  /* Subtle green-teal aurora in the background */
   background-image:
-    linear-gradient(to right, rgb(15 23 42 / 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(15 23 42 / 0.06) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 75%);
+    radial-gradient(at 20% 0%, rgba(46,230,200,0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, rgba(255,120,84,0.06) 0px, transparent 50%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scroll reveal */
-.landing-reveal {
-  opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 700ms cubic-bezier(0.2, 0.6, 0.2, 1),
-              transform 700ms cubic-bezier(0.2, 0.6, 0.2, 1);
+/* Custom scrollbar — dark themed */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0f0d; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #14c9a9, #0da58a);
+  border-radius: 10px;
+  border: 2px solid #0a0f0d;
 }
-.landing-reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-.landing-reveal-delay-1 {
-  transition-delay: 120ms;
-}
-.landing-reveal-delay-2 {
-  transition-delay: 240ms;
+::-webkit-scrollbar-thumb:hover { background: #2ee6c8; }
+
+/* Selection */
+::selection {
+  background: rgba(46,230,200,0.35);
+  color: #fbf9f5;
 }
 
-/* Progress bar fill â€” animates from 0 to the target width on mount */
-@keyframes landing-progress-fill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
-}
-.landing-progress {
-  transform-origin: left center;
-  animation: landing-progress-fill 1400ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+/* Focus ring — teal glow */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #0a0f0d, 0 0 0 4px #2ee6c8;
 }
 
-/* Pulsing notification dot */
-@keyframes landing-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50%      { transform: scale(1.8); opacity: 0; }
-}
-.landing-pulse {
-  animation: landing-pulse 2000ms ease-out infinite;
-}
+/* Lenis smooth scroll */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
 
-/* Slow float for decorative cards */
-@keyframes landing-float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
-}
-.landing-float {
-  animation: landing-float 6s ease-in-out infinite;
-}
-.landing-float-slow {
-  animation: landing-float 8s ease-in-out infinite;
-}
-
-/* Preview container subtle hover lift */
-.landing-preview {
-  transition: transform 500ms cubic-bezier(0.2, 0.6, 0.2, 1);
-}
-.landing-preview:hover {
-  transform: translateY(-2px);
-}
-
-/* Reduced motion: disable every landing animation and reveal transition */
-@media (prefers-reduced-motion: reduce) {
-  .landing-reveal,
-  .landing-reveal.is-visible {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-  .landing-progress {
-    animation: none;
-    transform: none;
-  }
-  .landing-pulse,
-  .landing-float,
-  .landing-float-slow {
-    animation: none;
-  }
-  .landing-preview:hover {
-    transform: none;
-  }
-}
-
-/* Additional reveal delays for staggered sections (up to index 3). */
-.landing-reveal-delay-3 {
-  transition-delay: 360ms;
-}
-
-/* ===== Landing: character + floating objects ===== */
-
-/* Character entrance and idle motion.
-   Two layers, so transition (entrance) and animation (idle float) never
-   fight over `transform`:
-     - .landing-character       — outer wrapper, handles entrance transition
-     - .landing-character-art   — inner wrapper, handles idle float
-*/
-.landing-character {
-  opacity: 0;
-  transform: translateY(24px) scale(0.96);
-  transition: opacity 900ms cubic-bezier(0.2, 0.6, 0.2, 1),
-              transform 900ms cubic-bezier(0.2, 0.6, 0.2, 1);
-}
-.landing-character.is-revealed {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-.landing-character.is-revealed .landing-character-art,
-.landing-character.is-revealed .landing-character-placeholder {
-  animation: character-idle 6s ease-in-out infinite;
-}
-
-@keyframes character-idle {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-
-/* Poses â€” subtle changes to suggest a gesture. These are designed to work
-   with the placeholder silhouette AND with any real illustration that
-   uses the same bounding box, because they only rotate/translate the
-   wrapper. */
-.landing-character.character--pointing .landing-character-placeholder {
-  transform: rotate(-3deg) translateX(-2px);
-}
-.landing-character.character--studying .landing-character-placeholder {
-  transform: rotate(2deg) translateY(4px);
-}
-.landing-character.character--celebrating .landing-character-placeholder {
-  animation: character-celebrate 1.2s ease-in-out;
-}
-.landing-character.character--joining .landing-character-placeholder {
-  transform: translateX(4px);
-}
-
-@keyframes character-celebrate {
-  0%   { transform: translateY(0) scale(1); }
-  30%  { transform: translateY(-14px) scale(1.03); }
-  60%  { transform: translateY(-4px) scale(1.01); }
-  100% { transform: translateY(0) scale(1); }
-}
-
-/* Soft glow behind the character */
-.landing-character-glow {
-  border-radius: 9999px;
-  background:
-    radial-gradient(closest-side, rgb(99 102 241 / 0.18), transparent 70%),
-    radial-gradient(closest-side, rgb(165 180 252 / 0.12), transparent 60%);
-  filter: blur(20px);
-  transform: scale(0.9);
-}
-
-/* Floating learning objects â€” fade/slide in, then idle */
-.landing-float-object {
-  opacity: 0;
-  transform: translateY(14px) scale(0.96);
-  transition: opacity 700ms cubic-bezier(0.2, 0.6, 0.2, 1),
-              transform 700ms cubic-bezier(0.2, 0.6, 0.2, 1);
-}
-.landing-float-object.is-revealed {
-  opacity: 1;
-  animation-name: float-object;
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
-}
-
-@keyframes float-object {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50%      { transform: translateY(-10px) scale(1); }
-}
-
-/* Reduced motion overrides */
-@media (prefers-reduced-motion: reduce) {
-  .landing-character,
-  .landing-character.is-revealed {
-    opacity: 1;
-    transform: none;
-    animation: none;
-    transition: none;
-  }
-  .landing-character.character--pointing .landing-character-placeholder,
-  .landing-character.character--studying .landing-character-placeholder,
-  .landing-character.character--joining .landing-character-placeholder,
-  .landing-character.character--celebrating .landing-character-placeholder {
-    transform: none;
-    animation: none;
-  }
-  .landing-float-object,
-  .landing-float-object.is-revealed {
-    opacity: 1;
-    transform: none;
-    animation: none;
-    transition: none;
-  }
-}
-
-
-/* ===== Landing R2: XP burst + ring ===== */
-
-/* +20 XP floating upward. Element is keyed on each correct answer so the
-   animation restarts. */
-@keyframes landing-xp-burst {
-  0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
-  20%  { opacity: 1; transform: translateY(0) scale(1.05); }
-  100% { opacity: 0; transform: translateY(-32px) scale(1); }
-}
-.landing-xp-burst {
-  animation: landing-xp-burst 1400ms ease-out forwards;
-}
-
-/* Progress ring draw-in */
-@keyframes landing-ring-draw {
-  from { stroke-dashoffset: 226; }
-}
-.landing-ring {
-  animation: landing-ring-draw 1400ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-/* Achievement star pulse */
-@keyframes landing-star-pulse {
-  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-  50%      { transform: scale(1.15) rotate(10deg); opacity: 0.9; }
-}
-.landing-star {
-  animation: landing-star-pulse 2400ms ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-xp-burst,
-  .landing-ring,
-  .landing-star {
-    animation: none;
-  }
-}
-
-/* ===== Landing hero image ===== */
-.landing-hero-image {
-  animation: hero-image-float 8s ease-in-out infinite;
-}
-.landing-hero-image-art {
-  /* If your image has a transparent background, this keeps it crisp
-     against the section. If not, remove this line. */
-  filter: drop-shadow(0 24px 48px rgb(15 23 42 / 0.12));
-}
-.landing-hero-image-glow {
-  border-radius: 9999px;
-  background:
-    radial-gradient(closest-side, rgb(99 102 241 / 0.14), transparent 70%);
-  filter: blur(40px);
-}
-
-@keyframes hero-image-float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-10px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-hero-image {
-    animation: none;
-  }
-}
-
-/* ===== Landing R3: audience toggle item ===== */
-
-/* Each list item fades/slides in when the toggle is switched. Items are
-   keyed by `mode`, so switching Student ↔ Teacher remounts the whole list
-   and re-triggers this animation. */
-@keyframes landing-toggle-item-in {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.landing-toggle-item {
-  animation: landing-toggle-item-in 350ms ease-out both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-toggle-item {
-    animation: none;
-  }
-}
-
-/* ===== Landing R3: audience toggle item ===== */
-
-/* Each list item fades/slides in when the toggle is switched. Items are
-   keyed by `mode`, so switching Student ↔ Teacher remounts the whole list
-   and re-triggers this animation. */
-@keyframes landing-toggle-item-in {
-  from { opacity: 0; transform: translateX(8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-.landing-toggle-item {
-  animation: landing-toggle-item-in 350ms ease-out both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .landing-toggle-item {
-    animation: none;
-  }
+/* Custom cursor — hide native on desktop */
+@media (hover: hover) and (min-width: 768px) {
+  body, a, button { cursor: none; }
 }

@@ -1,151 +1,132 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { GraduationCap, Menu, X } from "lucide-react";
-import clsx from "clsx";
+import { motion, useScroll, useMotionValueEvent } from "framer-motion";
+import { Menu, X, GraduationCap } from "lucide-react";
 
-import Button from "../../../components/ui/Button";
-import { useScrolled } from "../../../hooks/useScrolled";
-
-// In-page anchors use `href`. Route-based links use `to`.
 const NAV_LINKS = [
-  { label: "Product", href: "#hero" },
-  { label: "Features", to: "/features" },
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "For Students", href: "#students" },
-  { label: "For Teachers", href: "#teachers" },
-  { label: "Why Learn-Smart", href: "#why" },
+  { label: "Product", to: "#product" },
+  { label: "Features", to: "#features" },
+  { label: "How It Works", to: "#how" },
+  { label: "For Students", to: "#students" },
+  { label: "For Teachers", to: "#teachers" },
 ];
 
 export default function LandingNavbar() {
-  const scrolled = useScrolled(24);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const { scrollY } = useScroll();
 
-  // Lock body scroll while mobile menu is open.
-  useEffect(() => {
-    if (!mobileOpen) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [mobileOpen]);
-
-  const handleNavigate = () => setMobileOpen(false);
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    const prev = scrollY.getPrevious() ?? 0;
+    setHidden(latest > prev && latest > 120);
+    setScrolled(latest > 12);
+  });
 
   return (
-    <header
-      className={clsx(
-        "fixed inset-x-0 top-0 z-40 transition-all duration-300",
-        scrolled
-          ? "border-b border-ink-200 bg-white/80 backdrop-blur-md"
-          : "border-b border-transparent bg-white/40 backdrop-blur-sm"
-      )}
+    <motion.header
+      animate={{ y: hidden ? -100 : 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed inset-x-0 top-0 z-50"
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 lg:px-8">
-        <div
-          className={clsx(
-            "flex items-center transition-all duration-300",
-            scrolled ? "h-14" : "h-16"
-          )}
-        >
-          <Link
-            to="/"
-            className="focus-ring flex items-center gap-2 rounded-md text-ink-900"
-            aria-label="Learn Smart home"
+      <div
+        className={`mx-auto mt-3 flex max-w-7xl items-center justify-between rounded-2xl px-4 py-3 transition-all duration-300 sm:px-6 ${
+          scrolled
+            ? "border border-white/[0.08] bg-night-800/70 shadow-landing-lg backdrop-blur-xl"
+            : "border border-transparent bg-transparent"
+        }`}
+      >
+        {/* Brand */}
+        <Link to="/" className="flex items-center gap-2.5">
+          <motion.div
+            layoutId="brand-logo"
+            transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-teal"
           >
-            <GraduationCap size={20} className="text-brand-600" />
-            <span className="font-semibold">Learn Smart</span>
-          </Link>
-        </div>
+            <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
+          </motion.div>
+          <motion.span
+            layoutId="brand-word"
+            className="text-lg font-bold tracking-tight text-cream-100"
+          >
+            Learn<span className="text-brand-400">Smart</span>
+          </motion.span>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 lg:flex">
-          {NAV_LINKS.map((link) =>
-            link.to ? (
-              <Link
-                key={link.label}
-                to={link.to}
-                className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100/60 hover:text-ink-900"
-              >
-                {link.label}
-              </Link>
-            ) : (
-              <a
-                key={link.label}
-                href={link.href}
-                className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-100/60 hover:text-ink-900"
-              >
-                {link.label}
-              </a>
-            )
-          )}
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.to}
+              className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-muted-300 transition-colors hover:text-cream-100"
+            >
+              {link.label}
+              <span className="absolute inset-x-3.5 -bottom-0.5 h-px scale-x-0 bg-gradient-to-r from-transparent via-brand-400 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
+            </a>
+          ))}
         </nav>
 
-        {/* Desktop CTAs */}
-        <div className="hidden items-center gap-2 lg:flex">
-          <Link to="/login">
-            <Button variant="ghost" size="sm">
-              Login
-            </Button>
+        {/* Right actions */}
+        <div className="flex items-center gap-2">
+          <Link
+            to="/login"
+            className="hidden rounded-full px-4 py-2 text-sm font-medium text-muted-300 transition-colors hover:text-cream-100 sm:block"
+          >
+            Login
           </Link>
-          <Link to="/register">
-            <Button size="sm" variant="accent">Get Started</Button>
+          <Link
+            to="/register"
+            className="group relative hidden overflow-hidden rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-5 py-2 text-sm font-semibold text-night-900 shadow-glow-teal transition-all hover:shadow-glow-teal-lg sm:inline-flex"
+          >
+            <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+            <span className="relative">Get Started</span>
           </Link>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-night-800/60 text-cream-100 lg:hidden"
+          >
+            {open ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
-
-        {/* Mobile menu toggle */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((v) => !v)}
-          className="focus-ring rounded-md p-2 text-ink-700 hover:bg-ink-100 lg:hidden"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
       </div>
 
       {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="lg:hidden">
-          <div className="border-t border-ink-200 bg-white px-6 pb-6 pt-4">
-            <nav className="flex flex-col gap-1">
-              {NAV_LINKS.map((link) =>
-                link.to ? (
-                  <Link
-                    key={link.label}
-                    to={link.to}
-                    onClick={handleNavigate}
-                    className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
-                  >
-                    {link.label}
-                  </Link>
-                ) : (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    onClick={handleNavigate}
-                    className="focus-ring rounded-md px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100"
-                  >
-                    {link.label}
-                  </a>
-                )
-              )}
-            </nav>
-            <div className="mt-4 flex flex-col gap-2">
-              <Link to="/login" onClick={handleNavigate}>
-                <Button variant="secondary" className="w-full">
-                  Login
-                </Button>
-              </Link>
-              <Link to="/register" onClick={handleNavigate}>
-                <Button variant="accent" className="w-full">Get Started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-3 mt-2 rounded-2xl border border-white/[0.08] bg-night-800/95 p-4 shadow-landing-lg backdrop-blur-xl lg:hidden"
+        >
+          <nav className="flex flex-col gap-1">
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.to}
+                onClick={() => setOpen(false)}
+                className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-300 transition-colors hover:bg-white/5 hover:text-cream-100"
+              >
+                {link.label}
+              </a>
+            ))}
+            <Link
+              to="/login"
+              onClick={() => setOpen(false)}
+              className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-300 hover:bg-white/5 hover:text-cream-100"
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              onClick={() => setOpen(false)}
+              className="mt-2 rounded-xl bg-gradient-to-r from-brand-400 to-brand-500 px-3 py-2.5 text-center text-sm font-semibold text-night-900 shadow-glow-teal"
+            >
+              Get Started
+            </Link>
+          </nav>
+        </motion.div>
       )}
-    </header>
+    </motion.header>
   );
 }
-

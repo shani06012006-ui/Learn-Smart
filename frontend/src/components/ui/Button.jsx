@@ -1,45 +1,39 @@
-import clsx from "clsx";
+﻿const base =
+  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-night-900 disabled:cursor-not-allowed disabled:opacity-50";
 
-const VARIANTS = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800",
-  accent: "bg-accent-500 text-white hover:bg-accent-600 active:bg-accent-700",
-  secondary: "bg-white text-ink-700 border border-ink-300 hover:bg-ink-100",
-  danger: "bg-danger-500 text-white hover:bg-danger-700",
-  ghost: "bg-transparent text-ink-700 hover:bg-ink-100",
+const sizes = {
+  sm: "px-4 py-2 text-sm",
+  md: "px-5 py-2.5 text-sm",
+  lg: "px-7 py-3.5 text-base",
 };
 
-const SIZES = {
-  sm: "px-3 py-1.5 text-sm",
-  md: "px-4 py-2 text-sm",
-  lg: "px-5 py-2.5 text-base",
+const variants = {
+  primary:
+    "bg-brand-400 text-night-900 shadow-glow-teal hover:bg-brand-300 hover:shadow-glow-teal-lg",
+  accent:
+    "bg-gradient-to-r from-accent-400 to-accent-500 text-white shadow-glow-coral hover:from-accent-300 hover:to-accent-400 hover:shadow-glow-coral-lg",
+  secondary:
+    "border border-white/10 bg-night-800/60 text-cream-100 backdrop-blur hover:border-brand-400/40 hover:bg-night-700/80 hover:text-brand-300",
+  ghost:
+    "text-cream-100 hover:bg-white/5",
+  danger:
+    "bg-red-500 text-white shadow-[0_0_30px_-8px_rgba(239,68,68,0.6)] hover:bg-red-400",
 };
 
 export default function Button({
+  children,
   variant = "primary",
   size = "md",
-  loading = false,
-  disabled = false,
-  className,
-  children,
+  className = "",
+  type = "button",
   ...props
 }) {
   return (
     <button
-      disabled={disabled || loading}
-      className={clsx(
-        "focus-ring inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        VARIANTS[variant],
-        SIZES[size],
-        className
-      )}
+      type={type}
+      className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
       {...props}
     >
-      {loading && (
-        <span
-          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-          aria-hidden="true"
-        />
-      )}
       {children}
     </button>
   );
