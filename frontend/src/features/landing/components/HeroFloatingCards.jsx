@@ -1,4 +1,4 @@
-﻿import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { BookOpen, TrendingUp, Award, MessageCircle, Star, Sparkles, PlayCircle } from "lucide-react";
 
@@ -15,17 +15,17 @@ const CARDS = [
 const TONES = {
   brand: {
     iconBg: "bg-gradient-to-br from-brand-400 to-brand-600",
-    iconGlow: "shadow-glow-blue",
+    iconGlow: "shadow-glow-indigo",
     ring: "ring-brand-400/30",
-    chip: "bg-brand-400/15 text-brand-300",
-    accentLine: "bg-brand-400",
+    chip: "bg-brand-500/15 text-brand-600",
+    accentLine: "bg-brand-500",
   },
   gold: {
-    iconBg: "bg-gradient-to-br from-accent-300 to-accent-500",
-    iconGlow: "shadow-glow-gold",
+    iconBg: "bg-gradient-to-br from-accent-500 to-accent-500",
+    iconGlow: "shadow-glow-peach",
     ring: "ring-accent-400/30",
-    chip: "bg-accent-400/15 text-accent-300",
-    accentLine: "bg-accent-400",
+    chip: "bg-accent-500/15 text-accent-600",
+    accentLine: "bg-accent-500",
   },
 };
 
@@ -50,7 +50,7 @@ function Card({ card, progress }) {
       className={`absolute ${position} hidden w-56 cursor-pointer sm:block`}
     >
       <div
-        className={`animate-float relative overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-night-700/80 to-night-800/70 p-3.5 shadow-landing-lg backdrop-blur-xl ring-1 ${t.ring}`}
+        className={`animate-float relative overflow-hidden rounded-2xl border border-ink-200 bg-gradient-to-br from-night-700/80 to-night-800/70 p-3.5 shadow-landing-lg backdrop-blur-xl ring-1 ${t.ring}`}
         style={{ animationDelay: `${delay}s` }}
       >
         <div className={`absolute inset-x-0 top-0 h-px ${t.accentLine} opacity-60`} />
@@ -59,8 +59,8 @@ function Card({ card, progress }) {
             <Icon size={16} strokeWidth={2.5} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-cream-100">{title}</p>
-            <p className="truncate text-[11px] text-muted-400">{subtitle}</p>
+            <p className="truncate text-sm font-semibold text-ink-900">{title}</p>
+            <p className="truncate text-[11px] text-ink-500">{subtitle}</p>
           </div>
         </div>
         <p className={`mt-2.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${t.chip}`}>
@@ -92,14 +92,14 @@ export default function HeroFloatingCards() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute left-1/2 top-1/2 hidden h-52 w-52 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/25 via-night-800/40 to-accent-400/20 shadow-glow-blue-lg backdrop-blur-sm ring-1 ring-brand-400/30 md:flex"
+        className="absolute left-1/2 top-1/2 hidden h-52 w-52 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/25 via-night-800/40 to-accent-500/20 shadow-glow-indigo-lg backdrop-blur-sm ring-1 ring-brand-400/30 md:flex"
       >
         <div className="absolute inset-2 animate-spin-slow rounded-full border-2 border-dashed border-brand-400/30" />
         <div className="absolute inset-6 rounded-full border border-accent-400/20" />
         <div className="flex flex-col items-center gap-1">
-          <Star size={30} fill="currentColor" className="text-accent-400 drop-shadow-[0_0_12px_rgba(240,180,41,0.7)]" />
-          <span className="text-3xl font-bold tracking-tight text-cream-100">4.9</span>
-          <span className="text-[10px] uppercase tracking-widest text-muted-400">avg. rating</span>
+          <Star size={30} fill="currentColor" className="text-accent-500 drop-shadow-[0_0_12px_rgba(240,180,41,0.7)]" />
+          <span className="text-3xl font-bold tracking-tight text-ink-900">4.9</span>
+          <span className="text-[10px] uppercase tracking-widest text-ink-500">avg. rating</span>
         </div>
       </motion.div>
 

@@ -1,7 +1,6 @@
 ﻿/** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
-  darkMode: "class",
   theme: {
     extend: {
       keyframes: {
@@ -26,102 +25,105 @@ export default {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
         },
-        "pulse-glow": {
-          "0%,100%": { opacity: "0.55", transform: "scale(1)" },
-          "50%": { opacity: "1", transform: "scale(1.05)" },
-        },
         "grid-flow": {
           "0%": { backgroundPosition: "0 0" },
           "100%": { backgroundPosition: "64px 64px" },
+        },
+        "float-slow": {
+          "0%,100%": { transform: "translateY(0px) rotate(0deg)" },
+          "50%": { transform: "translateY(-8px) rotate(1deg)" },
+        },
+        "marquee": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
         },
       },
       animation: {
         blob: "blob 20s ease-in-out infinite",
         float: "float 6s ease-in-out infinite",
+        "float-slow": "float-slow 8s ease-in-out infinite",
         shimmer: "shimmer 3s linear infinite",
         "gradient-x": "gradient-x 8s ease infinite",
         "spin-slow": "spin-slow 24s linear infinite",
-        "pulse-glow": "pulse-glow 4s ease-in-out infinite",
-        "grid-flow": "grid-flow 20s linear infinite",
+        "grid-flow": "grid-flow 24s linear infinite",
+        marquee: "marquee 60s linear infinite",
       },
       colors: {
-        // ── Soft charcoal slate — warmer than pure navy, milder than black
-        night: {
-          50:  "#eef0f5",
-          100: "#d6d9e2",
-          200: "#aab0be",
-          300: "#7d8494",
-          400: "#565d70",
-          500: "#2f3545",
-          600: "#222634",
-          700: "#1c1f2a",
-          800: "#181a24",
-          900: "#14161e",  // page background — soft, not stark
-          950: "#0f1116",
+        // ── Warm paper base — never pure white ──────────────────────
+        paper: {
+          50:  "#fdfcfa",
+          100: "#f7f5f2",  // page background
+          200: "#efebe5",
+          300: "#e3ddd3",
         },
-
-        // ── Muted periwinkle — calm, not electric
+        // ── Deep warm ink — near-black with a hint of brown ────────
+        ink: {
+          900: "#1c1c1e",
+          800: "#2b2b2f",
+          700: "#3f3f45",
+          600: "#5a5a61",
+          500: "#7a7a80",
+          400: "#a3a3a8",
+          300: "#c9c9ce",
+          200: "#e5e3df",
+          100: "#f0eeea",
+        },
+        // ── Primary: soft indigo ──────────────────────────────────
         brand: {
-          50:  "#eef0fe",
-          100: "#e0e3fc",
-          200: "#c7cdf9",
-          300: "#a8b0f4",
-          400: "#7c8af0",  // primary — gentle
-          500: "#6472e3",
-          600: "#4d5bc4",
-          700: "#3e4a9e",
-          800: "#333d7c",
-          900: "#2b3366",
+          50:  "#eef0ff",
+          100: "#e0e3ff",
+          200: "#c7ccff",
+          300: "#a5adff",
+          400: "#8a92fc",
+          500: "#5b6ef5",  // primary
+          600: "#4453d6",
+          700: "#3542aa",
+          800: "#2b3488",
+          900: "#232a6b",
         },
-
-        // ── Soft warm amber — cozy, editorial
+        // ── Accent: warm peach ─────────────────────────────────────
         accent: {
-          50:  "#fdf7ed",
-          100: "#f9ead0",
-          200: "#f2d6a3",
-          300: "#e8bd70",
-          400: "#e0b878",  // accent — muted, not bright gold
-          500: "#cfa050",
-          600: "#a87f3a",
-          700: "#856130",
-          800: "#6a4e2c",
-          900: "#594228",
+          50:  "#fff5ee",
+          100: "#ffe7d5",
+          200: "#ffcfaa",
+          300: "#ffaf78",
+          400: "#f9a673",  // accent
+          500: "#ef8a52",
+          600: "#d46a2f",
+          700: "#a85022",
+          800: "#853f1d",
+          900: "#6b3419",
         },
-
-        // ── Warm off-white text
-        cream: {
-          50:  "#f7f8fb",
-          100: "#eef0f5",
-          200: "#dfe2eb",
+        // ── Success: soft mint ────────────────────────────────────
+        mint: {
+          400: "#7dd3a0",
+          500: "#4fb98a",
+          600: "#358d67",
         },
-        muted: {
-          300: "#a8aebe",
-          400: "#8c92a4",  // muted text
-          500: "#5c6274",
+        // ── Warm amber for badges ─────────────────────────────────
+        amber: {
+          400: "#f5c86a",
+          500: "#e8b03e",
         },
-        success: { 400: "#6ecf8e", 500: "#4caf6c" },
-        warning: { 400: "#e5b070", 500: "#cc8a3f" },
-        danger:  { 400: "#e08383", 500: "#c96060" },
       },
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px 0 rgb(0 0 0 / 0.2), 0 1px 3px 0 rgb(0 0 0 / 0.3)",
-        landing: "0 6px 24px -8px rgb(0 0 0 / 0.4), 0 2px 6px -2px rgb(0 0 0 / 0.25)",
-        "landing-lg": "0 16px 48px -12px rgb(0 0 0 / 0.5), 0 4px 12px -4px rgb(0 0 0 / 0.3)",
-        // Softer glows (lower opacity, bigger blur)
-        "glow-blue": "0 0 32px -8px rgba(124,138,240,0.4)",
-        "glow-blue-lg": "0 0 48px -10px rgba(124,138,240,0.5)",
-        "glow-gold": "0 0 32px -8px rgba(224,184,120,0.4)",
-        "glow-gold-lg": "0 0 48px -10px rgba(224,184,120,0.5)",
+        // Soft, diffuse shadows — no harshness
+        card: "0 1px 2px 0 rgb(28 28 30 / 0.04), 0 1px 3px 0 rgb(28 28 30 / 0.06)",
+        "card-hover": "0 6px 16px -4px rgb(28 28 30 / 0.08), 0 2px 6px -2px rgb(28 28 30 / 0.05)",
+        landing: "0 8px 24px -6px rgb(28 28 30 / 0.06), 0 2px 6px -2px rgb(28 28 30 / 0.04)",
+        "landing-lg": "0 20px 48px -12px rgb(28 28 30 / 0.10), 0 6px 16px -4px rgb(28 28 30 / 0.05)",
+        "glow-indigo": "0 0 40px -8px rgba(91,110,245,0.35)",
+        "glow-peach": "0 0 40px -8px rgba(249,166,115,0.4)",
       },
       borderRadius: {
-        card: "0.75rem",
+        card: "1rem",
       },
       backgroundImage: {
         "hero-mesh":
-          "radial-gradient(at 20% 20%, rgba(124,138,240,0.10) 0px, transparent 50%), radial-gradient(at 80% 15%, rgba(224,184,120,0.08) 0px, transparent 50%), radial-gradient(at 50% 90%, rgba(124,138,240,0.06) 0px, transparent 55%)",
+          "radial-gradient(at 20% 20%, rgba(91,110,245,0.10) 0px, transparent 50%), radial-gradient(at 80% 15%, rgba(249,166,115,0.12) 0px, transparent 50%), radial-gradient(at 50% 90%, rgba(125,211,160,0.08) 0px, transparent 55%)",
       },
     },
   },

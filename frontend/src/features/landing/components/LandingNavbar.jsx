@@ -32,7 +32,7 @@ export default function LandingNavbar() {
       <div
         className={`mx-auto mt-3 flex max-w-7xl items-center justify-between rounded-2xl px-4 py-3 transition-all duration-300 sm:px-6 ${
           scrolled
-            ? "border border-white/[0.08] bg-night-800/70 shadow-landing-lg backdrop-blur-xl"
+            ? "border border-ink-200 bg-white/85 shadow-landing-lg backdrop-blur-xl"
             : "border border-transparent bg-transparent"
         }`}
       >
@@ -41,15 +41,15 @@ export default function LandingNavbar() {
           <motion.div
             layoutId="brand-logo"
             transition={{ type: "spring", stiffness: 120, damping: 20 }}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-indigo"
           >
             <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
           </motion.div>
           <motion.span
             layoutId="brand-word"
-            className="text-lg font-bold tracking-tight text-cream-100"
+            className="text-lg font-bold tracking-tight text-ink-900"
           >
-            Learn<span className="text-brand-400">Smart</span>
+            Learn<span className="text-brand-500">Smart</span>
           </motion.span>
         </Link>
 
@@ -59,10 +59,10 @@ export default function LandingNavbar() {
             <a
               key={link.label}
               href={link.to}
-              className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-muted-300 transition-colors hover:text-cream-100"
+              className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900"
             >
               {link.label}
-              <span className="absolute inset-x-3.5 -bottom-0.5 h-px scale-x-0 bg-gradient-to-r from-transparent via-brand-400 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
+              <span className="absolute inset-x-3.5 -bottom-0.5 h-px scale-x-0 bg-gradient-to-r from-transparent via-brand-500 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
             </a>
           ))}
         </nav>
@@ -71,13 +71,13 @@ export default function LandingNavbar() {
         <div className="flex items-center gap-2">
           <Link
             to="/login"
-            className="hidden rounded-full px-4 py-2 text-sm font-medium text-muted-300 transition-colors hover:text-cream-100 sm:block"
+            className="hidden rounded-full px-4 py-2 text-sm font-medium text-ink-600 transition-colors hover:text-ink-900 sm:block"
           >
             Login
           </Link>
           <Link
             to="/register"
-            className="group relative hidden overflow-hidden rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-5 py-2 text-sm font-semibold text-night-900 shadow-glow-blue transition-all hover:shadow-glow-blue-lg sm:inline-flex"
+            className="group relative hidden overflow-hidden rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-5 py-2 text-sm font-semibold text-night-900 shadow-glow-indigo transition-all hover:shadow-glow-indigo-lg sm:inline-flex"
           >
             <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             <span className="relative">Get Started</span>
@@ -85,7 +85,7 @@ export default function LandingNavbar() {
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-night-800/60 text-cream-100 lg:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white/80 text-ink-900 lg:hidden"
           >
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
@@ -97,7 +97,7 @@ export default function LandingNavbar() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-3 mt-2 rounded-2xl border border-white/[0.08] bg-night-800/95 p-4 shadow-landing-lg backdrop-blur-xl lg:hidden"
+          className="mx-3 mt-2 rounded-2xl border border-ink-200 bg-white/95 p-4 shadow-landing-lg backdrop-blur-xl lg:hidden"
         >
           <nav className="flex flex-col gap-1">
             {NAV_LINKS.map((link) => (
@@ -105,7 +105,7 @@ export default function LandingNavbar() {
                 key={link.label}
                 href={link.to}
                 onClick={() => setOpen(false)}
-                className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-300 transition-colors hover:bg-white/5 hover:text-cream-100"
+                className="rounded-xl px-3 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
               >
                 {link.label}
               </a>
@@ -113,14 +113,14 @@ export default function LandingNavbar() {
             <Link
               to="/login"
               onClick={() => setOpen(false)}
-              className="rounded-xl px-3 py-2.5 text-sm font-medium text-muted-300 hover:bg-white/5 hover:text-cream-100"
+              className="rounded-xl px-3 py-2.5 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
             >
               Login
             </Link>
             <Link
               to="/register"
               onClick={() => setOpen(false)}
-              className="mt-2 rounded-xl bg-gradient-to-r from-brand-400 to-brand-500 px-3 py-2.5 text-center text-sm font-semibold text-night-900 shadow-glow-blue"
+              className="mt-2 rounded-xl bg-gradient-to-r from-brand-400 to-brand-500 px-3 py-2.5 text-center text-sm font-semibold text-night-900 shadow-glow-indigo"
             >
               Get Started
             </Link>

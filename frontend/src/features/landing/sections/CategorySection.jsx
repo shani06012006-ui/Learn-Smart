@@ -1,4 +1,4 @@
-﻿import { useRef } from "react";
+import { useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight, FlaskConical, Calculator, Languages, Code2,
@@ -14,16 +14,16 @@ const CATEGORIES = [
 
 const TONES = {
   brand: {
-    iconBg: "bg-brand-400/15 text-brand-300 ring-brand-400/30",
-    glow: "hover:shadow-glow-blue",
-    line: "bg-brand-400",
-    chip: "bg-brand-400/15 text-brand-300",
+    iconBg: "bg-brand-500/15 text-brand-600 ring-brand-400/30",
+    glow: "hover:shadow-glow-indigo",
+    line: "bg-brand-500",
+    chip: "bg-brand-500/15 text-brand-600",
   },
   gold: {
-    iconBg: "bg-accent-400/15 text-accent-300 ring-accent-400/30",
-    glow: "hover:shadow-glow-gold",
-    line: "bg-accent-400",
-    chip: "bg-accent-400/15 text-accent-300",
+    iconBg: "bg-accent-500/15 text-accent-600 ring-accent-400/30",
+    glow: "hover:shadow-glow-peach",
+    line: "bg-accent-500",
+    chip: "bg-accent-500/15 text-accent-600",
   },
 };
 
@@ -65,7 +65,7 @@ function Card({ index, total, progress, data }) {
     >
       <button
         type="button"
-        className={`flex h-full w-full flex-col items-start gap-5 rounded-3xl border border-white/[0.06] bg-gradient-to-br from-night-700/90 to-night-800/70 p-7 text-left shadow-landing-lg backdrop-blur-sm transition-all duration-300 hover:border-white/[0.15] ${t.glow}`}
+        className={`flex h-full w-full flex-col items-start gap-5 rounded-3xl border border-ink-200 bg-gradient-to-br from-night-700/90 to-night-800/70 p-7 text-left shadow-landing-lg backdrop-blur-sm transition-all duration-300 hover:border-ink-300 ${t.glow}`}
       >
         <div className={`absolute inset-x-0 top-0 h-px ${t.line} opacity-40 transition-opacity group-hover:opacity-100`} />
 
@@ -78,19 +78,19 @@ function Card({ index, total, progress, data }) {
         </span>
 
         <div className="flex-1">
-          <h3 className="text-lg font-semibold leading-snug text-cream-100 sm:text-xl">
+          <h3 className="text-lg font-semibold leading-snug text-ink-900 sm:text-xl">
             {name}
           </h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted-400">
+          <p className="mt-2 text-sm leading-relaxed text-ink-500">
             {copy}
           </p>
         </div>
 
-        <div className="flex w-full items-center justify-between border-t border-white/[0.06] pt-4">
+        <div className="flex w-full items-center justify-between border-t border-ink-200 pt-4">
           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${t.chip}`}>
             {courses} courses
           </span>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-cream-100 opacity-60 transition-opacity group-hover:opacity-100">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-ink-900 opacity-60 transition-opacity group-hover:opacity-100">
             Explore <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
           </span>
         </div>
@@ -134,29 +134,29 @@ export default function CategorySection() {
         >
           <div className="flex items-end justify-between gap-6">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-accent-300">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-accent-600">
                 Browse by subject
               </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-cream-100 sm:text-4xl md:text-5xl">
+              <h2 className="mt-3 text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
                 Choose the{" "}
-                <span className="bg-gradient-to-r from-accent-300 to-brand-300 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-accent-500 to-brand-500 bg-clip-text text-transparent">
                   <ScrambleText text="Category" delay={200} />
                 </span>{" "}
                 You Want
               </h2>
-              <p className="mt-3 max-w-lg text-sm text-muted-300 sm:text-base">
+              <p className="mt-3 max-w-lg text-sm text-ink-600 sm:text-base">
                 Scroll to explore — the cards slide as you go.
               </p>
             </div>
 
             <div className="hidden shrink-0 items-center gap-3 sm:flex">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
                 Scroll →
               </span>
               <div className="relative h-1 w-32 overflow-hidden rounded-full bg-white/5">
                 <motion.div
                   style={{ scaleX: progressScaleX, originX: 0 }}
-                  className="absolute inset-0 rounded-full bg-gradient-to-r from-brand-400 to-accent-400"
+                  className="absolute inset-0 rounded-full bg-gradient-to-r from-brand-400 to-accent-500"
                 />
               </div>
             </div>
@@ -183,12 +183,12 @@ export default function CategorySection() {
             <div className="flex w-[220px] shrink-0 items-center justify-center">
               <a
                 href="#features"
-                className="group flex h-40 w-40 flex-col items-center justify-center gap-3 rounded-full border border-white/[0.06] bg-night-800/40 text-center backdrop-blur-sm transition-all hover:border-brand-400/40 hover:bg-night-700/60"
+                className="group flex h-40 w-40 flex-col items-center justify-center gap-3 rounded-full border border-ink-200 bg-paper-200/60 text-center backdrop-blur-sm transition-all hover:border-brand-400/40 hover:bg-white/90"
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-400/15 text-brand-300 ring-1 ring-brand-400/30 transition-all group-hover:bg-brand-400 group-hover:text-white group-hover:shadow-glow-blue">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500/15 text-brand-600 ring-1 ring-brand-400/30 transition-all group-hover:bg-brand-500 group-hover:text-white group-hover:shadow-glow-indigo">
                   <ArrowRight size={18} />
                 </span>
-                <span className="text-xs font-semibold text-cream-100">
+                <span className="text-xs font-semibold text-ink-900">
                   View all subjects
                 </span>
               </a>
