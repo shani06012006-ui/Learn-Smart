@@ -1,10 +1,10 @@
-﻿import { GraduationCap } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 
 export function LogoMark({ size = 40, className = "" }) {
   return (
     <div
       style={{ width: size, height: size }}
-      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue ${className}`}
+      className={`flex items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-indigo ${className}`}
     >
       <GraduationCap className="text-white" strokeWidth={2.5} size={Math.round(size * 0.55)} />
     </div>
@@ -13,8 +13,8 @@ export function LogoMark({ size = 40, className = "" }) {
 
 export function LogoWord({ className = "" }) {
   return (
-    <span className={`font-bold tracking-tight text-cream-100 ${className}`}>
-      Learn<span className="text-brand-400">Smart</span>
+    <span className={`font-bold tracking-tight text-ink-900 ${className}`}>
+      Learn<span className="text-brand-500">Smart</span>
     </span>
   );
 }

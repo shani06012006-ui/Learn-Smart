@@ -1,4 +1,4 @@
-﻿import { useRef } from "react";
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import confetti from "canvas-confetti";
@@ -70,7 +70,7 @@ export default function HeroSection() {
         />
         <motion.div
           style={{ rotate: orbRotate }}
-          className="absolute -right-40 top-40 h-[32rem] w-[32rem] animate-blob rounded-full bg-accent-400/10 blur-[100px] [animation-delay:6s]"
+          className="absolute -right-40 top-40 h-[32rem] w-[32rem] animate-blob rounded-full bg-accent-500/10 blur-[100px] [animation-delay:6s]"
         />
         <motion.div
           style={{ opacity: vignetteOpacity }}
@@ -90,9 +90,9 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: EASE }}
-          className="inline-flex items-center gap-2 rounded-full border border-brand-400/30 bg-brand-400/5 px-3.5 py-1.5 text-xs font-medium text-brand-300 shadow-glow-blue backdrop-blur"
+          className="inline-flex items-center gap-2 rounded-full border border-brand-400/30 bg-brand-500/5 px-3.5 py-1.5 text-xs font-medium text-brand-600 shadow-glow-indigo backdrop-blur"
         >
-          <span className="flex h-1.5 w-1.5 animate-pulse-glow rounded-full bg-brand-400" />
+          <span className="flex h-1.5 w-1.5 animate-pulse-glow rounded-full bg-brand-500" />
           AI-Powered · Personalized · Interactive
         </motion.div>
 
@@ -100,11 +100,11 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
-          className="mt-8 text-5xl font-bold leading-[1.02] tracking-tight text-cream-100 sm:text-6xl lg:text-7xl"
+          className="mt-8 text-5xl font-bold leading-[1.02] tracking-tight text-ink-900 sm:text-6xl lg:text-7xl"
         >
           The Home of Your
           <br />
-          <span className="bg-gradient-to-r from-brand-300 via-brand-400 to-accent-400 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(91,124,250,0.4)]">
+          <span className="bg-gradient-to-r from-brand-500 via-brand-500 to-accent-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(91,124,250,0.4)]">
             <ScrambleText text="Learning Journey" delay={400} />
           </span>
         </motion.h1>
@@ -113,7 +113,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.25, ease: EASE }}
-          className="mx-auto mt-7 max-w-2xl text-base leading-relaxed text-muted-300 sm:text-lg"
+          className="mx-auto mt-7 max-w-2xl text-base leading-relaxed text-ink-600 sm:text-lg"
         >
           Find the right courses, track your progress, and learn from expert
           teachers — all in one place.
@@ -124,26 +124,26 @@ export default function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4, ease: EASE }}
           onSubmit={(e) => e.preventDefault()}
-          className="mx-auto mt-10 flex w-full max-w-2xl items-stretch overflow-hidden rounded-full border border-white/10 bg-night-800/70 p-1.5 shadow-landing-lg backdrop-blur-xl"
+          className="mx-auto mt-10 flex w-full max-w-2xl items-stretch overflow-hidden rounded-full border border-ink-200 bg-white/85 p-1.5 shadow-landing-lg backdrop-blur-xl"
         >
           <button
             type="button"
-            className="flex shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-300 transition-colors hover:bg-white/5 hover:text-cream-100"
+            className="flex shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
           >
             Category
-            <ChevronDown size={14} className="text-muted-400" />
+            <ChevronDown size={14} className="text-ink-500" />
           </button>
           <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-400" />
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-500" />
             <input
               type="text"
               placeholder="Search courses, subjects, teachers..."
-              className="h-full w-full bg-transparent py-3 pl-10 pr-4 text-sm text-cream-100 placeholder:text-muted-400 focus:outline-none"
+              className="h-full w-full bg-transparent py-3 pl-10 pr-4 text-sm text-ink-900 placeholder:text-ink-500 focus:outline-none"
             />
           </div>
           <button
             type="submit"
-            className="shrink-0 rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-6 text-sm font-semibold text-white shadow-glow-blue transition-all hover:shadow-glow-blue-lg"
+            className="shrink-0 rounded-full bg-gradient-to-r from-brand-400 to-brand-500 px-6 text-sm font-semibold text-white shadow-glow-indigo transition-all hover:shadow-glow-indigo-lg"
           >
             Search
           </button>
@@ -177,14 +177,14 @@ export default function HeroSection() {
           {STATS.map(({ icon: Icon, value, label }) => (
             <div
               key={label}
-              className="flex items-center gap-2.5 rounded-full border border-white/10 bg-night-800/60 px-4 py-2 shadow-landing backdrop-blur"
+              className="flex items-center gap-2.5 rounded-full border border-ink-200 bg-white/80 px-4 py-2 shadow-landing backdrop-blur"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-400/15 text-brand-300">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500/15 text-brand-600">
                 <Icon size={14} />
               </span>
               <div className="flex flex-col text-left leading-tight">
-                <span className="text-sm font-semibold text-cream-100">{value}</span>
-                <span className="text-[10px] uppercase tracking-wide text-muted-400">{label}</span>
+                <span className="text-sm font-semibold text-ink-900">{value}</span>
+                <span className="text-[10px] uppercase tracking-wide text-ink-500">{label}</span>
               </div>
             </div>
           ))}

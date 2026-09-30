@@ -1,4 +1,4 @@
-﻿import { useRef } from "react";
+import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 
 const INSTITUTIONS = [
@@ -21,12 +21,12 @@ export default function TrustBar() {
       ref={ref}
       id="trust"
       aria-label="Trusted by institutions"
-      className="relative overflow-hidden border-y border-white/[0.06] bg-night-800/40 py-14 backdrop-blur-sm"
+      className="relative overflow-hidden border-y border-ink-200 bg-paper-200/60 py-14 backdrop-blur-sm"
     >
       {/* soft top edge glow */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-400/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-500/40 to-transparent"
       />
 
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -35,18 +35,18 @@ export default function TrustBar() {
           initial={{ opacity: 0, y: 8 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, ease: EASE }}
-          className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-400"
+          className="text-center text-[11px] font-semibold uppercase tracking-[0.25em] text-ink-500"
         >
           Trusted by{" "}
           <span className="relative inline-block">
-            <span className="text-brand-300">200+</span>
+            <span className="text-brand-600">200+</span>
             <motion.span
               aria-hidden
               initial={{ scaleX: 0 }}
               animate={inView ? { scaleX: 1 } : {}}
               transition={{ duration: 0.7, delay: 0.5, ease: EASE }}
               style={{ originX: 0 }}
-              className="absolute -bottom-0.5 left-0 right-0 h-px bg-gradient-to-r from-brand-400 to-accent-400"
+              className="absolute -bottom-0.5 left-0 right-0 h-px bg-gradient-to-r from-brand-400 to-accent-500"
             />
           </span>{" "}
           institutions worldwide
@@ -73,7 +73,7 @@ export default function TrustBar() {
                 color: "rgb(165, 180, 252)",
                 transition: { duration: 0.2 },
               }}
-              className="select-none text-base font-semibold tracking-tight text-muted-400 opacity-70 sm:text-lg"
+              className="select-none text-base font-semibold tracking-tight text-ink-500 opacity-70 sm:text-lg"
             >
               {name}
             </motion.span>

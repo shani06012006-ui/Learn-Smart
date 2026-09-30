@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 // The ids of sections in order. Every section already has an id.
 const SECTIONS = [
@@ -40,11 +40,11 @@ export default function SectionIndicator() {
       className="pointer-events-none fixed right-6 top-1/2 z-[60] hidden -translate-y-1/2 select-none flex-col items-end gap-4 lg:flex"
     >
       {/* Current number */}
-      <div className="flex items-baseline gap-1 text-cream-100">
+      <div className="flex items-baseline gap-1 text-ink-900">
         <span className="font-mono text-3xl font-bold tabular-nums leading-none">
           {String(active + 1).padStart(2, "0")}
         </span>
-        <span className="font-mono text-xs text-muted-400">
+        <span className="font-mono text-xs text-ink-500">
           / {String(SECTIONS.length).padStart(2, "0")}
         </span>
       </div>
@@ -55,7 +55,7 @@ export default function SectionIndicator() {
           <div key={s.id} className="group flex items-center gap-2">
             <span
               className={`text-[10px] uppercase tracking-[0.2em] transition-colors ${
-                i === active ? "text-brand-300" : "text-muted-500"
+                i === active ? "text-brand-600" : "text-ink-400"
               }`}
             >
               {s.label}
@@ -63,7 +63,7 @@ export default function SectionIndicator() {
             <span
               className={`block h-px transition-all duration-500 ${
                 i === active
-                  ? "w-8 bg-gradient-to-r from-brand-400 to-accent-400"
+                  ? "w-8 bg-gradient-to-r from-brand-400 to-accent-500"
                   : "w-4 bg-white/15"
               }`}
             />

@@ -46,7 +46,7 @@ export default function LandingFooter() {
   return (
     <footer
       ref={footerRef}
-      className="relative overflow-hidden border-t border-white/[0.06] bg-night-950"
+      className="relative overflow-hidden border-t border-ink-200 bg-paper-100"
     >
       <motion.div
         initial={{ opacity: 0, y: 60 }}
@@ -58,14 +58,14 @@ export default function LandingFooter() {
           {/* Brand column */}
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-indigo">
                 <GraduationCap size={18} className="text-night-900" strokeWidth={2.5} />
               </div>
-              <span className="text-lg font-bold tracking-tight text-cream-100">
-                Learn<span className="text-brand-400">Smart</span>
+              <span className="text-lg font-bold tracking-tight text-ink-900">
+                Learn<span className="text-brand-500">Smart</span>
               </span>
             </Link>
-            <p className="mt-5 max-w-xs text-sm leading-relaxed text-muted-400">
+            <p className="mt-5 max-w-xs text-sm leading-relaxed text-ink-500">
               The home of your learning journey. Courses, live sessions,
               progress, and community — all in one place.
             </p>
@@ -75,7 +75,7 @@ export default function LandingFooter() {
                   key={label}
                   href="#"
                   aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-night-800/60 text-muted-400 transition-all hover:border-brand-400/40 hover:text-brand-300 hover:shadow-glow-blue"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white/80 text-ink-500 transition-all hover:border-brand-400/40 hover:text-brand-600 hover:shadow-glow-indigo"
                 >
                   <Icon size={16} />
                 </a>
@@ -85,7 +85,7 @@ export default function LandingFooter() {
 
           {SECTIONS.map((section) => (
             <div key={section.title}>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-400">
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-500">
                 {section.title}
               </h3>
               <ul className="mt-5 space-y-3">
@@ -93,7 +93,7 @@ export default function LandingFooter() {
                   <li key={link.label}>
                     <a
                       href={link.to}
-                      className="text-sm text-muted-300 transition-colors hover:text-brand-300"
+                      className="text-sm text-ink-600 transition-colors hover:text-brand-600"
                     >
                       {link.label}
                     </a>
@@ -104,15 +104,15 @@ export default function LandingFooter() {
           ))}
         </div>
 
-        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-white/[0.06] pt-8 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-400">
+        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t border-ink-200 pt-8 sm:flex-row sm:items-center">
+          <p className="text-xs text-ink-500">
             © {new Date().getFullYear()} Learn Smart. All rights reserved.
           </p>
-          <div className="flex items-center gap-5 text-xs text-muted-400">
-            <a href="#" className="transition-colors hover:text-brand-300">Privacy</a>
-            <a href="#" className="transition-colors hover:text-brand-300">Terms</a>
-            <Link to="/login" className="transition-colors hover:text-brand-300">Login</Link>
-            <Link to="/register" className="transition-colors hover:text-brand-300">Get Started</Link>
+          <div className="flex items-center gap-5 text-xs text-ink-500">
+            <a href="#" className="transition-colors hover:text-brand-600">Privacy</a>
+            <a href="#" className="transition-colors hover:text-brand-600">Terms</a>
+            <Link to="/login" className="transition-colors hover:text-brand-600">Login</Link>
+            <Link to="/register" className="transition-colors hover:text-brand-600">Get Started</Link>
           </div>
         </div>
       </motion.div>

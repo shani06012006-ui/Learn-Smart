@@ -26,7 +26,7 @@ export default function IntroOverlay({ onDone }) {
           key="intro"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.45, delay: 0.5 } }}
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-night-950"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-paper-100"
         >
           {/* neon nebula */}
           <div className="absolute -top-24 -left-24 h-96 w-96 animate-blob rounded-full bg-brand-500/20 blur-[120px]" />
@@ -49,7 +49,7 @@ export default function IntroOverlay({ onDone }) {
               <motion.div
                 layoutId="brand-logo"
                 transition={{ type: "spring", stiffness: 120, damping: 20 }}
-                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-blue-lg"
+                className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 shadow-glow-indigo-lg"
               >
                 <GraduationCap size={32} className="text-night-900" strokeWidth={2.5} />
               </motion.div>
@@ -57,8 +57,8 @@ export default function IntroOverlay({ onDone }) {
                 layoutId="brand-word"
                 transition={{ type: "spring", stiffness: 120, damping: 20 }}
               >
-                <span className="text-3xl font-bold tracking-tight text-cream-100">
-                  Learn<span className="text-brand-400">Smart</span>
+                <span className="text-3xl font-bold tracking-tight text-ink-900">
+                  Learn<span className="text-brand-500">Smart</span>
                 </span>
               </motion.div>
             </div>
@@ -67,7 +67,7 @@ export default function IntroOverlay({ onDone }) {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="flex items-end gap-2 text-3xl font-semibold text-cream-100"
+              className="flex items-end gap-2 text-3xl font-semibold text-ink-900"
             >
               Hi
               <motion.span
@@ -83,7 +83,7 @@ export default function IntroOverlay({ onDone }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="text-sm text-muted-400"
+              className="text-sm text-ink-500"
             >
               Welcome to your learning journey
             </motion.p>

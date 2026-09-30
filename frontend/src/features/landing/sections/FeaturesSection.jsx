@@ -1,155 +1,97 @@
-import { useRef } from "react";
+﻿import { useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import {
   BookOpen, Video, BarChart3, Award, Sparkles, MessageSquare,
 } from "lucide-react";
-import TiltCard from "../components/TiltCard";
 
 const FEATURES = [
-  { icon: BookOpen, title: "Course Library", description: "Over 1,000 ready-to-learn classes across every subject and level.", tone: "brand" },
-  { icon: Video, title: "Live Interactive Sessions", description: "Real-time classes with expert teachers, joinable from any device.", tone: "gold" },
-  { icon: BarChart3, title: "Progress Tracking", description: "Every quiz, every grade, every milestone — visible in one place.", tone: "brand" },
-  { icon: Award, title: "Verified Certificates", description: "Shareable certificates on completion, recognized by institutions.", tone: "gold" },
-  { icon: Sparkles, title: "AI Learning Paths", description: "Personalized study plans that adapt to your pace and strengths.", tone: "brand" },
-  { icon: MessageSquare, title: "Discussion Forums", description: "Ask questions, share insights, and learn alongside your peers.", tone: "gold" },
+  { icon: BookOpen,     title: "Course Library",            description: "Over 1,000 ready-to-learn classes across every subject and level.", tone: "brand" },
+  { icon: Video,        title: "Live Interactive Sessions", description: "Real-time classes with expert teachers, joinable from any device.", tone: "peach" },
+  { icon: BarChart3,    title: "Progress Tracking",         description: "Every quiz, every grade, every milestone — visible in one place.", tone: "brand" },
+  { icon: Award,        title: "Verified Certificates",     description: "Shareable certificates on completion, recognized by institutions.", tone: "mint"  },
+  { icon: Sparkles,     title: "AI Learning Paths",         description: "Personalized study plans that adapt to your pace and strengths.", tone: "peach" },
+  { icon: MessageSquare,title: "Discussion Forums",         description: "Ask questions, share insights, and learn alongside your peers.", tone: "brand" },
 ];
 
 const TONES = {
-  brand: {
-    icon: "bg-brand-400/15 text-brand-300 ring-brand-400/30",
-    hover: "group-hover:bg-brand-400 group-hover:text-white group-hover:shadow-glow-blue",
-    line: "bg-brand-400",
-  },
-  gold: {
-    icon: "bg-accent-400/15 text-accent-300 ring-accent-400/30",
-    hover: "group-hover:bg-accent-400 group-hover:text-night-900 group-hover:shadow-glow-gold",
-    line: "bg-accent-400",
-  },
+  brand: { icon: "bg-brand-50 text-brand-600 ring-brand-100", hotspot: "rgba(91,110,245,0.10)" },
+  peach: { icon: "bg-accent-50 text-accent-600 ring-accent-100", hotspot: "rgba(249,166,115,0.14)" },
+  mint:  { icon: "bg-mint-400/15 text-mint-600 ring-mint-400/30", hotspot: "rgba(125,211,160,0.14)" },
 };
 
-const EASE = [0.22, 1, 0.36, 1];
-
-// Text mask reveal: each word rises from a clip mask
-function MaskReveal({ text, delay = 0, className = "" }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-  const words = text.split(" ");
-
-  return (
-    <span ref={ref} className={`inline-block ${className}`}>
-      {words.map((word, i) => (
-        <span
-          key={i}
-          className="inline-block overflow-hidden align-bottom"
-          style={{ paddingBottom: "0.1em" }}
-        >
-          <motion.span
-            initial={{ y: "110%" }}
-            animate={inView ? { y: 0 } : {}}
-            transition={{
-              duration: 0.7,
-              delay: delay + i * 0.06,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-            className="inline-block"
-          >
-            {word}
-          </motion.span>
-          {i < words.length - 1 && <span>&nbsp;</span>}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function FeatureCard({ feature, index, baseDelay }) {
+function FeatureCard({ feature, index }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
+  const [mouse, setMouse] = useState({ x: 50, y: 50, visible: false });
+  const t = TONES[feature.tone];
 
-  const { icon: Icon, title, description, tone } = feature;
-  const t = TONES[tone];
+  const onMouseMove = (e) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setMouse({
+      x: ((e.clientX - r.left) / r.width) * 100,
+      y: ((e.clientY - r.top) / r.height) * 100,
+      visible: true,
+    });
+  };
+  const onMouseLeave = () => setMouse((m) => ({ ...m, visible: false }));
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, scale: 0.88, y: 24 }}
-      animate={inView ? { opacity: 1, scale: 1, y: 0 } : {}}
-      transition={{
-        duration: 0.7,
-        delay: baseDelay + index * 0.08,
-        ease: EASE,
-      }}
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, delay: index * 0.07, ease: [0.22, 1, 0.36, 1] }}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      className="group relative h-full overflow-hidden rounded-2xl border border-ink-200 bg-white p-6 shadow-landing transition-all duration-300 hover:-translate-y-1 hover:shadow-landing-lg"
     >
-      <TiltCard className="group h-full">
-        <div className="relative h-full overflow-hidden rounded-2xl border border-white/[0.08] bg-gradient-to-br from-night-700/80 to-night-800/60 p-6 shadow-landing backdrop-blur-sm transition-all duration-300 hover:border-white/[0.15]">
-          <div className={`absolute inset-x-0 top-0 h-px ${t.line} opacity-40 transition-opacity group-hover:opacity-100`} />
+      {/* Cursor-reactive hotspot */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(220px circle at ${mouse.x}% ${mouse.y}%, ${t.hotspot}, transparent 60%)`,
+          opacity: mouse.visible ? 1 : 0,
+        }}
+      />
 
-          {/* Icon — arrives slightly after the card, with a tiny overshoot */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={inView ? { opacity: 1, scale: 1 } : {}}
-            transition={{
-              duration: 0.5,
-              delay: baseDelay + index * 0.08 + 0.15,
-              ease: [0.34, 1.56, 0.64, 1], // overshoot
-            }}
-            className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl ring-1 ${t.icon} transition-all duration-300 ${t.hover}`}
-          >
-            <Icon size={22} strokeWidth={2.2} />
-          </motion.div>
+      <span className={`relative mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl ring-1 ${t.icon} transition-transform duration-300 group-hover:scale-105`}>
+        <feature.icon size={22} strokeWidth={2.2} />
+      </span>
 
-          <h3 className="text-lg font-semibold text-cream-100">{title}</h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted-300">
-            {description}
-          </p>
-        </div>
-      </TiltCard>
+      <h3 className="relative text-lg font-semibold text-ink-900">{feature.title}</h3>
+      <p className="relative mt-2 text-sm leading-relaxed text-ink-500">
+        {feature.description}
+      </p>
     </motion.div>
   );
 }
 
 export default function FeaturesSection() {
   return (
-    <section id="features" className="relative py-20 md:py-24">
+    <section id="features" className="section-pad relative">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand-300"
-          >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-brand-600">
             Everything you need
-          </motion.p>
-
-          <h2 className="mt-4 text-3xl font-bold tracking-tight text-cream-100 sm:text-4xl md:text-5xl">
-            <MaskReveal text="We Are Providing" delay={0.1} />{" "}
-            <span className="bg-gradient-to-r from-brand-300 to-accent-400 bg-clip-text text-transparent">
-              <MaskReveal text="Many Features" delay={0.25} />
+          </p>
+          <h2 className="section-heading-gap text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl md:text-5xl">
+            We Are Providing Many{" "}
+            <span className="bg-gradient-to-r from-brand-500 to-accent-500 bg-clip-text text-transparent">
+              Features
             </span>{" "}
-            <MaskReveal text="You Can Use" delay={0.4} />
+            You Can Use
           </h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.6, delay: 0.5, ease: EASE }}
-            className="mt-4 text-base leading-relaxed text-muted-300"
-          >
+          <p className="section-sub text-base leading-relaxed text-ink-500">
             A complete learning platform that brings courses, live sessions, progress, and community into one place.
-          </motion.p>
+          </p>
         </div>
 
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-14 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((feature, i) => (
-            <FeatureCard
-              key={feature.title}
-              feature={feature}
-              index={i}
-              baseDelay={0.3}
-            />
+            <FeatureCard key={feature.title} feature={feature} index={i} />
           ))}
         </div>
       </div>
