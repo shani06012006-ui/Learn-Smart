@@ -1,6 +1,6 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { BookOpen, TrendingUp, Award, MessageCircle, Star, Sparkles, PlayCircle } from "lucide-react";
+import { BookOpen, TrendingUp, Award, MessageCircle, Sparkles, PlayCircle } from "lucide-react";
 
 // Each card has its own driftY sign + magnitude, so they all move differently on scroll
 const CARDS = [
@@ -78,30 +78,8 @@ export default function HeroFloatingCards() {
     offset: ["start start", "end start"],
   });
 
-  // Center orb spins slower as you scroll
-  const orbScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
-  const orbOpacity = useTransform(scrollYProgress, [0, 0.9], [1, 0]);
-
   return (
     <div ref={ref} className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute left-1/2 top-1/2 h-[32rem] w-[32rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500/10 blur-[120px]" />
-      <div className="absolute left-1/3 top-1/3 h-[24rem] w-[24rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-500/8 blur-[100px]" />
-
-      <motion.div
-        style={{ scale: orbScale, opacity: orbOpacity }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute left-1/2 top-1/2 hidden h-52 w-52 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-brand-500/25 via-night-800/40 to-accent-500/20 shadow-glow-indigo-lg backdrop-blur-sm ring-1 ring-brand-400/30 md:flex"
-      >
-        <div className="absolute inset-2 animate-spin-slow rounded-full border-2 border-dashed border-brand-400/30" />
-        <div className="absolute inset-6 rounded-full border border-accent-400/20" />
-        <div className="flex flex-col items-center gap-1">
-          <Star size={30} fill="currentColor" className="text-accent-500 drop-shadow-[0_0_12px_rgba(240,180,41,0.7)]" />
-          <span className="text-3xl font-bold tracking-tight text-ink-900">4.9</span>
-          <span className="text-[10px] uppercase tracking-widest text-ink-500">avg. rating</span>
-        </div>
-      </motion.div>
 
       {CARDS.map((card) => (
         <Card key={card.id} card={card} progress={scrollYProgress} />

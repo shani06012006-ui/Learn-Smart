@@ -24,6 +24,8 @@ import StudentTimetableViewPage from "./features/student/timetable/TimetableView
 import LiveSessionPage from "./features/student/live-classes/LiveSessionPage";
 import ChatPage from "./features/chat/ChatPage";
 import FeaturesPage from "./features/features-page/FeaturesPage";
+import ProgramsPage from "./features/programs/ProgramsPage";
+import EnterprisePage from "./features/enterprise/EnterprisePage";
 import MaterialDetailPage from "./features/materials/MaterialDetailPage";
 import AdminLayout from "./features/admin/AdminLayout";
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
@@ -52,6 +54,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/features" element={<FeaturesPage />} />
+      <Route path="/programs" element={<ProgramsPage />} />
+      <Route path="/enterprise" element={<EnterprisePage />} />
 
 
       <Route element={<AdminRouteGuard />}>

@@ -1,95 +1,155 @@
 ﻿import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Star, Quote, Move } from "lucide-react";
+import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react";
+import { EASE } from "../motion";
 
 const TESTIMONIALS = [
-  { initials: "AK", name: "Anitha K.", role: "Grade 11 · Science",      quote: "The live classes and progress tracking keep me on track. I finally understand where I'm weak and what to study next.", tone: "brand" },
-  { initials: "RS", name: "Rahul S.",  role: "Grade 10 · Mathematics",  quote: "Best learning experience I've had. The AI paths actually help me move faster on topics I already know.",             tone: "peach" },
-  { initials: "MN", name: "Meera N.",  role: "Grade 12 · Programming",  quote: "Teachers respond fast, materials are always organized, and I can see all my courses in one place.",                   tone: "mint"  },
+  {
+    quote:
+      "EduCore replaced four separate systems across our institution. Grading, attendance, and analytics now live in one place — and faculty actually enjoy using it.",
+    name: "Dr. Elena Rostova",
+    role: "Dean of Academics, Northwood University",
+    initials: "ER",
+    tone: "navy",
+  },
+  {
+    quote:
+      "Onboarding 4,200 students in under two weeks. The deployment team was exceptional, and the platform has held 99.9% uptime through exam season.",
+    name: "Prof. Marcus Chen",
+    role: "Chief Information Officer, Riverdale Institute",
+    initials: "MC",
+    tone: "electric",
+  },
+  {
+    quote:
+      "The analytics dashboard gives us visibility we never had. We can spot at-risk students weeks earlier and intervene before it matters.",
+    name: "Dr. Fatima Aliyev",
+    role: "Head of Student Success, Greenwood College",
+    initials: "FA",
+    tone: "mint",
+  },
+  {
+    quote:
+      "Our hybrid programs run seamlessly on EduCore. Remote and on-campus students share the same experience — no compromises on either side.",
+    name: "Prof. Priya Sharma",
+    role: "Director of Digital Learning, NUS",
+    initials: "PS",
+    tone: "violet",
+  },
 ];
 
-const TONES = {
-  brand: { avatar: "bg-brand-500 text-white",              chip: "bg-brand-50 text-brand-700",  accent: "bg-brand-500" },
-  peach: { avatar: "bg-accent-500 text-white",             chip: "bg-accent-50 text-accent-700", accent: "bg-accent-500" },
-  mint:  { avatar: "bg-mint-500 text-white",               chip: "bg-mint-400/20 text-mint-600", accent: "bg-mint-500" },
+const TONE = {
+  navy: "from-navy-700 to-navy-900",
+  electric: "from-electric-500 to-electric-700",
+  mint: "from-accent-mint to-emerald-600",
+  violet: "from-accent-violet to-violet-700",
 };
 
-function DraggableCard({ data, index }) {
+export default function TestimonialsSection() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
-  const t = TONES[data.tone];
+  const scrollerRef = useRef(null);
 
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 40, rotate: 0 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.8, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -6, rotate: 0 }}
-      drag
-      dragElastic={0.18}
-      dragConstraints={{ left: -80, right: 80, top: -40, bottom: 40 }}
-      dragTransition={{ bounceStiffness: 320, bounceDamping: 26 }}
-      whileDrag={{ scale: 1.04, zIndex: 20, cursor: "grabbing", boxShadow: "0 24px 48px -12px rgba(28,28,30,0.18)" }}
-      className="relative flex h-full w-full cursor-grab flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white p-6 shadow-landing select-none"
-    >
-      <div className={`absolute inset-x-0 top-0 h-1 ${t.accent}`} />
+  const scrollBy = (dir) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.85;
+    el.scrollBy({ left: dir === "next" ? amount : -amount, behavior: "smooth" });
+  };
 
-      {/* Drag hint */}
-      <div className="absolute right-4 top-4 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-ink-400 opacity-60">
-        <Move size={11} /> drag
-      </div>
-
-      <Quote size={40} className="absolute right-16 top-4 text-ink-100" />
-
-      <div className="mb-4 flex items-center gap-0.5 text-amber-500">
-        {[0, 1, 2, 3, 4].map((s) => (
-          <Star key={s} size={14} fill="currentColor" />
-        ))}
-      </div>
-
-      <p className="relative flex-1 text-sm leading-relaxed text-ink-700">
-        &ldquo;{data.quote}&rdquo;
-      </p>
-
-      <div className="mt-6 flex items-center gap-3 border-t border-ink-200 pt-5">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${t.avatar} text-xs font-bold`}>
-          {data.initials}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-ink-900">{data.name}</p>
-          <p className="text-xs text-ink-500">{data.role}</p>
-        </div>
-        <span className={`ml-auto rounded-full px-2.5 py-1 text-[10px] font-semibold ${t.chip}`}>
-          Student
-        </span>
-      </div>
-    </motion.div>
-  );
-}
-
-export default function TestimonialsSection() {
   return (
     <section id="testimonials" className="section-pad relative overflow-hidden">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-accent-600">
-            Student voices
-          </p>
-          <h2 className="section-heading-gap text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-            What Our Students{" "}
-            <span className="bg-gradient-to-r from-accent-500 to-brand-500 bg-clip-text text-transparent">
-              Say About Us
-            </span>
-          </h2>
-          <p className="section-sub text-base leading-relaxed text-ink-500">
-            Pick them up. Drag them around. Real experiences, real flexibility.
-          </p>
+        {/* Heading + arrows */}
+        <div ref={ref} className="flex items-end justify-between gap-6">
+          <div className="max-w-2xl">
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.5, ease: EASE.smooth }}
+              className="eyebrow"
+            >
+              Institutional trust
+            </motion.p>
+            <motion.h2
+              initial={{ opacity: 0, y: 16 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.1, ease: EASE.smooth }}
+              className="h2 mt-5"
+            >
+              Trusted by Deans, Educators,{" "}
+              <span className="bg-gradient-to-r from-navy-800 to-electric-500 bg-clip-text text-transparent">
+                and Students Worldwide.
+              </span>
+            </motion.h2>
+          </div>
+
+          {/* Arrows */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="hidden shrink-0 items-center gap-2 sm:flex"
+          >
+            <button
+              type="button"
+              onClick={() => scrollBy("prev")}
+              aria-label="Previous testimonial"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50 hover:shadow-card"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollBy("next")}
+              aria-label="Next testimonial"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-navy-900 text-white shadow-navy-glow transition-all hover:bg-navy-800"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </motion.div>
         </div>
 
-        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map((data, i) => (
-            <DraggableCard key={data.name} data={data} index={i} />
+        {/* Horizontal scroller */}
+        <div
+          ref={scrollerRef}
+          className="mt-12 flex gap-5 overflow-x-auto pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {TESTIMONIALS.map((t, i) => (
+            <motion.article
+              key={t.name}
+              initial={{ opacity: 0, y: 32 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.7, delay: 0.3 + i * 0.1, ease: EASE.smooth }}
+              className="group relative flex w-[340px] shrink-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-elevated sm:w-[380px]"
+            >
+              <Quote
+                size={40}
+                className="absolute right-5 top-5 text-slate-100"
+              />
+
+              {/* Stars */}
+              <div className="mb-4 flex items-center gap-0.5 text-amber-500">
+                {[0, 1, 2, 3, 4].map((s) => (
+                  <Star key={s} size={14} fill="currentColor" />
+                ))}
+              </div>
+
+              <p className="relative flex-1 text-sm leading-relaxed text-slate-700">
+                &ldquo;{t.quote}&rdquo;
+              </p>
+
+              {/* Author */}
+              <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${TONE[t.tone]} text-sm font-bold text-white`}>
+                  {t.initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">{t.name}</p>
+                  <p className="text-xs text-slate-500">{t.role}</p>
+                </div>
+              </div>
+            </motion.article>
           ))}
         </div>
       </div>
