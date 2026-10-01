@@ -1,48 +1,55 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root { color-scheme: light; }
 
 html, body {
-  background-color: #f7f5f2;
-  color: #1c1c1e;
-}
-
-body {
-  background-image:
-    radial-gradient(at 12% 0%, rgba(91,110,245,0.05) 0px, transparent 45%),
-    radial-gradient(at 88% 100%, rgba(249,166,115,0.05) 0px, transparent 45%);
-  background-attachment: fixed;
+  overflow-x: hidden;
+  width: 100%;
+  background-color: #f4f6f9;
+  color: #0f172a;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Soft section padding tokens */
-@layer components {
-  .section-pad { @apply py-20 md:py-24; }
-  .section-heading-gap { @apply mt-3; }
-  .section-sub { @apply mt-4; }
+body {
+  background-image:
+    radial-gradient(at 15% 0%, rgba(54,93,241,0.04) 0px, transparent 45%),
+    radial-gradient(at 85% 100%, rgba(56,189,248,0.03) 0px, transparent 45%);
+  background-attachment: fixed;
 }
 
-/* Scrollbar — light, indigo thumb */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #f7f5f2; }
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #8a92fc, #5b6ef5);
-  border-radius: 10px;
-  border: 2px solid #f7f5f2;
+@layer components {
+  .section-pad { @apply py-20 md:py-28; }
+  .section-tight { @apply py-14 md:py-18; }
+  .h1 { @apply text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl; }
+  .h2 { @apply text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl; }
+  .h3 { @apply text-xl font-semibold text-slate-900; }
+  .body-lg { @apply text-base leading-relaxed text-slate-600 sm:text-lg; }
+  .body { @apply text-base leading-relaxed text-slate-600; }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600;
+  }
 }
-::-webkit-scrollbar-thumb:hover { background: #a5adff; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f4f6f9; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #91b0ff, #365df1);
+  border-radius: 10px;
+  border: 2px solid #f4f6f9;
+}
+::-webkit-scrollbar-thumb:hover { background: #5b86fc; }
 
 ::selection {
-  background: rgba(91,110,245,0.20);
-  color: #1c1c1e;
+  background: rgba(54,93,241,0.18);
+  color: #0f172a;
 }
 
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #f7f5f2, 0 0 0 4px #5b6ef5;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #365df1;
 }
 
 /* Lenis */
@@ -50,8 +57,13 @@ html.lenis, html.lenis body { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
 .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
 .lenis.lenis-stopped { overflow: hidden; }
-
-/* Keep the custom cursor on desktop — it's what makes this feel crafted */
-@media (hover: hover) and (min-width: 768px) {
-  body, a, button { cursor: none; }
+/* Root wrapper — prevents any child from blowing out the page width */
+#root {
+  width: 100%;
+  overflow-x: hidden;
+}
+@layer components {
+  .container {
+    @apply mx-auto w-full max-w-7xl px-6 lg:px-8;
+  }
 }

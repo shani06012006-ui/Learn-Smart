@@ -1,4 +1,3 @@
-﻿import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Provider } from "react-redux";
 import { BrowserRouter } from "react-router-dom";
@@ -14,7 +13,7 @@ import "./index.css";
 // backend, set VITE_USE_MOCKS=false and change `apiSlice.js` to use
 // `fetchBaseQuery` -- this file doesn't need to change.
 createRoot(document.getElementById("root")).render(
-  <StrictMode>
+  
     <ErrorBoundary>
       <Provider store={store}>
         <BrowserRouter>
@@ -22,5 +21,5 @@ createRoot(document.getElementById("root")).render(
         </BrowserRouter>
       </Provider>
     </ErrorBoundary>
-  </StrictMode>
+  
 );

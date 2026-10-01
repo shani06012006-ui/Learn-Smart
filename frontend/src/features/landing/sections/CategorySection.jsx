@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import {
   ArrowRight, FlaskConical, Calculator, Languages, Code2,
 } from "lucide-react";
@@ -102,10 +102,11 @@ function Card({ index, total, progress, data }) {
 export default function CategorySection() {
   const wrapperRef = useRef(null);
 
-  const { scrollYProgress } = useScroll({
+  const { scrollYProgress: rawProgress } = useScroll({
     target: wrapperRef,
     offset: ["start start", "end end"],
   });
+  const scrollYProgress = useSpring(rawProgress, { stiffness: 90, damping: 24, mass: 0.5, restDelta: 0.001 });
 
   // Track slides horizontally
   const x = useTransform(scrollYProgress, [0, 1], ["0%", "-70%"]);
