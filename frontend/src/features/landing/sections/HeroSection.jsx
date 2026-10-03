@@ -1,4 +1,4 @@
-// frontend/src/features/landing/sections/HeroSection.jsx
+﻿// frontend/src/features/landing/sections/HeroSection.jsx
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
@@ -213,7 +213,7 @@ export default function HeroSection() {
                 className="absolute inset-x-0 bottom-0 top-8 overflow-hidden rounded-[3rem]"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1519452575417-564c1401ecc0?w=800&q=80"
+                  src="https://i.pinimg.com/1200x/85/e8/08/85e80878dbd55569c3f4e4e479b2e9a9.jpg"
                   alt="Student with backpack"
                   className="h-full w-full object-cover object-top"
                   onError={(e) => {

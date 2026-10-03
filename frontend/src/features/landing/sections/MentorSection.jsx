@@ -34,7 +34,7 @@ export default function MentorSection() {
               {/* HERE IS YOUR IMAGE — mentor portrait — paste a URL below */}
               <div className="absolute inset-6 overflow-hidden rounded-full">
                 <img
-                  src="https://images.unsplash.com/photo-1560250097-0b93528c311a?w=800&q=80"
+                  src="https://i.pinimg.com/736x/4e/5d/84/4e5d84e967cdf19ece54aaa281220669.jpg"
                   alt="Mentor portrait"
                   className="h-full w-full object-cover object-top"
                   onError={(e) => {

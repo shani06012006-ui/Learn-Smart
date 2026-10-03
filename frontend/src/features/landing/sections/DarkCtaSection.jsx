@@ -153,7 +153,7 @@ export default function DarkCtaSection() {
                 className="relative mx-auto aspect-[4/3] w-full max-w-lg overflow-hidden rounded-3xl"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=900&q=80"
+                  src="https://i.pinimg.com/736x/d9/de/14/d9de14a39bdb9366463e63d475241c3e.jpg"
                   alt="Developer at desk"
                   className="h-full w-full object-cover"
                   onError={(e) => {

@@ -16,7 +16,7 @@ const AVATARS = [
     ring: "ring-coral-200",
     delay: 0.5,
     // HERE IS YOUR IMAGE — avatar 1 — paste a URL below
-    src: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&q=80",
+    src: "https://i.pinimg.com/736x/4e/5d/84/4e5d84e967cdf19ece54aaa281220669.jpg",
   },
   {
     id: "a2",

@@ -89,7 +89,7 @@ function PageHero() {
 
               {/* HERE IS YOUR IMAGE — hero photo — paste a URL over the src */}
               <img
-                src=""
+                src="https://i.pinimg.com/1200x/c9/dc/69/c9dc696611bebb48fa1e775039aff34e.jpg"
                 alt="Student at desk"
                 className="absolute inset-0 h-full w-full object-cover"
                 onError={(e) => {
