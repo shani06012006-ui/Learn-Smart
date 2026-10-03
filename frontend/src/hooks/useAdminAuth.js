@@ -2,13 +2,13 @@ import { useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
-import { useAdminLogoutMutation } from "../../../store/api/realApi";
+import { useAdminLogoutMutation } from "../store/api/realApi";
 import {
   adminLoggedOut,
   selectAdminUser,
   selectAdminStatus,
   selectIsAdminAuthenticated,
-} from "../../../store/slices/adminAuthSlice";
+} from "../store/slices/adminAuthSlice";
 
 // Note: no `login` here anymore. Admin login goes through the shared
 // `/login` page (see features/auth/LoginPage.jsx), which dispatches
