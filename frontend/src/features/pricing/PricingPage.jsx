@@ -1,4 +1,4 @@
-﻿// frontend/src/features/pricing/PricingPage.jsx
+// frontend/src/features/pricing/PricingPage.jsx
 import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
@@ -243,8 +243,8 @@ function PricingCard({ pack, index, inView }) {
       </p>
 
       {/* CTA button */}
-      <button
-        type="button"
+      <Link
+        to="/register"
         className={`mt-5 inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold transition-all ${
           featured
             ? "bg-purple-500 text-white shadow-purple-glow hover:bg-purple-600 hover:-translate-y-0.5"
@@ -252,7 +252,7 @@ function PricingCard({ pack, index, inView }) {
         }`}
       >
         Purchase Course
-      </button>
+      </Link>
     </motion.div>
   );
 }
