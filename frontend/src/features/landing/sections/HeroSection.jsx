@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/sections/HeroSection.jsx
+// frontend/src/features/landing/sections/HeroSection.jsx
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
