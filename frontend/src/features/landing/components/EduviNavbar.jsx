@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/components/EduviNavbar.jsx
+// frontend/src/features/landing/components/EduviNavbar.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
@@ -6,7 +6,7 @@ import { Menu, X, ChevronDown, ShoppingCart, User } from "lucide-react";
 
 /* ── Nav links from the reference ────────────────────────────────── */
 const NAV_LINKS = [
-  { label: "Shop",            href: "#shop",        dropdown: false },
+  { label: "Shop", href: "/shop", dropdown: false },
   { label: "For Kindergarten",href: "#kindergarten", dropdown: true  },
   { label: "For High School", href: "#highschool",   dropdown: true  },
   { label: "For College",     href: "#college",      dropdown: true  },
