@@ -1,4 +1,4 @@
-﻿// frontend/src/features/course-details/components/PlaylistItem.jsx
+// frontend/src/features/course-details/components/PlaylistItem.jsx
 import { PlayCircle } from "lucide-react";
 
 const GRADIENTS = [
@@ -28,7 +28,7 @@ export default function PlaylistItem({ lesson, index = 0, active = false }) {
       >
         {/* HERE IS YOUR IMAGE — playlist thumbnail — paste a URL over the src */}
         <img
-          src=""
+          src="https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=200&q=80"
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {

@@ -1,4 +1,4 @@
-﻿// frontend/src/features/shop/ShopPage.jsx
+// frontend/src/features/shop/ShopPage.jsx
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";

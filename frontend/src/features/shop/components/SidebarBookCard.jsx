@@ -1,4 +1,4 @@
-﻿// frontend/src/features/shop/components/SidebarBookCard.jsx
+// frontend/src/features/shop/components/SidebarBookCard.jsx
 import { Star } from "lucide-react";
 
 const GRADIENTS = [
@@ -16,7 +16,7 @@ export default function SidebarBookCard({ book, index = 0 }) {
       <div className={`relative flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br ${gradient}`}>
         {/* HERE IS YOUR IMAGE — sidebar book thumbnail — paste a URL over the src */}
         <img
-          src=""
+          src="https://images.unsplash.com/photo-1512820790803-83ca734da794?w=120&q=80"
           alt={book.title}
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {

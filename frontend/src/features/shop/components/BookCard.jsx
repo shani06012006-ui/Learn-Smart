@@ -1,4 +1,4 @@
-﻿// frontend/src/features/shop/components/BookCard.jsx
+// frontend/src/features/shop/components/BookCard.jsx
 import { Star } from "lucide-react";
 
 /* Cover background gradients — one per index so the grid looks alive
@@ -30,7 +30,7 @@ export default function BookCard({ book, index = 0 }) {
         {/* Book cover image — paste your URL below */}
         {/* HERE IS YOUR IMAGE — book cover — paste a URL over the src */}
         <img
-          src=""
+          src="https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&q=80"
           alt={book.title}
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {

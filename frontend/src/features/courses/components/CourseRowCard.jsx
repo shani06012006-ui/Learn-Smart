@@ -1,4 +1,4 @@
-﻿// frontend/src/features/courses/components/CourseRowCard.jsx
+// frontend/src/features/courses/components/CourseRowCard.jsx
 import { Star, ShoppingBag } from "lucide-react";
 
 /* Placeholder gradient per index so the tile reads as an image before
@@ -23,7 +23,7 @@ export default function CourseRowCard({ course, index = 0, active = false }) {
       <div className={`relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${gradient} sm:w-28`}>
         {/* HERE IS YOUR IMAGE — course thumbnail — paste a URL over the src */}
         <img
-          src=""
+          src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&q=80"
           alt={course.title}
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => {
