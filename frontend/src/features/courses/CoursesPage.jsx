@@ -1,4 +1,4 @@
-﻿// frontend/src/features/courses/CoursesPage.jsx
+// frontend/src/features/courses/CoursesPage.jsx
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
@@ -27,7 +27,7 @@ const FILTERS = [
 const STANDARDS = [
   { n: "1", title: "Standard One",   body: "Standard 1 is a foundation Standard that reflects 7 important concepts...", badge: "bg-coral-500",   active: false },
   { n: "2", title: "Standard Two",   body: "Standard 2 builds on the foundations of Standard 1 and includes requirements...", badge: "bg-navy-950",    active: false },
-  { n: "3", title: "Standard Three", body: "Standard 3 of the Aged Care Quality Standards applies to all services delivering personal...", badge: "bg-teal-400",   active: true  },
+  { n: "3", title: "Standard Three", body: "Standard 3 of the Aged Care Quality Standards applies to all services delivering personal...", badge: "bg-teal-400",   active: true, href: "/courses/standard-3"  },
   { n: "4", title: "Standard Four",  body: "Standard 4 of the Aged Care Quality Standards focuses on services and supports...", badge: "bg-navy-950",     active: false },
   { n: "5", title: "Standard Five",  body: "Standard 5 Learning Resources. Learning Resources ensure that the school has the...", badge: "bg-teal-400",    active: false },
   { n: "6", title: "Standard Six",   body: "Standard 6 requires an organisation to have a system to resolve complaints...", badge: "bg-orange-400",    active: false },
@@ -172,7 +172,7 @@ function StandardsSection() {
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 lg:gap-6">
           {STANDARDS.map((card, i) => (
-            <StandardCard key={i} card={card} index={i} inView={inView} />
+            <StandardCard key={i} card={card} index={i} inView={inView} href={card.href} />
           ))}
         </div>
       </div>
