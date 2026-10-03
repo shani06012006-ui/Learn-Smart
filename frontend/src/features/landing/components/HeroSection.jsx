@@ -1,14 +1,33 @@
-﻿import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+﻿import { useRef } from "react";
+import { Link } from "react-router-dom";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   ArrowRight, GraduationCap, Bell, TrendingUp, PlayCircle,
-  CheckCircle2, Wifi, Battery, Signal, Users, Sparkles, Award,
+  CheckCircle2, Wifi, Battery, Signal, ChevronDown,
 } from "lucide-react";
 import { EASE } from "../motion";
 
-/* ────────────────────────────────────────────────────────────────
-   Phone screen UI — the LMS mobile app preview.
-   ──────────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────────
+   Text mask reveal — each line rises from behind a clip mask
+   ────────────────────────────────────────────────────────────────── */
+function MaskLine({ children, delay = 0, className = "" }) {
+  return (
+    <span className={`block overflow-hidden ${className}`}>
+      <motion.span
+        initial={{ y: "110%" }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.85, delay, ease: EASE.smooth }}
+        className="block"
+      >
+        {children}
+      </motion.span>
+    </span>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Phone screen — the LMS mobile app preview
+   ────────────────────────────────────────────────────────────────── */
 function PhoneScreen() {
   return (
     <div className="relative aspect-[9/19.2] w-full bg-gradient-to-b from-surface-50 to-white">
@@ -60,7 +79,7 @@ function PhoneScreen() {
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: "87%" }}
-            transition={{ duration: 1.4, delay: 1.1, ease: EASE.smooth }}
+            transition={{ duration: 1.4, delay: 1.8, ease: EASE.smooth }}
             className="h-full rounded-full bg-gradient-to-r from-electric-400 to-electric-500"
           />
         </div>
@@ -105,70 +124,35 @@ function PhoneScreen() {
           </div>
         ))}
       </div>
-
-      {/* Bottom tab bar */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-around border-t border-slate-100 bg-white/90 px-4 pb-3 pt-2 backdrop-blur">
-        <span className="flex flex-col items-center gap-0.5 text-navy-800">
-          <div className="h-4 w-4 rounded-md bg-navy-800/15" />
-          <span className="text-[7px] font-semibold">Home</span>
-        </span>
-        <span className="flex flex-col items-center gap-0.5 text-slate-400">
-          <div className="h-4 w-4 rounded-md bg-slate-200" />
-          <span className="text-[7px] font-semibold">Courses</span>
-        </span>
-        <span className="flex flex-col items-center gap-0.5 text-slate-400">
-          <div className="h-4 w-4 rounded-md bg-slate-200" />
-          <span className="text-[7px] font-semibold">Chat</span>
-        </span>
-        <span className="flex flex-col items-center gap-0.5 text-slate-400">
-          <div className="h-4 w-4 rounded-md bg-slate-200" />
-          <span className="text-[7px] font-semibold">Me</span>
-        </span>
-      </div>
     </div>
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
-   Hero visual — floating phone with side cards. No hand.
-   ──────────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────────
+   Hero visual — phone + floating side cards (each pops in)
+   ────────────────────────────────────────────────────────────────── */
 function HeroVisual() {
   return (
     <div className="relative mx-auto w-full max-w-md min-w-0">
-      {/* Ambient glow behind the phone */}
       <div
         aria-hidden
         className="absolute -inset-10 rounded-[3rem] bg-gradient-to-br from-navy-500/15 via-electric-400/10 to-transparent blur-3xl"
       />
 
-      {/* Two soft orbs behind, floating */}
-      <div
-        aria-hidden
-        className="absolute right-4 top-6 h-32 w-32 rounded-full bg-electric-500/15 blur-2xl animate-float-slow"
-      />
-      <div
-        aria-hidden
-        className="absolute bottom-8 left-2 h-40 w-40 rounded-full bg-navy-500/15 blur-2xl animate-float"
-      />
-
-      {/* Perspective container */}
       <div className="relative" style={{ perspective: "1400px", perspectiveOrigin: "50% 40%" }}>
         <motion.div
-          initial={{ opacity: 0, y: 60, rotateY: -16, rotateX: 8 }}
+          initial={{ opacity: 0, y: 80, rotateY: -18, rotateX: 10 }}
           animate={{ opacity: 1, y: 0, rotateY: -8, rotateX: 4 }}
-          transition={{ duration: 1.1, delay: 0.6, ease: EASE.smooth }}
+          transition={{ duration: 1.2, delay: 0.6, ease: EASE.smooth }}
           style={{ transformStyle: "preserve-3d" }}
           className="relative"
         >
-          {/* Phone */}
           <div className="relative mx-auto w-[280px] animate-float">
-            {/* Soft cast shadow under phone */}
             <div
               aria-hidden
               className="absolute -bottom-8 left-1/2 h-10 w-4/5 -translate-x-1/2 rounded-full bg-slate-900/20 blur-2xl"
             />
             <div className="relative overflow-hidden rounded-[2.2rem] border-[9px] border-slate-900 bg-slate-900 shadow-[0_40px_80px_-20px_rgba(15,23,42,0.5),0_0_0_1px_rgba(255,255,255,0.08)_inset]">
-              {/* Notch */}
               <div className="absolute left-1/2 top-0 z-20 h-5 w-28 -translate-x-1/2 rounded-b-2xl bg-slate-900">
                 <div className="absolute left-1/2 top-1.5 h-1.5 w-12 -translate-x-1/2 rounded-full bg-slate-800" />
               </div>
@@ -176,11 +160,11 @@ function HeroVisual() {
             </div>
           </div>
 
-          {/* Floating side card — top right */}
+          {/* Floating cards — pop in with spring, staggered */}
           <motion.div
-            initial={{ opacity: 0, x: 40, y: -30 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.9, delay: 1.3, ease: EASE.smooth }}
+            initial={{ opacity: 0, x: 40, y: -30, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            transition={{ duration: 0.7, delay: 1.5, ease: EASE.overshoot }}
             className="absolute -right-14 top-20 hidden w-48 rounded-2xl border border-slate-200 bg-white/95 p-3.5 shadow-elevated backdrop-blur-xl lg:block animate-float"
           >
             <div className="flex items-center gap-2.5">
@@ -194,11 +178,10 @@ function HeroVisual() {
             </div>
           </motion.div>
 
-          {/* Floating side card — left middle */}
           <motion.div
-            initial={{ opacity: 0, x: -40, y: 20 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.9, delay: 1.45, ease: EASE.smooth }}
+            initial={{ opacity: 0, x: -40, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            transition={{ duration: 0.7, delay: 1.7, ease: EASE.overshoot }}
             className="absolute -left-16 top-44 hidden w-48 rounded-2xl border border-slate-200 bg-white/95 p-3.5 shadow-elevated backdrop-blur-xl lg:block animate-float-slow"
           >
             <div className="flex items-center gap-2.5">
@@ -212,16 +195,15 @@ function HeroVisual() {
             </div>
           </motion.div>
 
-          {/* Floating card — bottom right */}
           <motion.div
-            initial={{ opacity: 0, x: 30, y: 30 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ duration: 0.9, delay: 1.6, ease: EASE.smooth }}
+            initial={{ opacity: 0, x: 30, y: 30, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            transition={{ duration: 0.7, delay: 1.9, ease: EASE.overshoot }}
             className="absolute -right-12 bottom-24 hidden w-44 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-elevated backdrop-blur-xl md:block animate-float"
           >
             <div className="flex items-center gap-2">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-violet/15 text-violet-600">
-                <Award size={13} />
+                <PlayCircle size={13} />
               </span>
               <div className="min-w-0">
                 <p className="truncate text-[10px] font-bold text-slate-900">Certificate earned</p>
@@ -229,40 +211,33 @@ function HeroVisual() {
               </div>
             </div>
           </motion.div>
-
-          {/* Small floating pill — bottom left */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 1.75, ease: EASE.smooth }}
-            className="absolute -left-12 bottom-40 hidden items-center gap-2 rounded-full border border-slate-200 bg-white/95 py-1.5 pl-1.5 pr-3.5 shadow-elevated backdrop-blur-xl md:flex animate-float-slow"
-          >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-navy-800 text-white">
-              <Users size={11} />
-            </span>
-            <p className="text-[10px] font-bold text-slate-900">
-              2,340 <span className="font-medium text-slate-500">online</span>
-            </p>
-          </motion.div>
-
-          {/* Small sparkle badge top-left */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 1.9, ease: EASE.overshoot }}
-            className="absolute left-0 top-4 hidden h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-elevated md:flex"
-          >
-            <Sparkles size={16} className="text-electric-500" />
-          </motion.div>
         </motion.div>
       </div>
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   Page hero
+   ────────────────────────────────────────────────────────────────── */
 export default function HeroSection() {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+
+  // Parallax: text lifts gently, phone drifts faster, both fade
+  const contentY = useTransform(scrollYProgress, [0, 1], [0, -120]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const visualY = useTransform(scrollYProgress, [0, 1], [0, -180]);
+
   return (
-    <section id="hero" className="relative overflow-hidden pt-20 pb-24 md:pt-28 md:pb-32">
+    <section
+      ref={ref}
+      id="hero"
+      className="relative overflow-hidden pt-20 pb-24 md:pt-28 md:pb-32"
+    >
       {/* Background — soft wash + faint grid */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-hero-wash" />
@@ -270,65 +245,79 @@ export default function HeroSection() {
       </div>
 
       <div className="container grid grid-cols-1 items-center gap-14 lg:grid-cols-2 lg:gap-16">
-        {/* LEFT — copy */}
-        <div className="min-w-0">
+        {/* LEFT — copy, staggered reveals */}
+        <motion.div
+          style={{ y: contentY, opacity: contentOpacity }}
+          className="min-w-0"
+        >
+          {/* Eyebrow — drops in from above with a slight rotation */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: EASE.smooth }}
+            initial={{ opacity: 0, y: -16, rotate: -3 }}
+            animate={{ opacity: 1, y: 0, rotate: 0 }}
+            transition={{ duration: 0.6, delay: 0.15, ease: EASE.smooth }}
             className="eyebrow"
           >
             <GraduationCap size={13} className="text-navy-800" />
             Trusted by <span className="font-bold text-slate-900">150+ universities</span>
           </motion.div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.08, ease: EASE.smooth }}
-            className="h1 mt-6"
-          >
-            Empowering Next-Gen{" "}
-            <span className="bg-gradient-to-r from-navy-800 via-navy-700 to-electric-500 bg-clip-text text-transparent">
-              Higher Education
-            </span>{" "}
-            &amp; Campus Learning.
-          </motion.h1>
+          {/* Headline — word-by-word mask reveal per line */}
+          <h1 className="h1 mt-6">
+            <MaskLine delay={0.25}>The modern LMS</MaskLine>
+            <MaskLine delay={0.4}>
+              for the{" "}
+              <span className="bg-gradient-to-r from-navy-800 via-navy-700 to-electric-500 bg-clip-text text-transparent">
+                modern campus.
+              </span>
+            </MaskLine>
+          </h1>
 
+          {/* Subheadline — blur-in */}
           <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.16, ease: EASE.smooth }}
+            initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.7, ease: EASE.smooth }}
             className="body-lg mt-6 max-w-xl"
           >
-            A unified institutional LMS designed to manage courses, streamline faculty workflows, and enhance student engagement — all in one secure platform.
+            Courses, faculty workflows, live classrooms, and analytics — unified
+            in one secure platform built for institutions.
           </motion.p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.28, ease: EASE.smooth }}
-            className="mt-9 flex flex-wrap items-center gap-3"
-          >
-            <Link
-              to="/register"
-              className="group inline-flex items-center gap-2 rounded-full bg-navy-900 px-7 py-3.5 text-base font-semibold text-white shadow-navy-glow transition-all hover:bg-navy-800 hover:shadow-elevated"
+          {/* CTAs — slide in from left with stagger */}
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <motion.div
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.95, ease: EASE.smooth }}
             >
-              Request Institution Demo
-              <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-            </Link>
-            <a
-              href="#reach"
-              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
-            >
-              View enterprise plan
-            </a>
-          </motion.div>
+              <Link
+                to="/register"
+                className="group inline-flex items-center gap-2 rounded-full bg-navy-900 px-7 py-3.5 text-base font-semibold text-white shadow-navy-glow transition-all hover:bg-navy-800 hover:shadow-elevated"
+              >
+                Request Institution Demo
+                <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </motion.div>
 
+            <motion.div
+              initial={{ opacity: 0, x: -24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 1.05, ease: EASE.smooth }}
+            >
+              <a
+                href="#features"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-base font-semibold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
+              >
+                See how it works
+              </a>
+            </motion.div>
+          </div>
+
+          {/* Micro-trust — fades in last */}
           <motion.ul
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.46 }}
+            transition={{ duration: 0.6, delay: 1.25 }}
             className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-slate-500"
           >
             {["FERPA & GDPR compliant", "99.9% uptime SLA", "Dedicated onboarding team"].map((t) => (
@@ -338,13 +327,32 @@ export default function HeroSection() {
               </li>
             ))}
           </motion.ul>
-        </div>
+        </motion.div>
 
-        {/* RIGHT — visual */}
-        <div className="flex min-w-0 justify-center lg:justify-end">
+        {/* RIGHT — visual, drifts faster on scroll */}
+        <motion.div
+          style={{ y: visualY }}
+          className="flex min-w-0 justify-center lg:justify-end"
+        >
           <HeroVisual />
-        </div>
+        </motion.div>
       </div>
+
+      {/* Scroll hint — sits at the bottom, gently pulses */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 2.4 }}
+        className="pointer-events-none absolute bottom-6 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-1 text-slate-400 md:flex"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">Scroll to explore</span>
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <ChevronDown size={18} />
+        </motion.div>
+      </motion.div>
     </section>
   );
 }
