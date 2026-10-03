@@ -10,7 +10,7 @@ const NAV_LINKS = [
   { label: "For Kindergarten",href: "#kindergarten", dropdown: true  },
   { label: "For High School", href: "#highschool",   dropdown: true  },
   { label: "For College",     href: "#college",      dropdown: true  },
-  { label: "Courses",         href: "#courses",      dropdown: true  },
+  { label: "Courses", href: "/courses", dropdown: true },
 ];
 
 /* ── Eduvi logo — red "M" mark + word ────────────────────────────── */
