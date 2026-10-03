@@ -1,23 +1,24 @@
-// frontend/src/features/landing/components/EduviNavbar.jsx
+﻿// frontend/src/features/landing/components/EduviNavbar.jsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { Menu, X, ChevronDown, ShoppingCart, User } from "lucide-react";
 
-/* ── Nav links from the reference ────────────────────────────────── */
+/* ── Nav links ────────────────────────────────────────────────────
+   `route: true`  → uses <Link to={href}>
+   `route: false` → uses <a href={href}> (anchor on same page)
+   `dropdown`     → shows a chevron; wire real dropdowns later
+   ────────────────────────────────────────────────────────────── */
 const NAV_LINKS = [
-  { label: "Shop", href: "/shop", dropdown: false },
-  { label: "For Kindergarten",href: "#kindergarten", dropdown: true  },
-  { label: "For High School", href: "#highschool",   dropdown: true  },
-  { label: "For College",     href: "#college",      dropdown: true  },
-  { label: "Courses", href: "/courses", dropdown: true },
+  { label: "Shop",    href: "/shop",    route: true,  dropdown: false },
+  { label: "Courses", href: "/courses", route: true,  dropdown: true  },
+  { label: "Blogs",   href: "/blogs",   route: true,  dropdown: false },
+  { label: "Contact", href: "/contact", route: true,  dropdown: false },
 ];
 
-/* ── Eduvi logo — red "M" mark + word ────────────────────────────── */
 function EduviLogo() {
   return (
     <Link to="/" className="flex items-center gap-2" aria-label="Eduvi home">
-      {/* Logo mark — replace with your own image if desired */}
       {/* HERE IS YOUR IMAGE — logo mark — paste a URL over the gradient below */}
       <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-coral-500 to-coral-600 shadow-coral-glow">
         <span className="text-sm font-black leading-none text-white">M</span>
@@ -41,6 +42,37 @@ export default function EduviNavbar() {
     setScrolled(latest > 12);
   });
 
+  const renderNavItem = (link, onClick, mobile = false) => {
+    const base = mobile
+      ? "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-950 hover:bg-slate-50"
+      : "group inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold text-navy-900 transition-colors hover:text-coral-500";
+
+    const inner = (
+      <>
+        {link.label}
+        {link.dropdown && (
+          <ChevronDown
+            size={14}
+            className={mobile ? "text-slate-400" : "text-slate-400 transition-transform group-hover:translate-y-0.5"}
+          />
+        )}
+      </>
+    );
+
+    if (link.route) {
+      return (
+        <Link key={link.label} to={link.href} onClick={onClick} className={base}>
+          {inner}
+        </Link>
+      );
+    }
+    return (
+      <a key={link.label} href={link.href} onClick={onClick} className={base}>
+        {inner}
+      </a>
+    );
+  };
+
   return (
     <motion.header
       animate={{ y: hidden ? -100 : 0 }}
@@ -60,21 +92,7 @@ export default function EduviNavbar() {
 
           {/* CENTER — desktop nav */}
           <nav className="hidden items-center gap-1 lg:flex">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="group inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-semibold text-navy-900 transition-colors hover:text-coral-500"
-              >
-                {link.label}
-                {link.dropdown && (
-                  <ChevronDown
-                    size={14}
-                    className="text-slate-400 transition-transform group-hover:translate-y-0.5"
-                  />
-                )}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) => renderNavItem(link))}
           </nav>
 
           {/* RIGHT — cart + account */}
@@ -98,7 +116,7 @@ export default function EduviNavbar() {
             </a>
           </div>
 
-          {/* Mobile menu toggle */}
+          {/* Mobile toggle */}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -118,22 +136,14 @@ export default function EduviNavbar() {
           className="mx-3 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-elevated lg:hidden"
         >
           <nav className="flex flex-col gap-1">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-900 hover:bg-slate-50"
-              >
-                {link.label}
-                {link.dropdown && <ChevronDown size={14} className="text-slate-400" />}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) =>
+              renderNavItem(link, () => setOpen(false), true)
+            )}
             <div className="my-2 h-px bg-slate-100" />
             <a
               href="#cart"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-900 hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-950 hover:bg-slate-50"
             >
               <ShoppingCart size={16} className="text-coral-500" />
               Cart (0)
@@ -141,7 +151,7 @@ export default function EduviNavbar() {
             <a
               href="#account"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-900 hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-950 hover:bg-slate-50"
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-600">
                 <User size={14} />

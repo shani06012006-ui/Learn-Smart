@@ -1,71 +1,86 @@
 // frontend/src/features/courses/components/CourseRowCard.jsx
-import { Star, ShoppingBag } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Star, Clock, PlayCircle } from "lucide-react";
 
-/* Placeholder gradient per index so the tile reads as an image before
-   you paste a URL. */
-const GRADIENTS = [
-  "from-[#2b2d42] to-[#8d99ae]",
-  "from-[#f4a261] to-[#e76f51]",
-  "from-[#a8dadc] to-[#457b9d]",
-  "from-[#ffd6a5] to-[#fdffb6]",
-  "from-[#caffbf] to-[#9bf6ff]",
-  "from-[#bdb2ff] to-[#a0c4ff]",
-  "from-[#ffc6ff] to-[#ffadad]",
-  "from-[#0f0a2e] to-[#4433b8]",
-];
+function FadeImg({ src, alt, className = "" }) {
+  const ref = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-export default function CourseRowCard({ course, index = 0, active = false }) {
-  const gradient = GRADIENTS[index % GRADIENTS.length];
+  useEffect(() => {
+    if (ref.current?.complete && ref.current.naturalWidth) setLoaded(true);
+  }, [src]);
 
+  if (!src || failed) return null;
   return (
-    <div className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:shadow-elevated sm:p-4">
-      {/* Image */}
-      <div className={`relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-xl bg-gradient-to-br ${gradient} sm:w-28`}>
-        {/* HERE IS YOUR IMAGE — course thumbnail — paste a URL over the src */}
-        <img
-          src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=400&q=80"
-          alt={course.title}
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
-        {/* Fallback silhouette */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 60 60" className="h-8 w-8 text-white/40" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="30" cy="20" r="8" />
-            <path d="M12 52c0-10 8-16 18-16s18 6 18 16" />
-          </svg>
-        </div>
+    <img
+      ref={ref}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onLoad={() => setLoaded(true)}
+      onError={() => setFailed(true)}
+      className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ${
+        loaded ? "opacity-100" : "opacity-0"
+      } ${className}`}
+    />
+  );
+}
+
+export default function CourseRowCard({ course, active = false }) {
+  return (
+    <article
+      className={`group flex items-center gap-4 rounded-3xl border p-3 transition-[box-shadow,border-color,background-color] duration-300 ${
+        active
+          ? "border-purple-200 bg-purple-50/50 shadow-purple-glow"
+          : "border-slate-100 bg-white hover:border-purple-200 hover:shadow-card"
+      }`}
+    >
+      {/* IMAGE SPACE — set `image` on the course */}
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-purple-100 to-paper-100 sm:h-28 sm:w-32">
+        <FadeImg src={course.image} alt={course.title} className="group-hover:scale-105" />
       </div>
 
-      {/* Text content */}
       <div className="min-w-0 flex-1">
-        <h3 className="truncate font-display text-sm font-bold text-navy-950 sm:text-base">
+        {course.category && (
+          <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[11px] font-bold text-purple-500">
+            {course.category}
+          </span>
+        )}
+        <h3 className="mt-1.5 truncate font-display text-sm font-extrabold text-navy-950 sm:text-base">
           {course.title}
         </h3>
-        <div className="mt-1 flex items-center gap-0.5 text-amber-500">
-          {[0, 1, 2, 3, 4].map((s) => (
-            <Star key={s} size={11} fill="currentColor" />
-          ))}
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-400">
+          <span className="inline-flex items-center gap-1">
+            <Star size={12} className="fill-orange-400 text-orange-400" />
+            {course.rating ?? "4.8"}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <PlayCircle size={12} />
+            {course.lessons ?? 24} lessons
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Clock size={12} />
+            {course.hours ?? 12}h
+          </span>
         </div>
-        <p className="mt-1.5 text-sm font-bold text-coral-500 sm:text-base">
-          ${course.price.toFixed(2)}
-        </p>
       </div>
 
-      {/* Cart button — purple when active, outlined otherwise */}
-      <button
-        type="button"
-        aria-label={`Add ${course.title} to cart`}
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all ${
-          active
-            ? "bg-purple-500 text-white shadow-purple-glow hover:bg-purple-600"
-            : "bg-purple-50 text-purple-500 ring-1 ring-purple-100 hover:bg-purple-100"
-        }`}
-      >
-        <ShoppingBag size={16} />
-      </button>
-    </div>
+      <div className="flex shrink-0 flex-col items-end gap-2 pr-2">
+        <span className="font-display text-base font-extrabold text-navy-950">${course.price.toFixed(2)}</span>
+        <button
+          type="button"
+          className={`rounded-full px-4 py-1.5 text-xs font-bold transition-colors ${
+            active
+              ? "bg-coral-500 text-white shadow-coral-glow"
+              : "bg-paper-100 text-purple-500 hover:bg-purple-500 hover:text-white"
+          }`}
+        >
+          Enroll
+        </button>
+      </div>
+    </article>
   );
 }
