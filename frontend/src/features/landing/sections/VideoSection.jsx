@@ -94,7 +94,7 @@ export default function VideoSection() {
               {/* Whiteboard teacher photo — replace with your own URL */}
               {/* HERE IS YOUR IMAGE — teacher at whiteboard — paste a URL below */}
               <img
-                src="https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=1200&q=80"
+                src="https://i.pinimg.com/736x/49/4e/02/494e024f3e24b2666076163687c20f5f.jpg"
                 alt="Teacher at whiteboard"
                 className="h-full w-full object-cover"
               />
@@ -112,7 +112,7 @@ export default function VideoSection() {
               >
                 {/* HERE IS YOUR IMAGE — kid in PiP — paste a URL below */}
                 <img
-                  src="https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=400&q=80"
+                  src="https://i.pinimg.com/736x/bd/6c/d5/bd6cd58cb2fb075c1988a1d20ac748a4.jpg"
                   alt="Student joining class"
                   className="h-full w-full object-cover"
                 />

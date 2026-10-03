@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/components/EduviFooter.jsx
+// frontend/src/features/landing/components/EduviFooter.jsx
 import { Link } from "react-router-dom";
 
 /* ── Column data ─────────────────────────────────────────────────── */
