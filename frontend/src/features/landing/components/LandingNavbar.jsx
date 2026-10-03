@@ -6,12 +6,12 @@ import { Menu, X, GraduationCap } from "lucide-react";
 // `to` can be a route ("/programs") or an anchor on this page ("#features").
 // `route: true` uses <Link>, `route: false` uses <a href>.
 const NAV_LINKS = [
-  { label: "Home",       to: "/",          route: true  },
-  { label: "Programs",   to: "/programs",  route: true  },
-  { label: "Enterprise", to: "/enterprise", route: true  },
-  { label: "Pricing",    to: "#pricing",   route: false },
-  { label: "Portal",     to: "#portal",    route: false },
-  { label: "Resources",  to: "#resources", route: false },
+  { label: "Home",       to: "#hero",       route: false },
+  { label: "Programs",   to: "#features",   route: false },
+  { label: "Enterprise", to: "#reach",      route: false },
+  { label: "Pricing",    to: "#pricing",    route: false },
+  { label: "Portal",     to: "#portal",     route: false },
+  { label: "Resources",  to: "#resources",  route: false },
 ];
 
 export default function LandingNavbar() {
