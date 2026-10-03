@@ -1,52 +1,80 @@
 ﻿// frontend/src/features/courses/components/StandardCard.jsx
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { EASE } from "../../landing/motion";
+import { ArrowUpRight } from "lucide-react";
 
-export default function StandardCard({ card, index = 0, inView = true, href }) {
-  // If a card has an href, wrap the whole card in a link.
-  // The Class Details button also becomes a link.
-  const CardWrapper = href ? Link : "div";
-  const wrapperProps = href ? { to: href } : {};
+/* Image that fades in once loaded (no pop-in) and hides itself if the URL fails */
+function FadeImg({ src, alt, className = "" }) {
+  const ref = useRef(null);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
 
+  useEffect(() => {
+    if (ref.current?.complete && ref.current.naturalWidth) setLoaded(true);
+  }, [src]);
+
+  if (!src || failed) return null;
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay: 0.15 + index * 0.04, ease: EASE.smooth }}
-    >
-      <CardWrapper
-        {...wrapperProps}
-        className="group flex h-full flex-col items-center rounded-2xl border border-slate-100 bg-white px-5 py-6 text-center shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated"
-      >
-        {/* Number badge */}
+    <img
+      ref={ref}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onLoad={() => setLoaded(true)}
+      onError={() => setFailed(true)}
+      className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ${
+        loaded ? "opacity-100" : "opacity-0"
+      } ${className}`}
+    />
+  );
+}
+
+export default function StandardCard({ card, href }) {
+  const body = (
+    <>
+      {/* IMAGE SPACE — set `image` on the card in STANDARDS */}
+      <div className="relative">
+        <div className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-purple-100 to-paper-100">
+          <FadeImg src={card.image} alt={card.title} className="group-hover:scale-105" />
+        </div>
         <span
-          className={`flex h-11 w-11 items-center justify-center rounded-full text-base font-black text-white shadow-soft ${card.badge}`}
+          className={`absolute -bottom-5 left-5 flex h-11 w-11 items-center justify-center rounded-2xl text-lg font-extrabold text-white ring-4 ring-white ${card.badge}`}
         >
           {card.n}
         </span>
+      </div>
 
-        {/* Title */}
-        <h3 className="mt-4 font-display text-base font-extrabold text-navy-950 sm:text-lg">
-          {card.title}
-        </h3>
+      <div className="flex flex-1 flex-col px-5 pb-5 pt-8">
+        <h3 className="font-display text-base font-extrabold text-navy-950">{card.title}</h3>
+        <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-500">{card.body}</p>
 
-        {/* Body */}
-        <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-slate-500 sm:text-sm">
-          {card.body}
-        </p>
-
-        {/* Class Details button */}
         <span
-          className={`mt-5 inline-flex items-center justify-center rounded-full border-2 px-4 py-2 text-[11px] font-bold transition-all sm:text-xs ${
-            card.active
-              ? "border-purple-500 bg-purple-500 text-white shadow-purple-glow group-hover:bg-purple-600"
-              : "border-purple-200 bg-white text-purple-600 group-hover:border-purple-400 group-hover:bg-purple-50"
+          className={`mt-4 inline-flex items-center gap-1 text-xs font-bold ${
+            card.active ? "text-purple-500" : "text-slate-400"
           }`}
         >
-          Class Details
+          {card.active ? "View course" : "Coming soon"}
+          {card.active && <ArrowUpRight size={13} />}
         </span>
-      </CardWrapper>
-    </motion.div>
+      </div>
+    </>
+  );
+
+  const base =
+    "group flex h-full flex-col overflow-hidden rounded-3xl border bg-white transition-shadow duration-300";
+  const state = card.active
+    ? "border-purple-200 shadow-card hover:shadow-purple-glow"
+    : "border-slate-100";
+
+  return href ? (
+    <Link
+      to={href}
+      className={`${base} ${state} focus-visible:outline focus-visible:outline-2 focus-visible:outline-purple-500`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={`${base} ${state}`}>{body}</div>
   );
 }
