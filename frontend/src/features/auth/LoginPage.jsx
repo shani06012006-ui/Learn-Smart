@@ -1,13 +1,14 @@
+﻿// frontend/src/features/auth/LoginPage.jsx
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { GraduationCap } from "lucide-react";
+import { User, Lock } from "lucide-react";
 
 import { useAdminLoginMutation } from "../../store/api/realApi";
 import { adminCredentialsReceived } from "../../store/slices/adminAuthSlice";
-import { extractErrorMessage } from "../../utils/apiError";
-import Button from "../../components/ui/Button";
-import Input from "../../components/ui/Input";
+import AuthLayout from "./components/AuthLayout";
+import FormField from "./components/FormField";
+import SocialButton from "./components/SocialButton";
 
 // One login form for all three roles, backed by the real Django backend.
 // The response contains { access, refresh, user } — the access token is a
@@ -70,35 +71,48 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-100 px-4">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center gap-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-600 text-white">
-            <GraduationCap size={24} />
-          </div>
-          <h1 className="text-xl font-semibold text-ink-900">
-            Sign in to Learn Smart
-          </h1>
-          <p className="text-sm text-ink-500">
-            Auto-learning &amp; grading platform
-          </p>
-        </div>
+    <AuthLayout
+      heading={
+        <>
+          Welcome back to{" "}
+          <span className="text-coral-500">Eduvi</span> Online Learning Platform
+        </>
+      }
+      illustrationSrc=""
+    >
+      {/* Google */}
+      <SocialButton
+        label="Login with google"
+        onClick={() => {}}
+      />
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-4 rounded-xl bg-white p-6 shadow-sm"
-        >
-          <Input
-            label="Email"
-            type="email"
-            name="email"
-            autoComplete="email"
-            required
-            value={form.email}
-            onChange={handleChange}
-            placeholder="you@school.edu"
-          />
-          <Input
+      {/* Divider */}
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+          Or login with your email
+        </span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormField
+          id="email"
+          label="Email"
+          type="email"
+          name="email"
+          autoComplete="email"
+          required
+          value={form.email}
+          onChange={handleChange}
+          placeholder="bill.sanders@example.com"
+          icon={User}
+        />
+
+        <div>
+          <FormField
+            id="password"
             label="Password"
             type="password"
             name="password"
@@ -106,25 +120,44 @@ export default function LoginPage() {
             required
             value={form.password}
             onChange={handleChange}
-            placeholder="••••••••"
+            placeholder="••••••••••••"
+            icon={Lock}
           />
+          <div className="mt-2 text-right">
+            <Link
+              to="/forgot-password"
+              className="text-xs font-semibold text-purple-500 transition-colors hover:text-purple-600"
+            >
+              Forgot password?
+            </Link>
+          </div>
+        </div>
 
-          {formError && (
-            <p role="alert" className="text-sm text-danger-700">
-              {formError}
-            </p>
-          )}
+        {formError && (
+          <p role="alert" className="text-sm text-coral-600">
+            {formError}
+          </p>
+        )}
 
-          <Button type="submit" loading={isLoading} className="mt-2 w-full">
-            Sign in
-          </Button>
-        </form>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-purple-500 px-6 text-sm font-bold text-white shadow-purple-glow transition-all hover:bg-purple-600 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? "Logging in…" : "Login"}
+        </button>
+      </form>
 
-        <p className="mt-6 text-center text-xs text-ink-500">
-          Students join a class using the code their teacher gives them — after
-          your teacher adds you, sign in here with the email they used.
-        </p>
-      </div>
-    </div>
+      {/* Footer link */}
+      <p className="mt-6 text-center text-sm text-slate-500">
+        Don&apos;t have an account?{" "}
+        <Link
+          to="/register"
+          className="font-bold text-purple-500 transition-colors hover:text-purple-600"
+        >
+          Sign up
+        </Link>
+      </p>
+    </AuthLayout>
   );
 }
