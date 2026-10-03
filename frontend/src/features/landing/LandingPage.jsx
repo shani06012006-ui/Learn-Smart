@@ -1,33 +1,27 @@
-import LandingNavbar from "./components/LandingNavbar";
-import HeroSection from "./components/HeroSection";
-import LandingFooter from "./components/LandingFooter";
-import ScrollProgress from "./components/ScrollProgress";
-import MetricsBand from "./sections/MetricsBand";
-import FeaturesSection from "./sections/FeaturesSection";
-import ReachSection from "./sections/ReachSection";
-import CommunitySection from "./sections/CommunitySection";
-import TestimonialsSection from "./sections/TestimonialsSection";
-import FaqSection from "./sections/FaqSection";
+﻿// frontend/src/features/landing/LandingPage.jsx
+import EduviNavbar from "./components/EduviNavbar";
+import EduviFooter from "./components/EduviFooter";
+import HeroSection from "./sections/HeroSection";
+import VideoSection from "./sections/VideoSection";
+import StandardsSection from "./sections/StandardsSection";
+import DarkCtaSection from "./sections/DarkCtaSection";
+import MentorSection from "./sections/MentorSection";
+import SubscribeSection from "./sections/SubscribeSection";
 
 export default function LandingPage() {
   return (
-    <>
-      <ScrollProgress />
-
-      <div className="relative">
-        <LandingNavbar />
-        <div className="h-20" aria-hidden="true" />
-        <main>
-          {/* 1 */}  <HeroSection />
-          {/* 2 */}  <MetricsBand />
-          {/* 3 */}  <FeaturesSection />
-          {/* 4 */}  <ReachSection />
-          {/* 5 */}  <CommunitySection />
-          {/* 6 */}  <TestimonialsSection />
-          {/* 7 */}  <FaqSection />
-        </main>
-        <LandingFooter />
-      </div>
-    </>
+    <div className="min-h-screen bg-paper-100 font-sans text-navy-950">
+      <EduviNavbar />
+      <div className="h-20" aria-hidden="true" />
+      <main>
+        <HeroSection />
+        <VideoSection />
+        <StandardsSection />
+        <DarkCtaSection />
+        <MentorSection />
+        <SubscribeSection />
+      </main>
+      <EduviFooter />
+    </div>
   );
 }

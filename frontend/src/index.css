@@ -1,69 +1,71 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Manrope:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light; }
-
 html, body {
-  overflow-x: hidden;
-  width: 100%;
-  background-color: #f4f6f9;
-  color: #0f172a;
+  background-color: #f7f5f2;
+  color: #160f45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 body {
-  background-image:
-    radial-gradient(at 15% 0%, rgba(54,93,241,0.04) 0px, transparent 45%),
-    radial-gradient(at 85% 100%, rgba(56,189,248,0.03) 0px, transparent 45%);
-  background-attachment: fixed;
+  font-family: Manrope, ui-sans-serif, system-ui, sans-serif;
 }
 
-@layer components {
-  .section-pad { @apply py-20 md:py-28; }
-  .section-tight { @apply py-14 md:py-18; }
-  .h1 { @apply text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl; }
-  .h2 { @apply text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl; }
-  .h3 { @apply text-xl font-semibold text-slate-900; }
-  .body-lg { @apply text-base leading-relaxed text-slate-600 sm:text-lg; }
-  .body { @apply text-base leading-relaxed text-slate-600; }
-  .eyebrow {
-    @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600;
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Poppins, Manrope, ui-sans-serif, system-ui, sans-serif;
+    color: #160f45;
+    letter-spacing: -0.02em;
   }
 }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #f4f6f9; }
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #91b0ff, #365df1);
-  border-radius: 10px;
-  border: 2px solid #f4f6f9;
+@layer components {
+  .section-pad { @apply py-16 md:py-24; }
+  .container-wide { @apply mx-auto w-full max-w-7xl px-6 lg:px-8; }
+  .container-narrow { @apply mx-auto w-full max-w-4xl px-6 lg:px-8; }
+  .h1 { @apply text-4xl font-extrabold leading-[1.1] tracking-tight text-navy-950 sm:text-5xl md:text-6xl; }
+  .h2 { @apply text-3xl font-bold leading-tight tracking-tight text-navy-950 sm:text-4xl md:text-5xl; }
+  .h3 { @apply text-xl font-bold text-navy-950; }
+  .body-lg { @apply text-base leading-relaxed text-slate-500 sm:text-lg; }
+  .body { @apply text-base leading-relaxed text-slate-500; }
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500;
+  }
+  /* Soft rounded pill button */
+  .btn-pill { @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-all duration-200; }
+  .btn-purple { @apply btn-pill bg-purple-500 text-white shadow-purple-glow hover:bg-purple-600 hover:-translate-y-0.5; }
+  .btn-coral  { @apply btn-pill bg-coral-500 text-white shadow-coral-glow hover:bg-coral-600 hover:-translate-y-0.5; }
+  .btn-outline { @apply btn-pill border-2 border-purple-200 bg-white text-purple-600 hover:border-purple-400 hover:bg-purple-50; }
 }
-::-webkit-scrollbar-thumb:hover { background: #5b86fc; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f7f5f2; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ab92ff, #7c3aed);
+  border-radius: 10px;
+  border: 2px solid #f7f5f2;
+}
 
 ::selection {
-  background: rgba(54,93,241,0.18);
-  color: #0f172a;
+  background: rgba(124, 58, 237, 0.20);
+  color: #160f45;
 }
 
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #365df1;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #7c3aed;
 }
 
-/* Lenis */
-html.lenis, html.lenis body { height: auto; }
-.lenis.lenis-smooth { scroll-behavior: auto !important; }
-.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
-.lenis.lenis-stopped { overflow: hidden; }
-/* Root wrapper — prevents any child from blowing out the page width */
-#root {
-  width: 100%;
-  overflow-x: hidden;
+/* Optional: dotted pattern helper used in several sections */
+.dot-pattern-coral {
+  background-image: radial-gradient(circle, rgba(255,87,34,0.5) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
 }
-@layer components {
-  .container {
-    @apply mx-auto w-full max-w-7xl px-6 lg:px-8;
-  }
+.dot-pattern-purple {
+  background-image: radial-gradient(circle, rgba(124,58,237,0.5) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
 }

@@ -1,281 +1,373 @@
-﻿// frontend/src/features/landing/sections/ReachSection.jsx
-// Real world map (Natural Earth land data, baked into a dot-matrix) with smooth zoom-to-campus.
-// Needs only react + lucide-react + Tailwind (standard classes). No framer-motion, no map library.
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Search, MapPin, Calendar, ChevronDown, Check, Globe2, GraduationCap, FlaskConical, RotateCcw,
-} from "lucide-react";
-
-/* ---------- Map data ---------- */
-const COLS = 240, ROWS = 95, STEP = 1.5;          // 1.5° dot grid, lat 84°N → 58°S
-const MAP_W = 360, MAP_H = 142;                    // viewBox in degrees
-const MAP_HEX = "000000000000000000000017fe0000000000000000000000000000000000000000000000001ffff9ffffffc60000000000000000000000000000000000000000000000ff7f9ffffffff8000004800196000007800000000000000000000000001a3ffc7fffffffc00000fc0000000000001c0000000000000000000000e00003803ffffffff00000300000000000100c00000000000000000000003dce18c0007fffffe0000000000001e00003fff0002f000000000000000740000000003fffffe000000000000600003fff8000000000000000000007fcc6adc0000ffffd800000000000180303ffffeffc02000000c0010000023fc0c6ff8007fffec0000000000008076ffffffffcfff80001001fffc0f23ffac127e01bffff0000000ffc0000c77fffffffffffffe0bcc07fffffffe0437985e003fff00000001fffc637ffbfffffffffffffffffec0fffffffffffff81fe07ff800000007ffde3fffd7fffffffffffffffff187ffffffffffffd0fe407f8007e00007c7e1fffffffffffffffffffffff0007ffffffffffd340f803f800300003fdfffffffffffffffffffffffffe003fffffffffffc08e3001f00000100ff3fffffffffffffffffffffffff8001ffbffffffff800fc000700000001ff3ffffffffffffffffffffff07c0000f801fffffff800fcc00000000001ff0fffffffffffffffffffe46180000014007ffffffc007fe000000000800e8fffffffffffffffffff800780000040000fffffff817fe000000000c0663fffffffffffffffffff000f800002000017fffffff9fff80000000320307ffffffffffffffffffc000f000000000003fffffff9fffe0000000370ffffffffffffffffffffffc00e000000000001fffffffdfffc0000000479ffffffffffffffffffffffd008000000000001ffffffffff1000000000c7ffffffffffffffffffffffd0100000000000007ffffffffd87000000001fffffffffffffffffffffff80000000000000007fffffffff80800000001fffffffffffffffffffffff80000000000000007fffffffffc0000000001fffff27f1ffffffffffffff00000000000000007ffffffffc80000000001ff3fe03e3fffffffffffffe30000000000000007ffffffff80000000003fc18fe00f1fffffffffffff070000000000000007fffffffe00000000003f8067e79f8ffffffffffffc000000000000000007fffffffe00000000003f00067fff8fffffffffff58060000000000000003fffffffc00000000003f00233fff8ffffffffffe1c040000000000000001fffffff80000000000082e0037ffdfffffffffff8c1c0000000000000001fffffff800000000000dfe00c2ffffffffffffff0cfc00000000000000007fffffe000000000001ffe0000ffffffffffffff02e000000000000000003fffffc000000000003fffc601ffffffffffffff8100000000000000000017ffffc000000000007ffff7ffffffffffffffff800000000000000000001fff984000000000007fffffffff3fffffffffff800000000000000000001bfe00400000000001fffffffcff9fffffffffff0000000000000000000005fe00600000000003fffffffeff83ffffffffff0000000000000000000004fe00000000000003fffffffe7fcc07fffffffe00000000000000000000007e00000000000007ffffffff3ffe03fffffffc80000000000000000000003e00100000000007ffffffffbfff03fff7ffe000000000000000000000003e0c0e0000000007ffffffff9ffe007fc3fe0000000000000000000000001f1c00c000000007ffffffff9ffc007f01fcc0000000000000000000000007f8000000000007ffffffffcff8007e01fe00c000000000000000000000013f000000000007ffffffffcfe0007c007f008000000000000000000000001f800000000007fffffffff7800038007f8080000000000000000000000003000000000007fffffffffc000038003f8000000000000000000000000001014000000007fffffffff8c0001800078070000000000000000000000000837e00000001ffffffffffc0001c000200000000000000000000000000004fff00000001ffffffffff800014002000300000000000000000000000000fff80000000ffffffffff800006001000100000000000000000000000000ffff80000003e0fffffff0000000198070000000000000000000000000007fffc0000000003ffffff00000000d80c000000000000000000000000000ffffc0000000001fffffc00000000683e040000000000000000000000001ffffc0000000003fffff800000000307ee40000000000000000000000003fffff8000000003fffff000000000187c04a000000000000000000000003fffffc000000003ffffe0000000003c7d809800000000000000000000003ffffffc00000001ffffe0000000000e0c487f00000000000000000000003fffffff00000000ffffe0000000000600000f80000000000000000000001fffffff80000000ffffc00000000003000047c0000000000000000000001fffffff800000007fffc0000000000038200f60000000000000000000000fffffff000000007fffc0000000000000200030000000000000000000000ffffffe000000007fffe00000000000000100000000000000000000000007fffffe000000007fffe000000000000001e1000000000000000000000007fffffc00000000ffffe08000000000000be3000000000000000000000003fffffc00000000ffffe1c000000000001fe3800000000000000000000000fffffc00000000ffff878000000000007ffb8000000000000000000000007ffffc00000000ffff078000000000007fffc000000000000000000000007ffff8000000007ffe03020000000001ffffe000000000000000000000007ffff8000000007fff07000000000007fffff002000000000000000000007fffc0000000003fff0700000000000ffffff800000000000000000000007fff00000000003ffe0600000000000ffffffc00000000000000000000007fff00000000003ffc0000000000001ffffffc00000000000000000000007fff00000000003ffc0000000000000ffffffc0000000000000000000000fffe00000000001ff800000000000007fffffc0000000000000000000000fffc00000000000ff000000000000007fffffc0000000000000000000000fff800000000000fe000000000000007f87ffc0000000000000000000000fff000000000000f8000000000000007c02ff80000000000000000000000ffc00000000000000000000000000000000ff00010000000000000000001ffc000000000000000000000000000000007f00008000000000000000001ff800000000000000000000000000000000340000e000000000000000001fe000000000000000000000000000000000000000c000000000000000001f80000000000000000000000000000000000e00008000000000000000001fc0000000000000000000000000000000000600030000000000000000001f000000000000000000000000000000000000000c0000000000000000001e000000000000000000000000000000000000001c0000000000000000003f00000000000000000000000000000000000000000000000000000000003e00000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000001c08000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000380000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-
-const project = (lon, lat) => ({ x: ((lon + 180) / MAP_W) * 100, y: ((84 - lat) / MAP_H) * 100 });
-
-/* ---------- Campuses ---------- */
-const TYPES = {
-  campus:   { label: "Connected campus", icon: GraduationCap, bg: "bg-[#0b1f4d]", glow: "bg-blue-500" },
-  research: { label: "Live research hub", icon: FlaskConical,  bg: "bg-emerald-500", glow: "bg-emerald-400" },
-  study:    { label: "Global study node", icon: Globe2,        bg: "bg-violet-500", glow: "bg-violet-400" },
-};
+﻿import { useEffect, useRef, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import { MapPin, Search, Calendar, ChevronDown, Globe2, Wifi } from "lucide-react";
+import { EASE } from "../motion";
 
 const CAMPUSES = [
-  { name: "Harvard",    city: "Cambridge, USA",   lat: 42.37,  lng: -71.11, type: "campus" },
-  { name: "Oxford",     city: "Oxford, UK",       lat: 51.75,  lng: -1.25,  type: "campus" },
-  { name: "Cape Town",  city: "Cape Town, SA",    lat: -33.92, lng: 18.42,  type: "research" },
-  { name: "IIT Bombay", city: "Mumbai, India",    lat: 19.13,  lng: 72.91,  type: "research" },
-  { name: "Melbourne",  city: "Melbourne, AU",    lat: -37.81, lng: 144.96, type: "study" },
-].map((c) => ({ ...c, ...project(c.lng, c.lat) }));
+  { id: "harvard",   name: "Harvard",     city: "Cambridge, US",  x: 24, y: 38, tone: "navy",     students: "21K" },
+  { id: "oxford",    name: "Oxford",      city: "Oxford, UK",     x: 46, y: 30, tone: "electric", students: "24K" },
+  { id: "nus",       name: "NUS",         city: "Singapore",      x: 76, y: 60, tone: "mint",     students: "38K" },
+  { id: "iitb",      name: "IIT Bombay",  city: "Mumbai, India",  x: 67, y: 52, tone: "violet",   students: "11K" },
+  { id: "melbourne", name: "Melbourne",   city: "Melbourne, AU",  x: 84, y: 80, tone: "electric", students: "52K" },
+  { id: "toronto",   name: "Toronto",     city: "Toronto, CA",    x: 21, y: 30, tone: "navy",     students: "93K" },
+  { id: "capetown",  name: "Cape Town",   city: "Cape Town, ZA",  x: 52, y: 78, tone: "mint",     students: "29K" },
+];
 
-const TERMS = ["Fall 2026", "Spring 2027", "Summer 2027", "Fall 2027"];
+const TONE = {
+  navy:     { dot: "bg-navy-800",      ring: "ring-navy-200",      halo: "bg-navy-700/20" },
+  electric: { dot: "bg-electric-500",  ring: "ring-electric-200",  halo: "bg-electric-500/20" },
+  mint:     { dot: "bg-accent-mint",   ring: "ring-emerald-200",   halo: "bg-accent-mint/20" },
+  violet:   { dot: "bg-accent-violet", ring: "ring-violet-200",    halo: "bg-accent-violet/20" },
+};
 
-const ZOOM = 3.4;
-const ASPECT = 1.9;                         // map window shape (width / height): taller = bigger map
-const R = MAP_W / MAP_H / ASPECT;           // base zoom so the map fills the window
-const OVERVIEW = project(30, 8);            // initial view centre (lon, lat)
-const EASE = "1100ms cubic-bezier(0.22, 1, 0.36, 1)";
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+/* ──────────────────────────────────────────────────────────────────
+   Live campus counter — counts up when in view
+   ────────────────────────────────────────────────────────────────── */
+function LiveCampusCount({ inView }) {
+  const [count, setCount] = useState(0);
 
-function distanceKm(aLat, aLng, bLat, bLng) {
-  const r = Math.PI / 180;
-  const dLat = (bLat - aLat) * r, dLng = (bLng - aLng) * r;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * r) * Math.cos(bLat * r) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(h));
+  useEffect(() => {
+    if (!inView) return;
+    const start = performance.now();
+    const duration = 1600;
+    let raf = 0;
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setCount(Math.round(3240 * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView]);
+
+  return <span className="tabular-nums">{count.toLocaleString("en-US")}</span>;
 }
 
-/* ---------- Map ---------- */
-function WorldMap({ active, onSelect }) {
+/* ──────────────────────────────────────────────────────────────────
+   World map — pins drop from above, arcs draw between them
+   ────────────────────────────────────────────────────────────────── */
+function WorldMap() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-100px" });
   const [hovered, setHovered] = useState(null);
-
-  // Decode the baked land mask into one SVG path of round dots.
-  const dots = useMemo(() => {
-    const per = COLS / 4;
-    let d = "";
-    for (let j = 0; j < ROWS; j++) {
-      const row = MAP_HEX.slice(j * per, (j + 1) * per);
-      for (let k = 0; k < per; k++) {
-        const n = parseInt(row[k], 16);
-        for (let b = 0; b < 4; b++) {
-          if (n & (8 >> b)) {
-            const i = k * 4 + b;
-            d += `M${((i + 0.5) * STEP).toFixed(2)} ${((j + 0.5) * STEP).toFixed(2)}h0`;
-          }
-        }
-      }
-    }
-    return d;
-  }, []);
-
-  const zoomed = active !== null;
-  const z = zoomed ? ZOOM : R;
-  const focus = zoomed ? CAMPUSES[active] : OVERVIEW;
-  const tx = clamp(50 - z * focus.x, (1 - z) * 100, 0);
-  const ty = clamp(50 * R - z * focus.y, (R - z) * 100, 0);
-  const shown = hovered ?? active;
 
   return (
     <div
-      className="relative w-full min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 shadow-xl"
-      style={{ aspectRatio: ASPECT }}
+      ref={ref}
+      className="relative aspect-[16/10] w-full min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-surface-50 to-navy-50/30 shadow-elevated"
     >
-      {/* Zoomable stage: map + pins move together */}
+      {/* Faint grid */}
       <div
-        className="absolute left-0 top-0 w-full origin-top-left will-change-transform motion-reduce:!transition-none"
-        style={{ aspectRatio: `${MAP_W} / ${MAP_H}`, transform: `translate(${tx}%, ${ty}%) scale(${z})`, transition: `transform ${EASE}` }}
-      >
-        <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="absolute inset-0 h-full w-full" aria-hidden>
-          <path d={dots} stroke="#93b4f5" strokeWidth="0.95" strokeLinecap="round" fill="none" />
-        </svg>
+        aria-hidden
+        className="absolute inset-0 opacity-50"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(15,23,42,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.04) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      />
 
-        {CAMPUSES.map((c, i) => {
-          const T = TYPES[c.type];
-          const Icon = T.icon;
-          const isActive = active === i;
+      {/* World map SVG */}
+      <svg viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet" className="absolute inset-0 h-full w-full" aria-hidden>
+        <defs>
+          <linearGradient id="landGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#dbe6ff" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="#bed0ff" stopOpacity="0.7" />
+          </linearGradient>
+          <linearGradient id="landGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#e0e9ff" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#c7d5f5" stopOpacity="0.65" />
+          </linearGradient>
+        </defs>
+
+        {/* Continents */}
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.15 }}
+          d="M 130 90 C 170 70 240 60 300 80 C 340 95 350 130 330 160 C 320 190 300 210 280 230 C 260 250 240 280 220 280 C 200 280 190 260 180 240 C 170 220 150 200 140 170 C 130 140 120 110 130 90 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.2 }}
+          d="M 340 40 C 380 30 410 45 400 80 C 390 100 360 105 340 90 C 325 78 320 55 340 40 Z"
+          fill="url(#landGrad2)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.25 }}
+          d="M 250 300 C 290 290 320 310 320 350 C 320 400 300 440 280 460 C 260 470 245 460 240 430 C 235 400 230 370 240 340 C 245 320 245 305 250 300 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.3 }}
+          d="M 440 100 C 470 85 510 80 545 95 C 565 105 570 125 555 145 C 540 165 520 175 495 175 C 470 175 450 165 440 145 C 430 125 425 110 440 100 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.35 }}
+          d="M 450 200 C 490 185 540 195 570 215 C 590 235 595 270 585 310 C 575 350 555 385 530 400 C 505 415 480 410 465 385 C 450 355 440 320 440 285 C 440 250 440 220 450 200 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.4 }}
+          d="M 580 80 C 650 60 760 70 850 100 C 900 120 920 160 900 200 C 890 230 860 260 830 280 C 800 300 770 300 740 285 C 710 270 690 250 670 235 C 650 220 630 220 615 210 C 600 195 590 175 585 155 C 580 135 575 105 580 80 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.45 }}
+          d="M 640 220 C 665 220 680 250 675 285 C 670 320 655 340 640 335 C 625 330 618 300 622 270 C 625 240 630 225 640 220 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.5 }}
+          d="M 740 300 C 770 295 800 310 805 330 C 810 350 785 365 760 358 C 740 350 730 330 730 315 Z"
+          fill="url(#landGrad2)" stroke="#91b0ff" strokeWidth="1"
+        />
+        <motion.path
+          initial={{ opacity: 0 }} animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.9, delay: 0.55 }}
+          d="M 830 340 C 870 330 910 345 920 380 C 925 410 905 435 875 435 C 845 435 820 415 815 385 C 812 360 815 345 830 340 Z"
+          fill="url(#landGrad)" stroke="#91b0ff" strokeWidth="1"
+        />
+
+        {/* Connection arcs — draw between HQ campuses, staggered */}
+        {CAMPUSES.slice(0, -1).map((c, i) => {
+          const next = CAMPUSES[i + 1];
+          const x1 = c.x * 10, y1 = c.y * 5;
+          const x2 = next.x * 10, y2 = next.y * 5;
+          const mx = (x1 + x2) / 2;
+          const my = Math.min(y1, y2) - 45;
           return (
-            <div key={c.name} className="absolute" style={{ left: `${c.x}%`, top: `${c.y}%`, zIndex: shown === i ? 30 : 10 }}>
-              {/* counter-scale so pins keep their size while the map zooms */}
-              <div
-                style={{ transform: `translate(-50%, -50%) scale(${1 / z})`, transition: `transform ${EASE}` }}
-                className="motion-reduce:!transition-none"
-              >
-                <button
-                  type="button"
-                  aria-label={`${c.name}, ${c.city}`}
-                  aria-pressed={isActive}
-                  onClick={() => onSelect(isActive ? null : i)}
-                  onMouseEnter={() => setHovered(i)}
-                  onMouseLeave={() => setHovered(null)}
-                  onFocus={() => setHovered(i)}
-                  onBlur={() => setHovered(null)}
-                  className="relative flex h-10 w-10 items-center justify-center rounded-full focus:outline-none"
-                >
-                  {/* radar glow */}
-                  <span className={`absolute inset-0 animate-ping rounded-full opacity-40 motion-reduce:animate-none ${T.glow}`} />
-                  <span className={`absolute -inset-1.5 rounded-full opacity-20 ${T.glow}`} />
-                  <span className={`relative flex h-10 w-10 items-center justify-center rounded-full border-[3px] border-white text-white shadow-lg transition-transform hover:scale-110 ${T.bg} ${isActive ? "ring-4 ring-blue-300/70" : ""}`}>
-                    <Icon size={16} />
-                  </span>
-                </button>
-
-                {shown === i && (
-                  <span className="pointer-events-none absolute bottom-full left-1/2 mb-3 block -translate-x-1/2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-xl">
-                    <span className="block text-xs font-bold text-slate-900">{c.name}</span>
-                    <span className="block text-[11px] text-slate-500">{c.city} · {T.label}</span>
-                  </span>
-                )}
-              </div>
-            </div>
+            <motion.path
+              key={i}
+              d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`}
+              fill="none"
+              stroke="#365df1"
+              strokeWidth="0.9"
+              strokeDasharray="3 4"
+              opacity="0.4"
+              initial={{ pathLength: 0 }}
+              animate={inView ? { pathLength: 1 } : {}}
+              transition={{ duration: 1.4, delay: 1.4 + i * 0.15, ease: EASE.smooth }}
+            />
           );
         })}
-      </div>
+      </svg>
 
-      {/* Floating stats pill (stays fixed while map zooms) */}
-      <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold text-slate-800 shadow-lg ring-1 ring-slate-200 backdrop-blur sm:bottom-4 sm:left-4">
-        <Globe2 size={14} className="text-blue-600" />
-        62 Countries • 150+ Campuses
-      </div>
-
-      {zoomed && (
-        <button
+      {/* Pins — each drops from above with a bounce */}
+      {CAMPUSES.map((c, i) => (
+        <motion.button
+          key={c.id}
           type="button"
-          onClick={() => onSelect(null)}
-          className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-lg ring-1 ring-slate-200 backdrop-blur hover:bg-white sm:right-4 sm:top-4"
+          onMouseEnter={() => setHovered(i)}
+          onMouseLeave={() => setHovered(null)}
+          initial={{ opacity: 0, y: -80, scale: 0.4 }}
+          animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+          transition={{
+            duration: 0.75,
+            delay: 0.7 + i * 0.12,
+            ease: [0.34, 1.56, 0.64, 1], // overshoot bounce
+          }}
+          className="absolute -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${c.x}%`, top: `${c.y}%` }}
         >
-          <RotateCcw size={12} /> Reset view
-        </button>
-      )}
-    </div>
-  );
-}
+          {/* Halo pulse behind pin */}
+          <span className={`absolute left-1/2 top-1/2 -z-10 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full ${TONE[c.tone].halo} blur-md`} />
 
-/* ---------- Search pill dropdown ---------- */
-function Field({ icon: Icon, label, value, placeholder, options, onChange }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef(null);
+          <span className="relative flex h-4 w-4">
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full ${TONE[c.tone].dot} opacity-40`} />
+            <span className={`relative inline-flex h-4 w-4 items-center justify-center rounded-full ring-4 ${TONE[c.tone].dot} ${TONE[c.tone].ring}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+            </span>
+          </span>
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => !box.current?.contains(e.target) && setOpen(false);
-    const esc = (e) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
+          {hovered === i && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="absolute left-1/2 top-6 z-10 -translate-x-1/2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-elevated"
+            >
+              <p className="text-[11px] font-bold text-slate-900">{c.name}</p>
+              <p className="text-[9px] text-slate-500">{c.city}</p>
+              <p className="mt-1 text-[9px] font-semibold text-navy-800">{c.students} students</p>
+            </motion.div>
+          )}
+        </motion.button>
+      ))}
 
-  return (
-    <div ref={box} className="relative min-w-0 flex-1">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 rounded-full px-4 py-2.5 text-left transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      {/* Rotating globe — top-right corner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.6 }}
+        animate={inView ? { opacity: 1, scale: 1 } : {}}
+        transition={{ duration: 0.6, delay: 1.8, ease: EASE.overshoot }}
+        className="absolute right-4 top-4 hidden h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-card sm:flex"
       >
-        <Icon size={18} className="shrink-0 text-blue-600" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-          <span className={`block truncate text-sm font-semibold ${value ? "text-slate-900" : "text-slate-400"}`}>{value || placeholder}</span>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+        >
+          <Globe2 size={18} className="text-navy-800" />
+        </motion.div>
+      </motion.div>
+
+      {/* Network status — bottom-left badge */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.6, delay: 2, ease: EASE.smooth }}
+        className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-card backdrop-blur"
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
         </span>
-        <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <ul role="listbox" className="absolute left-0 right-0 top-full z-40 mt-2 max-h-64 min-w-[12rem] overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl">
-          {options.map((o) => (
-            <li key={o.label} role="option" aria-selected={o.selected}>
-              <button
-                type="button"
-                onClick={() => { onChange(o.value); setOpen(false); }}
-                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-              >
-                {o.label}
-                {o.selected && <Check size={14} className="text-blue-600" />}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+        All campuses online
+      </motion.div>
+
+      {/* Live count — bottom-right badge */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={inView ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.6, delay: 2.1, ease: EASE.smooth }}
+        className="absolute bottom-4 right-4 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-card backdrop-blur"
+      >
+        <span className="text-navy-800"><LiveCampusCount inView={inView} /></span>
+        <span className="text-slate-500"> active campuses</span>
+      </motion.div>
     </div>
   );
 }
 
-/* ---------- Section ---------- */
+/* ──────────────────────────────────────────────────────────────────
+   Section wrapper
+   ────────────────────────────────────────────────────────────────── */
 export default function ReachSection() {
-  const [active, setActive] = useState(null);
-  const [term, setTerm] = useState("");
-  const [status, setStatus] = useState("");
-
-  const select = (i) => {
-    setActive(i);
-    setStatus(i === null ? "" : `${CAMPUSES[i].name} · ${CAMPUSES[i].city}`);
-  };
-
-  const search = () => {
-    if (active !== null) return select(active);
-    if (!navigator.geolocation) return setStatus("Choose a campus from the list.");
-    setStatus("Finding your nearest campus…");
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        let best = 0, min = Infinity;
-        CAMPUSES.forEach((c, i) => {
-          const d = distanceKm(coords.latitude, coords.longitude, c.lat, c.lng);
-          if (d < min) { min = d; best = i; }
-        });
-        setActive(best);
-        setStatus(`Nearest: ${CAMPUSES[best].name} (${Math.round(min)} km away)`);
-      },
-      () => setStatus("Location blocked. Choose a campus from the list."),
-      { timeout: 8000 }
-    );
-  };
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
 
   return (
-    <section id="reach" className="relative scroll-mt-16 overflow-hidden py-20 md:py-28">
-      <div className="mx-auto grid max-w-[90rem] grid-cols-1 items-center gap-12 px-6 lg:grid-cols-[1.35fr_1fr] lg:gap-12 lg:px-8">
+    <section id="reach" className="section-pad relative overflow-hidden">
+      <div className="container grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
+        {/* Map */}
         <div className="order-2 min-w-0 lg:order-1">
-          <WorldMap active={active} onSelect={select} />
+          <WorldMap />
         </div>
 
+        {/* Copy */}
         <div className="order-1 min-w-0 lg:order-2">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl xl:text-5xl">
-            Seamless Campus &amp;{" "}
-            <span className="bg-gradient-to-r from-[#0b1f4d] to-blue-500 bg-clip-text text-transparent">Remote Connectivity.</span>
-          </h2>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
-            Deploy across physical campuses, hybrid environments, or multi-branch educational networks effortlessly.
-          </p>
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, ease: EASE.smooth }}
+            className="eyebrow"
+          >
+            <Globe2 size={12} className="text-navy-800" />
+            Global reach
+          </motion.p>
 
-          <div className="mt-8 flex flex-col gap-2 rounded-3xl border border-slate-200 bg-white p-2 shadow-xl sm:flex-row sm:items-center sm:rounded-full">
-            <Field
-              icon={MapPin}
-              label="Location"
-              value={active === null ? "" : CAMPUSES[active].name}
-              placeholder="Select campus"
-              onChange={select}
-              options={CAMPUSES.map((c, i) => ({ value: i, label: `${c.name} · ${c.city}`, selected: active === i }))}
-            />
-            <span aria-hidden className="hidden h-8 w-px bg-slate-200 sm:block" />
-            <Field
-              icon={Calendar}
-              label="Academic Year"
-              value={term}
-              placeholder="Select term"
-              onChange={setTerm}
-              options={TERMS.map((t) => ({ value: t, label: t, selected: t === term }))}
-            />
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.1, ease: EASE.smooth }}
+            className="h2 mt-5"
+          >
+            One platform,{" "}
+            <span className="bg-gradient-to-r from-navy-800 to-electric-500 bg-clip-text text-transparent">
+              every campus.
+            </span>
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.2, ease: EASE.smooth }}
+            className="body-lg mt-5 max-w-xl"
+          >
+            Deploy across physical campuses, hybrid classrooms, and multi-branch
+            networks — with region-specific data residency and a single source
+            of truth.
+          </motion.p>
+
+          {/* Feature ticks */}
+          <motion.ul
+            initial={{ opacity: 0 }}
+            animate={inView ? { opacity: 1 } : {}}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="mt-6 space-y-2 text-sm text-slate-600"
+          >
+            {[
+              "Region-specific data residency (US, EU, APAC)",
+              "Per-campus branding and policies",
+              "Real-time sync across all locations",
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-2">
+                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-mint" />
+                {t}
+              </li>
+            ))}
+          </motion.ul>
+
+          {/* Filters */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.4, ease: EASE.smooth }}
+            className="mt-8 rounded-2xl border border-slate-200 bg-white p-3 shadow-card"
+          >
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <button
+                type="button"
+                className="flex items-center gap-3 rounded-xl border border-transparent bg-surface-50 px-3.5 py-2.5 text-left transition-all hover:border-slate-200 hover:bg-white"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-50 text-navy-800">
+                  <MapPin size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Department / Campus
+                  </span>
+                  <span className="block truncate text-sm font-semibold text-slate-900">
+                    Select campus
+                  </span>
+                </span>
+                <ChevronDown size={14} className="shrink-0 text-slate-400" />
+              </button>
+
+              <button
+                type="button"
+                className="flex items-center gap-3 rounded-xl border border-transparent bg-surface-50 px-3.5 py-2.5 text-left transition-all hover:border-slate-200 hover:bg-white"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-electric-500/10 text-electric-600">
+                  <Calendar size={16} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Academic Year
+                  </span>
+                  <span className="block truncate text-sm font-semibold text-slate-900">
+                    2025 – 2026
+                  </span>
+                </span>
+                <ChevronDown size={14} className="shrink-0 text-slate-400" />
+              </button>
+            </div>
+
             <button
               type="button"
-              aria-label="Search campuses"
-              onClick={search}
-              className="flex h-12 w-full shrink-0 items-center justify-center rounded-full bg-[#0b1f4d] text-white shadow-md transition-colors hover:bg-blue-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 sm:w-12"
+              className="group mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy-900 px-6 py-3 text-sm font-semibold text-white shadow-navy-glow transition-all hover:bg-navy-800"
             >
-              <Search size={18} />
+              <Search size={15} className="transition-transform group-hover:scale-110" />
+              Find campuses near me
             </button>
-          </div>
-          <p role="status" aria-live="polite" className="mt-3 min-h-[1.25rem] px-2 text-sm text-slate-500">{status}</p>
+          </motion.div>
         </div>
       </div>
     </section>
