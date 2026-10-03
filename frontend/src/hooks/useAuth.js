@@ -1,6 +1,6 @@
-﻿// frontend/src/hooks/useAuth.js
+// frontend/src/hooks/useAuth.js
 
-import { useAdminAuth } from "../features/admin/hooks/useAdminAuth";
+import { useAdminAuth } from "./useAdminAuth";
 
 /**
  * Role-agnostic auth hook.
