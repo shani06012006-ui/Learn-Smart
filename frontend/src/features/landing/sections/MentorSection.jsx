@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/sections/MentorSection.jsx
+// frontend/src/features/landing/sections/MentorSection.jsx
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 

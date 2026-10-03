@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/sections/SubscribeSection.jsx
+// frontend/src/features/landing/sections/SubscribeSection.jsx
 import { useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";

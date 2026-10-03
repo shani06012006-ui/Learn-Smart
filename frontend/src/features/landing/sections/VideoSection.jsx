@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/sections/VideoSection.jsx
+// frontend/src/features/landing/sections/VideoSection.jsx
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Volume2, Radio, PlayCircle, PhoneOff, Mic } from "lucide-react";
