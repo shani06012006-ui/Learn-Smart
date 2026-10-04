@@ -409,6 +409,17 @@ export const realApi = createApi({
       ],
     }),
 
+    deleteAdminCourse: builder.mutation({
+      query: (id) => ({
+        url: `/admin/courses/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [
+        { type: "AdminCourse", id: "LIST" },
+        { type: "AdminStats" },
+      ],
+    }),
+
     getAdminCourseStudents: builder.query({
       query: (id) => `/admin/courses/${id}/students/`,
       providesTags: (result, error, id) => [
