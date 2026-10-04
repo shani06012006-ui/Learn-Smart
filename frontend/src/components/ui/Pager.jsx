@@ -1,68 +1,37 @@
+﻿// frontend/src/components/ui/Pager.jsx
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import Button from "./Button";
-
-// Pagination control. Presentational only — the parent owns the page
-// state and passes `page`, `count`, `pageSize`, and an `onPageChange`
-// callback. Matches the DRF PageNumberPagination contract:
-//   { count, next, previous, results }
-//
-// The parent derives totalPages from count/pageSize; this component
-// just renders Prev / "Page X of Y" / Next.
-export default function Pager({
-  page = 1,
-  count = 0,
-  pageSize = 20,
-  onPageChange,
-  disabled = false,
-}) {
+export default function Pager({ page = 1, count = 0, pageSize = 20, onPageChange }) {
   const totalPages = Math.max(1, Math.ceil(count / pageSize));
-  const canPrev = page > 1 && !disabled;
-  const canNext = page < totalPages && !disabled;
-
-  // Hide the whole control when there's only one page — avoids visual
-  // noise on small lists.
-  if (count === 0 || totalPages <= 1) {
-    return null;
-  }
-
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, count);
+  if (count === 0) return null;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-xs text-ink-500">
-        Showing <span className="font-medium text-ink-700">{start}</span>
-        {"–"}
-        <span className="font-medium text-ink-700">{end}</span> of{" "}
-        <span className="font-medium text-ink-700">{count}</span>
+    <div className="mt-6 flex items-center justify-between gap-4">
+      <p className="text-xs text-slate-500">
+        Page <span className="font-bold text-navy-950">{page}</span> of{" "}
+        <span className="font-bold text-navy-950">{totalPages}</span>
+        <span className="ml-2 text-slate-400">· {count} total</span>
       </p>
 
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canPrev}
-          onClick={() => canPrev && onPageChange(page - 1)}
+        <button
+          type="button"
+          aria-label="Previous page"
+          disabled={page <= 1}
+          onClick={() => onPageChange?.(page - 1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-all hover:border-slate-300 hover:text-navy-950 disabled:opacity-40"
         >
           <ChevronLeft size={14} />
-          Previous
-        </Button>
-
-        <span className="px-2 text-xs text-ink-600">
-          Page <span className="font-medium text-ink-900">{page}</span> of{" "}
-          <span className="font-medium text-ink-900">{totalPages}</span>
-        </span>
-
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canNext}
-          onClick={() => canNext && onPageChange(page + 1)}
+        </button>
+        <button
+          type="button"
+          aria-label="Next page"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange?.(page + 1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-500 text-white shadow-purple-glow transition-all hover:bg-purple-600 disabled:opacity-40"
         >
-          Next
           <ChevronRight size={14} />
-        </Button>
+        </button>
       </div>
     </div>
   );

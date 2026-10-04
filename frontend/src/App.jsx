@@ -1,4 +1,4 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 // Auth
 import LoginPage from "./features/auth/LoginPage";
@@ -17,6 +17,8 @@ import ContactPage from "./features/contact/ContactPage";
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
 import AdminLayout from "./features/admin/AdminLayout";
 import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
+import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
+import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
 
 export default function App() {
@@ -39,7 +41,8 @@ export default function App() {
           <Route index element={<AdminDashboardPage />} />
 
           {/* Sidebar items — real pages restored in later batches */}
-          <Route path="users"      element={<AdminPlaceholder title="Users" />} />
+          <Route path="users"      element={<AdminUsersPage />} />
+          <Route path="users/:id"  element={<AdminUserDetailPage />} />
           <Route path="teachers"   element={<AdminPlaceholder title="Teachers" />} />
           <Route path="students"   element={<AdminPlaceholder title="Students" />} />
           <Route path="courses"    element={<AdminPlaceholder title="Courses" />} />

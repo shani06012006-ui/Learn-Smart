@@ -1,42 +1,35 @@
-﻿import clsx from "clsx";
-
-import { avatarColor } from "../../utils/avatarColor";
-
-// Shared avatar primitive. Renders a circle with the user's initials,
-// background color derived deterministically from `userId`. Uses the same
-// `avatarColor` palette across the app for consistency.
-
+﻿// frontend/src/components/ui/Avatar.jsx
 const SIZES = {
-  xs: "h-6 w-6 text-[10px]",
-  sm: "h-7 w-7 text-[10px]",
-  md: "h-9 w-9 text-xs",
-  lg: "h-10 w-10 text-sm",
-  xl: "h-14 w-14 text-lg",
-  "2xl": "h-20 w-20 text-2xl",
+  sm: "h-9 w-9 text-xs",
+  md: "h-11 w-11 text-sm",
+  lg: "h-14 w-14 text-base",
 };
 
-export default function Avatar({
-  userId,
-  initials,
-  size = "md",
-  className,
-  // Optional: force a neutral (gray) background instead of the deterministic
-  // color. Useful for group avatars where we want a distinct look.
-  neutral = false,
-}) {
-  const palette = avatarColor(userId || initials || "?");
+const GRADIENTS = [
+  "from-purple-500 to-purple-700",
+  "from-coral-500 to-coral-700",
+  "from-emerald-500 to-teal-600",
+  "from-amber-500 to-coral-500",
+  "from-purple-500 to-coral-500",
+  "from-teal-500 to-emerald-700",
+];
 
+function pickGradient(seed) {
+  if (seed == null) return GRADIENTS[0];
+  const s = String(seed);
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return GRADIENTS[h % GRADIENTS.length];
+}
+
+export default function Avatar({ userId, initials = "?", size = "md", className = "" }) {
   return (
-    <div
-      className={clsx(
-        "flex shrink-0 items-center justify-center rounded-full font-semibold",
-        SIZES[size] || SIZES.md,
-        neutral ? "bg-ink-100 text-ink-700" : `${palette.bg} ${palette.text}`,
-        className
-      )}
-      aria-hidden="true"
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-black uppercase text-white ${pickGradient(
+        userId
+      )} ${SIZES[size] || SIZES.md} ${className}`}
     >
-      {initials || "?"}
-    </div>
+      {initials}
+    </span>
   );
 }
