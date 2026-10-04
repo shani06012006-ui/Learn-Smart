@@ -28,6 +28,7 @@ import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage"
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminAttendancePage from "./features/admin/pages/AdminAttendancePage";
 import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
+import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
 
 export default function App() {
@@ -60,7 +61,7 @@ export default function App() {
           <Route path="courses/:id"   element={<AdminCourseDetailPage />} />
           <Route path="attendance"     element={<AdminAttendancePage />} />
           <Route path="timetable"      element={<AdminTimetablePage />} />
-          <Route path="leaves"     element={<AdminPlaceholder title="Leaves" />} />
+          <Route path="leaves"         element={<AdminLeavesPage />} />
           <Route path="sessions"       element={<AdminSessionsPage />} />
         </Route>
       </Route>
