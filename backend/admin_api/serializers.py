@@ -396,7 +396,10 @@ class TimetableEntryReadSerializer(serializers.ModelSerializer):
 
 class TimetableEntryWriteSerializer(serializers.Serializer):
 
-    class_course_id = serializers.UUIDField()
+    class_course_id = serializers.UUIDField(required=False, allow_null=True)
+    class_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=200
+    )
     day_of_week = serializers.IntegerField(min_value=0, max_value=6)
     start_time = serializers.TimeField()
     end_time = serializers.TimeField()
@@ -413,11 +416,30 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
             )
 
         class_id = attrs.get("class_course_id")
-        try:
-            course = ClassCourse.objects.get(pk=class_id)
-        except ClassCourse.DoesNotExist:
+        class_name = (attrs.get("class_name") or "").strip()
+
+        if class_id:
+            try:
+                course = ClassCourse.objects.get(pk=class_id)
+            except ClassCourse.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"class_course_id": "No class matches this id."}
+                )
+        elif class_name:
+            request = self.context.get("request")
+            institution = getattr(request.user, "institution", None) if request else None
+            if institution is None:
+                raise serializers.ValidationError(
+                    {"class_name": "Institution context is required."}
+                )
+            course, _ = ClassCourse.objects.get_or_create(
+                institution=institution,
+                name=class_name,
+                defaults={"subject": "Manual"},
+            )
+        else:
             raise serializers.ValidationError(
-                {"class_course_id": "No class matches this id."}
+                {"class_course_id": "Pick a class or type a new one."}
             )
 
         attrs["_course"] = course

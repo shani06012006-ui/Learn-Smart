@@ -780,7 +780,7 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
     def create(self, request):
         from classes.services import materialize_upcoming_sessions
 
-        serializer = TimetableEntryWriteSerializer(data=request.data)
+        serializer = TimetableEntryWriteSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
@@ -828,7 +828,7 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         from classes.services import regenerate_future_sessions
 
         entry = self.get_object()
-        serializer = TimetableEntryWriteSerializer(data=request.data, partial=True)
+        serializer = TimetableEntryWriteSerializer(data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 

@@ -580,6 +580,7 @@ export const {
   useGetAdminCourseQuery,
   useCreateAdminCourseMutation,
   useUpdateAdminCourseMutation,
+  useDeleteAdminCourseMutation,
   useAdminMeQuery,
   useAdminLogoutMutation,
   useGetAdminUsersQuery,
