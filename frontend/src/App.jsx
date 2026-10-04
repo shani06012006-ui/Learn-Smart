@@ -19,6 +19,8 @@ import AdminLayout from "./features/admin/AdminLayout";
 import AdminDashboardPage from "./features/admin/pages/AdminDashboardPage";
 import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
+import AdminTeachersPage from "./features/admin/pages/AdminTeachersPage";
+import AdminTeacherDetailPage from "./features/admin/pages/AdminTeacherDetailPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
 
 export default function App() {
@@ -43,7 +45,8 @@ export default function App() {
           {/* Sidebar items — real pages restored in later batches */}
           <Route path="users"      element={<AdminUsersPage />} />
           <Route path="users/:id"  element={<AdminUserDetailPage />} />
-          <Route path="teachers"   element={<AdminPlaceholder title="Teachers" />} />
+          <Route path="teachers"       element={<AdminTeachersPage />} />
+          <Route path="teachers/:id"   element={<AdminTeacherDetailPage />} />
           <Route path="students"   element={<AdminPlaceholder title="Students" />} />
           <Route path="courses"    element={<AdminPlaceholder title="Courses" />} />
           <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
