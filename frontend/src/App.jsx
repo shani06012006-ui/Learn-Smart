@@ -25,6 +25,7 @@ import AdminStudentsPage from "./features/admin/pages/AdminStudentsPage";
 import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
+import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
 
 export default function App() {
@@ -58,7 +59,7 @@ export default function App() {
           <Route path="attendance" element={<AdminPlaceholder title="Attendance" />} />
           <Route path="timetable"  element={<AdminPlaceholder title="Timetable" />} />
           <Route path="leaves"     element={<AdminPlaceholder title="Leaves" />} />
-          <Route path="sessions"   element={<AdminPlaceholder title="Sessions" />} />
+          <Route path="sessions"       element={<AdminSessionsPage />} />
         </Route>
       </Route>
 
