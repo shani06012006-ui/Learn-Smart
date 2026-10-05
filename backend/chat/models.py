@@ -1,4 +1,4 @@
-﻿"""
+"""
 Chat models — threads, memberships, and messages.
 
 Design notes:
@@ -126,3 +126,46 @@ class Message(TimeStampedModel):
     @property
     def is_deleted(self):
         return self.deleted_at is not None
+
+class MessageReaction(TimeStampedModel):
+    """
+    A single emoji reaction by one user on one message.
+
+    Rules:
+      - One reaction per (message, user). Adding a different emoji
+        replaces the existing row (handled in the view layer).
+      - Emoji is stored as the raw Unicode character (e.g. "👍").
+      - Cascade-deletes with the message.
+
+    Indexes:
+      - (message, emoji)   -> fast aggregation for reaction summaries
+      - (user_id)          -> "what did I react to" queries
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="chat_reactions",
+    )
+    emoji = models.CharField(max_length=16)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "user"],
+                name="unique_reaction_per_user_per_message",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["message", "emoji"]),
+            models.Index(fields=["user"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user_id} reacted {self.emoji} to {self.message_id}"

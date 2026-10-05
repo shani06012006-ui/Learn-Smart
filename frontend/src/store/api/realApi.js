@@ -70,6 +70,8 @@ export const realApi = createApi({
     "Enrollment",
     "Material",
     "Announcement",
+    "ChatThread",
+    "ChatMessage",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -420,6 +422,54 @@ export const realApi = createApi({
       ],
     }),
 
+    // ─────────────────────────────────────────────────────────
+    // Chat — institution teacher group
+    // ─────────────────────────────────────────────────────────
+
+    getTeacherGroupThread: builder.query({
+      query: () => `/chat/teacher-group/`,
+      providesTags: [{ type: "ChatThread", id: "teacher-group" }],
+    }),
+
+    getTeacherGroupMembers: builder.query({
+      query: () => `/chat/teacher-group/members/`,
+      providesTags: [{ type: "ChatThread", id: "teacher-group-members" }],
+    }),
+
+
+    getTeacherGroupMessages: builder.query({
+      query: ({ after } = {}) =>
+        `/chat/teacher-group/messages/${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+      providesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+
+    sendTeacherGroupMessage: builder.mutation({
+      query: (body) => ({
+        url: `/chat/teacher-group/messages/`,
+        method: "POST",
+        body: { body },
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+
+    toggleMessageReaction: builder.mutation({
+      query: ({ messageId, emoji }) => ({
+        url: `/chat/messages/${messageId}/react/`,
+        method: "POST",
+        body: { emoji },
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+
+    removeMessageReaction: builder.mutation({
+      query: ({ messageId }) => ({
+        url: `/chat/messages/${messageId}/react/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+
+
     getAdminCourseStudents: builder.query({
       query: (id) => `/admin/courses/${id}/students/`,
       providesTags: (result, error, id) => [
@@ -603,6 +653,12 @@ export const {
   useGetAdminUserClassesQuery,
   useGetAdminUserEnrollmentsQuery,
   useGetAdminCourseStudentsQuery,
+  useGetTeacherGroupThreadQuery,
+  useGetTeacherGroupMembersQuery,
+  useGetTeacherGroupMessagesQuery,
+  useSendTeacherGroupMessageMutation,
+  useToggleMessageReactionMutation,
+  useRemoveMessageReactionMutation,
   useGetAdminSessionsQuery,
   useRevokeAdminSessionMutation,
   useGetAdminEnrollmentsQuery,
