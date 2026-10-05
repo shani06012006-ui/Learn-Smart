@@ -75,6 +75,7 @@ export const realApi = createApi({
     "ClassDetail",
     "ClassRoster",
     "ClassMaterial",
+    "MaterialList",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -454,6 +455,17 @@ export const realApi = createApi({
       providesTags: (result, error, id) => [{ type: "ClassMaterial", id }],
     }),
 
+    getAllMaterials: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.class_course) search.set("class_course", params.class_course);
+        if (params.q) search.set("q", params.q);
+        const qs = search.toString();
+        return `/materials/${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: [{ type: "MaterialList", id: "ALL" }],
+    }),
+
     addClassStudent: builder.mutation({
       query: ({ classId, email, first_name, last_name }) => ({
         url: `/classes/${classId}/students/`,
@@ -747,6 +759,7 @@ export const {
   useGetClassQuery,
   useGetClassStudentsQuery,
   useGetClassMaterialsQuery,
+  useGetAllMaterialsQuery,
   useAddClassStudentMutation,
   useUpdateEnrollmentStatusMutation,
   useUploadClassMaterialMutation,

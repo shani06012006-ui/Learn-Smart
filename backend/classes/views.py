@@ -302,3 +302,65 @@ class MaterialDetailView(APIView):
         material = self._resolve_for_write(material_id, request.user)
         material.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+# ---------------------------------------------------------------- material list
+
+
+class MaterialListView(APIView):
+    """
+    GET /api/v1/materials/
+
+    Cross-class material feed for the current user.
+
+    - teacher: all materials across classes they teach
+    - student: all materials from classes they're actively enrolled in
+    - admin:   403 (use /admin/ views instead)
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        qs = (
+            Material.objects
+            .select_related("uploaded_by", "class_course")
+            .order_by("-created_at")
+        )
+
+        if user.role == "teacher":
+            qs = qs.filter(class_course__teacher=user)
+        elif user.role == "student":
+            enrolled_ids = StudentEnrollment.objects.filter(
+                student=user,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            ).values_list("class_course_id", flat=True)
+            qs = qs.filter(class_course_id__in=enrolled_ids)
+        else:
+            return Response(
+                {"detail": "Only teachers and students can list materials."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Optional filter by class
+        class_id = request.query_params.get("class_course")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+
+        # Optional search on title / description / filename
+        q = request.query_params.get("q")
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(title__icontains=q)
+                | Q(description__icontains=q)
+                | Q(file_name__icontains=q)
+            )
+
+        serializer = MaterialSerializer(
+            qs, many=True, context={"request": request}
+        )
+        return Response({
+            "count": qs.count(),
+            "results": serializer.data,
+        })
+

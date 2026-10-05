@@ -9,6 +9,7 @@ from .views import (
     ClassStudentsView,
     JoinClassView,
     MaterialDetailView,
+    MaterialListView,
 )
 
 urlpatterns = [
@@ -25,6 +26,7 @@ urlpatterns = [
         ClassMaterialsView.as_view(),
         name="class-materials",
     ),
+    path("materials/", MaterialListView.as_view(), name="material-list"),
     path(
         "materials/<uuid:material_id>/",
         MaterialDetailView.as_view(),
