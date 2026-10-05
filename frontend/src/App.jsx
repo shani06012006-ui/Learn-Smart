@@ -32,6 +32,13 @@ import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
 import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
 
+// Teacher
+import TeacherLayout from "./components/layout/TeacherLayout";
+import TeacherChatPage from "./features/teacher/pages/TeacherChatPage";
+import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import RoleRoute from "./routes/RoleRoute";
+
 export default function App() {
   return (
     <Routes>
@@ -69,6 +76,21 @@ export default function App() {
       </Route>
 
       {/* ── Catch-all ──────────────────────────────────────────── */}
+      {/* ── Teacher (protected, role-scoped) ───────────────────────── */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<RoleRoute allow={["teacher"]} />}>
+          <Route path="/teacher" element={<TeacherLayout />}>
+            <Route index element={<TeacherPlaceholder title="Dashboard" />} />
+            <Route path="chat" element={<TeacherChatPage />} />
+            <Route path="classes" element={<TeacherPlaceholder title="Classes" />} />
+            <Route path="timetable" element={<TeacherPlaceholder title="Timetable" />} />
+            <Route path="materials" element={<TeacherPlaceholder title="Materials" />} />
+            <Route path="announcements" element={<TeacherPlaceholder title="Announcements" />} />
+            <Route path="live-classes" element={<TeacherPlaceholder title="Live Classes" />} />
+          </Route>
+        </Route>
+      </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
