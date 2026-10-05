@@ -193,6 +193,25 @@ class AdminEnrollmentViewSet(viewsets.GenericViewSet):
 
 
 class AdminUserViewSet(viewsets.GenericViewSet):
+    """
+    Admin CRUD for institution users.
+
+    NOTE: When a student's `grade` is set or changed, we auto-enroll
+    them into every active class of that grade (best-effort).
+    """
+
+    def _sync_student_grade_enrollments(self, user_obj):
+        if getattr(user_obj, "role", None) != "student":
+            return
+        try:
+            from classes.services import auto_enroll_student_into_grade
+            auto_enroll_student_into_grade(user_obj)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "auto-enroll failed for student %s", user_obj.id
+            )
+
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 

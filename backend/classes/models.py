@@ -32,6 +32,17 @@ class ClassCourse(SoftDeleteModel, TimeStampedModel):
     name = models.CharField(max_length=255)
     subject = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    grade = models.ForeignKey(
+        "institutions.Grade",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_courses",
+        help_text=(
+            "Optional grade/standard this class is taught at. "
+            "If set, all students in that grade auto-enroll."
+        ),
+    )
     is_archived = models.BooleanField(
         default=False,
         help_text="Archived = read-only but still visible. Distinct from is_deleted (soft-delete).",

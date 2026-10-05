@@ -9,14 +9,61 @@ from .models import ClassCourse, Material, StudentEnrollment
 class ClassCourseSerializer(serializers.ModelSerializer):
     teacher = UserPublicSerializer(read_only=True)
     student_count = serializers.SerializerMethodField()
+    grade_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    grade = serializers.SerializerMethodField()
+    auto_enrolled_count = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassCourse
         fields = [
             "id", "name", "subject", "description", "teacher",
             "is_archived", "student_count", "created_at",
+            "grade_id", "grade", "auto_enrolled_count",
         ]
-        read_only_fields = ["id", "teacher", "is_archived", "student_count", "created_at"]
+        read_only_fields = [
+            "id", "teacher", "is_archived", "student_count", "created_at",
+            "grade", "auto_enrolled_count",
+        ]
+
+    def get_grade(self, obj):
+        if not obj.grade_id:
+            return None
+        return {
+            "id": str(obj.grade.id),
+            "level": obj.grade.level,
+            "name": obj.grade.name,
+        }
+
+    def get_auto_enrolled_count(self, obj):
+        return getattr(self.context.get("request"), "_auto_enrolled_count", 0)
+
+    def validate_grade_id(self, value):
+        if value in (None, ""):
+            return None
+        from institutions.models import Grade
+        request = self.context.get("request")
+        qs = Grade.objects.filter(id=value)
+        if request and request.user.institution_id:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except Grade.DoesNotExist:
+            raise serializers.ValidationError("Unknown grade for your institution.")
+
+    def create(self, validated_data):
+        grade = validated_data.pop("grade_id", None)
+        request = self.context["request"]
+        validated_data["teacher"] = request.user
+        validated_data["institution"] = request.user.institution
+        if grade is not None:
+            validated_data["grade"] = grade
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        grade = validated_data.pop("grade_id", None)
+        if "grade_id" in self.initial_data:
+            instance.grade = grade
+        return super().update(instance, validated_data)
 
     def get_student_count(self, obj):
         """

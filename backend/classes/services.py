@@ -7,7 +7,7 @@ from django.utils import timezone
 from accounts.models import OnlineStatus, StudentProfile, User
 from core.utils import generate_unique_code
 
-from .models import LiveClass, StudentEnrollment, TimetableEntry
+from .models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 
 @transaction.atomic
 def add_student_to_class(class_course, email, first_name, last_name):
@@ -154,3 +154,95 @@ def regenerate_future_sessions(timetable_entry):
     ).delete()
 
     return materialize_upcoming_sessions(timetable_entry)
+
+
+# ---------------------------------------------------------------- grade sync
+
+
+@transaction.atomic
+def auto_enroll_class_into_grade(class_course):
+    """
+    Called after a ClassCourse is created with `grade` set.
+
+    Enrolls every active student of that grade in the class. Idempotent —
+    existing enrollments are left alone (including ones that were blocked
+    or removed by the teacher).
+
+    Returns the number of NEW enrollments created.
+    """
+    grade = getattr(class_course, "grade", None)
+    if grade is None:
+        return 0
+
+    institution = class_course.institution
+    if institution is None:
+        return 0
+
+    students = (
+        User.objects
+        .filter(
+            role=User.ROLE_STUDENT,
+            institution=institution,
+            grade=grade,
+            is_active=True,
+        )
+        .exclude(id__in=StudentEnrollment.objects.filter(
+            class_course=class_course
+        ).values_list("student_id", flat=True))
+    )
+
+    created = 0
+    for student in students:
+        StudentEnrollment.objects.create(
+            student=student,
+            class_course=class_course,
+            joining_code=generate_unique_code(
+                StudentEnrollment, field_name="joining_code"
+            ),
+            status=StudentEnrollment.STATUS_ACTIVE,
+            joined_at=timezone.now(),
+        )
+        created += 1
+
+    return created
+
+
+@transaction.atomic
+def auto_enroll_student_into_grade(student):
+    """
+    Called after a student's `grade` is set or changed.
+
+    Enrolls the student into every active ClassCourse of that grade in
+    their institution. Idempotent — existing enrollments are left alone.
+
+    Returns the number of NEW enrollments created.
+    """
+    if student.role != User.ROLE_STUDENT:
+        return 0
+    if student.grade_id is None or student.institution_id is None:
+        return 0
+
+    classes = ClassCourse.objects.filter(
+        institution=student.institution,
+        grade_id=student.grade_id,
+        is_archived=False,
+        is_deleted=False,
+    ).exclude(id__in=StudentEnrollment.objects.filter(
+        student=student
+    ).values_list("class_course_id", flat=True))
+
+    created = 0
+    for klass in classes:
+        StudentEnrollment.objects.create(
+            student=student,
+            class_course=klass,
+            joining_code=generate_unique_code(
+                StudentEnrollment, field_name="joining_code"
+            ),
+            status=StudentEnrollment.STATUS_ACTIVE,
+            joined_at=timezone.now(),
+        )
+        created += 1
+
+    return created
+

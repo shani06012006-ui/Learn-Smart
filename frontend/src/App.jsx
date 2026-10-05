@@ -40,6 +40,7 @@ import TeacherClassesPage from "./features/teacher/pages/TeacherClassesPage";
 import TeacherClassDetailPage from "./features/teacher/pages/TeacherClassDetailPage";
 import TeacherTimetablePage from "./features/teacher/pages/TeacherTimetablePage";
 import TeacherMaterialsPage from "./features/teacher/pages/TeacherMaterialsPage";
+import TeacherStudentsPage from "./features/teacher/pages/TeacherStudentsPage";
 import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -89,6 +90,7 @@ export default function App() {
             <Route path="chat" element={<TeacherChatPage />} />
             <Route path="classes" element={<TeacherClassesPage />} />
             <Route path="classes/:id" element={<TeacherClassDetailPage />} />
+            <Route path="students" element={<TeacherStudentsPage />} />
             <Route path="timetable" element={<TeacherTimetablePage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
             <Route path="announcements" element={<TeacherPlaceholder title="Announcements" />} />

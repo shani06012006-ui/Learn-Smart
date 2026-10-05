@@ -26,6 +26,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     institution = InstitutionBriefSerializer(read_only=True)
     full_name = serializers.SerializerMethodField()
+    grade = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -37,6 +38,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "full_name",
             "role",
             "institution",
+            "grade",
             "is_active",
             "is_staff",
             "is_superuser",
@@ -47,6 +49,12 @@ class AdminUserSerializer(serializers.ModelSerializer):
 
     def get_full_name(self, obj):
         return obj.get_full_name()
+
+    def get_grade(self, obj):
+        if not obj.grade_id:
+            return None
+        g = obj.grade
+        return {"id": str(g.id), "level": g.level, "name": g.name}
 
 
 class AdminUserCreateSerializer(serializers.Serializer):

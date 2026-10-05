@@ -38,6 +38,22 @@ class ClassCourseListCreateView(generics.ListCreateAPIView):
             return [permissions.IsAuthenticated(), IsTeacher()]
         return [permissions.IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        """
+        Create the class and, if a grade is attached, auto-enroll all
+        students of that grade. The count is stashed on `self.request`
+        so the serializer can surface it in the response.
+        """
+        instance = serializer.save()
+        try:
+            enrolled = services.auto_enroll_class_into_grade(instance)
+            self.request._auto_enrolled_count = enrolled
+        except Exception as exc:  # pragma: no cover — best-effort
+            import logging
+            logging.getLogger(__name__).exception(
+                "auto-enroll failed for class %s: %s", instance.id, exc
+            )
+
     def get_queryset(self):
         user = self.request.user
         if user.role == "teacher":

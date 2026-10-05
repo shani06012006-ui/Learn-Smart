@@ -557,6 +557,18 @@ export const realApi = createApi({
       providesTags: [{ type: "ChatThread", id: "teacher-group-members" }],
     }),
 
+    getStudentsList: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.scope) search.set("scope", params.scope);
+        if (params.grade) search.set("grade", params.grade);
+        if (params.q) search.set("q", params.q);
+        const qs = search.toString();
+        return `/auth/students/${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: [{ type: "AdminUser", id: "STUDENT_LIST" }],
+    }),
+
 
     getTeacherGroupMessages: builder.query({
       query: ({ after } = {}) =>
@@ -776,6 +788,7 @@ export const {
   useGetAdminCourseStudentsQuery,
   useGetTeacherGroupThreadQuery,
   useGetTeacherGroupMembersQuery,
+  useGetStudentsListQuery,
   useGetTeacherGroupMessagesQuery,
   useSendTeacherGroupMessageMutation,
   useToggleMessageReactionMutation,
