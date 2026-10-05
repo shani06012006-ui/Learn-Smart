@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { BookOpen } from "lucide-react";
+import { BookOpen, GraduationCap } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
 import {
   useCreateClassMutation,
   useUpdateClassMutation,
+  useGetGradesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -13,6 +14,8 @@ import { extractErrorMessage } from "../../../utils/apiError";
  * ClassFormModal -- create or edit a ClassCourse.
  *
  * Pass `klass` to edit, or omit it to create a new one.
+ * When a grade is picked, the class is linked to that year level and
+ * every student of the grade is auto-enrolled on creation.
  */
 export default function ClassFormModal({
   open,
@@ -25,7 +28,11 @@ export default function ClassFormModal({
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [gradeId, setGradeId] = useState("");
   const [error, setError] = useState("");
+
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
 
   const [createClass, { isLoading: creating }] = useCreateClassMutation();
   const [updateClass, { isLoading: updating }] = useUpdateClassMutation();
@@ -38,10 +45,12 @@ export default function ClassFormModal({
       setName(klass.name || "");
       setSubject(klass.subject || "");
       setDescription(klass.description || "");
+      setGradeId(klass.grade?.id || "");
     } else {
       setName("");
       setSubject("");
       setDescription("");
+      setGradeId("");
     }
     setError("");
   }, [open, klass]);
@@ -64,20 +73,18 @@ export default function ClassFormModal({
     }
 
     try {
+      const payload = {
+        name: trimName,
+        subject: trimSubject,
+        description: trimDesc,
+      };
+      if (gradeId) payload.grade_id = gradeId;
+
       if (isEdit) {
-        const res = await updateClass({
-          id: klass.id,
-          name: trimName,
-          subject: trimSubject,
-          description: trimDesc,
-        }).unwrap();
+        const res = await updateClass({ id: klass.id, ...payload }).unwrap();
         onSuccess?.(res, "updated");
       } else {
-        const res = await createClass({
-          name: trimName,
-          subject: trimSubject,
-          description: trimDesc,
-        }).unwrap();
+        const res = await createClass(payload).unwrap();
         onSuccess?.(res, "created");
       }
       onClose();
@@ -96,12 +103,7 @@ export default function ClassFormModal({
           <Button variant="ghost" onClick={onClose} disabled={isBusy}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            type="submit"
-            form="class-form"
-            loading={isBusy}
-          >
+          <Button variant="primary" type="submit" form="class-form" loading={isBusy}>
             {isEdit ? "Save changes" : "Create class"}
           </Button>
         </>
@@ -114,8 +116,8 @@ export default function ClassFormModal({
               <BookOpen size={16} />
             </span>
             <p className="text-xs text-purple-700">
-              After creating your class, share the joining code with
-              students so they can enroll.
+              If you pick a grade, every student of that grade is auto-enrolled
+              into this class immediately.
             </p>
           </div>
         )}
@@ -128,7 +130,7 @@ export default function ClassFormModal({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Class 10 Physics — Section A"
+            placeholder="e.g. Class 10 Physics - Section A"
             autoFocus
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
           />
@@ -145,6 +147,28 @@ export default function ClassFormModal({
             placeholder="e.g. Physics"
             className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
           />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <GraduationCap size={12} />
+            Grade (optional)
+          </span>
+          <select
+            value={gradeId}
+            onChange={(e) => setGradeId(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+          >
+            <option value="">— Not linked to a grade —</option>
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-slate-400">
+            Pick a grade to auto-enroll all students of that grade.
+          </span>
         </label>
 
         <label className="flex flex-col gap-1.5">

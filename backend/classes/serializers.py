@@ -101,6 +101,23 @@ class AddStudentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     first_name = serializers.CharField(max_length=100)
     last_name = serializers.CharField(max_length=100)
+    grade_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_grade_id(self, value):
+        """Ensure the grade belongs to the teacher's institution."""
+        if value in (None, ""):
+            return None
+        request = self.context.get("request")
+        from institutions.models import Grade
+        qs = Grade.objects.filter(id=value)
+        if request and getattr(request.user, "institution_id", None):
+            qs = qs.filter(institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except Grade.DoesNotExist:
+            raise serializers.ValidationError(
+                "Unknown grade for your institution."
+            )
 
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):

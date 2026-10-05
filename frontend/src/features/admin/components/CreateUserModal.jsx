@@ -1,10 +1,13 @@
-﻿// frontend/src/features/admin/components/CreateUserModal.jsx
+// frontend/src/features/admin/components/CreateUserModal.jsx
 import { useState } from "react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
-import { useCreateAdminUserMutation } from "../../../store/api/realApi";
+import {
+  useCreateAdminUserMutation,
+  useGetGradesQuery,
+} from "../../../store/api/realApi";
 
 const INITIAL = {
   email: "",
@@ -12,10 +15,13 @@ const INITIAL = {
   first_name: "",
   last_name: "",
   role: "teacher",
+  grade_id: "",
 };
 
 export default function CreateUserModal({ open, onClose, defaultRole = "teacher" }) {
   const [createUser, { isLoading }] = useCreateAdminUserMutation();
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
   const [form, setForm] = useState({ ...INITIAL, role: defaultRole });
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
@@ -54,13 +60,17 @@ export default function CreateUserModal({ open, onClose, defaultRole = "teacher"
     }
 
     try {
-      await createUser({
+      const payload = {
         email: form.email.trim(),
         password: form.password,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
         role: form.role,
-      }).unwrap();
+      };
+      if (form.role === "student" && form.grade_id) {
+        payload.grade_id = form.grade_id;
+      }
+      await createUser(payload).unwrap();
       handleClose();
     } catch (err) {
       const detail = err?.data?.error?.detail;
@@ -116,6 +126,34 @@ export default function CreateUserModal({ open, onClose, defaultRole = "teacher"
             Admins are created only by platform operators.
           </p>
         </div>
+
+        {/* Grade (only for students) */}
+        {form.role === "student" && (
+          <div>
+            <label
+              htmlFor="admin-create-grade"
+              className="block text-xs font-bold text-navy-950"
+            >
+              Grade / Class
+            </label>
+            <select
+              id="admin-create-grade"
+              value={form.grade_id}
+              onChange={handleChange("grade_id")}
+              className="mt-2 h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+            >
+              <option value="">— Not assigned —</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-slate-400">
+              Students in this grade are auto-enrolled into matching classes.
+            </p>
+          </div>
+        )}
 
         <Input
           label="Email"

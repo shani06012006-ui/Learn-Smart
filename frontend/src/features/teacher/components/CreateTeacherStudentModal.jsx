@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { UserPlus, GraduationCap } from "lucide-react";
+import { GraduationCap, UserPlus } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
 import {
-  useAddClassStudentMutation,
+  useCreateTeacherStudentMutation,
   useGetGradesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
-export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
+export default function CreateTeacherStudentModal({ open, onClose, onSuccess }) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -19,7 +19,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
   const { data: gradesData } = useGetGradesQuery();
   const grades = gradesData?.results ?? gradesData ?? [];
 
-  const [addStudent, { isLoading }] = useAddClassStudentMutation();
+  const [createStudent, { isLoading }] = useCreateTeacherStudentMutation();
 
   useEffect(() => {
     if (!open) {
@@ -36,21 +36,17 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
     setError("");
 
     const trimEmail = email.trim();
-    const trimFirst = firstName.trim();
-    const trimLast = lastName.trim();
-
-    if (!trimEmail || !trimFirst || !trimLast) {
-      setError("Email, first name, and last name are required.");
+    if (!trimEmail) {
+      setError("Email is required.");
       return;
     }
 
     try {
-      const res = await addStudent({
-        classId,
+      const res = await createStudent({
         email: trimEmail,
-        first_name: trimFirst,
-        last_name: trimLast,
-        grade_id: gradeId || undefined,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        grade_id: gradeId || null,
       }).unwrap();
       onSuccess?.(res);
       onClose();
@@ -63,7 +59,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Add a student"
+      title="Create a student"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={isLoading}>
@@ -72,22 +68,26 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
           <Button
             variant="primary"
             type="submit"
-            form="add-student-form"
+            form="create-teacher-student-form"
             loading={isLoading}
           >
-            Add student
+            Create student
           </Button>
         </>
       }
     >
-      <form id="add-student-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form
+        id="create-teacher-student-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
         <div className="flex items-start gap-3 rounded-xl border border-purple-100 bg-purple-50/50 p-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-purple-600 ring-1 ring-purple-100">
             <UserPlus size={16} />
           </span>
           <p className="text-xs text-purple-700">
-            The student is added to this class. If you pick a grade, they are
-            automatically enrolled in every class of that grade.
+            The student is created in your institution. If you set a grade,
+            they are auto-enrolled in every class of that grade.
           </p>
         </div>
 
@@ -136,7 +136,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
         <label className="flex flex-col gap-1.5">
           <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
             <GraduationCap size={12} />
-            Grade (optional)
+            Grade
           </span>
           <select
             value={gradeId}
@@ -150,9 +150,6 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
               </option>
             ))}
           </select>
-          <span className="text-[11px] text-slate-400">
-            Pick a grade to auto-enroll the student in every matching class.
-          </span>
         </label>
 
         {error && (

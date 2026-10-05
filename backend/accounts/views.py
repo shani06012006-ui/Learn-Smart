@@ -280,3 +280,106 @@ class StudentListView(APIView):
             "results": serializer.data,
         })
 
+
+class TeacherStudentCreateView(APIView):
+    """
+    POST /api/v1/auth/students/create/
+
+    Teachers create a student directly (with an optional grade).
+    The student is auto-enrolled into every class of that grade.
+
+    Body: { email, first_name, last_name, grade_id (optional) }
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+
+        if user.role != "teacher":
+            return Response(
+                {"detail": "Only teachers can create students here."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if user.institution_id is None:
+            return Response(
+                {"detail": "Your account has no institution."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from accounts.models import OnlineStatus, StudentProfile, User
+        from institutions.models import Grade
+        from classes.services import auto_enroll_student_into_grade
+
+        email = (request.data.get("email") or "").strip().lower()
+        first_name = (request.data.get("first_name") or "").strip()
+        last_name = (request.data.get("last_name") or "").strip()
+        grade_id = request.data.get("grade_id")
+
+        if not email:
+            return Response(
+                {"detail": "Email is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate grade belongs to teacher's institution
+        grade = None
+        if grade_id:
+            try:
+                grade = Grade.objects.get(
+                    id=grade_id,
+                    institution_id=user.institution_id,
+                )
+            except Grade.DoesNotExist:
+                return Response(
+                    {"detail": "Unknown grade for your institution."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Refuse if the user already exists
+        existing = User.objects.filter(email=email).first()
+        if existing is not None:
+            # Reuse — do not change password/role; just enrol if needed
+            if existing.role != User.ROLE_STUDENT:
+                return Response(
+                    {"detail": "A non-student user already uses this email."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            student = existing
+            if grade is not None and student.grade_id != grade.id:
+                student.grade = grade
+                student.save(update_fields=["grade", "updated_at"])
+            created = False
+        else:
+            student = User.objects.create_user(
+                email=email,
+                password=None,  # unusable until they set one
+                first_name=first_name,
+                last_name=last_name,
+                role=User.ROLE_STUDENT,
+                institution=user.institution,
+                grade=grade,
+            )
+            StudentProfile.objects.create(user=student)
+            OnlineStatus.objects.create(user=student)
+            created = True
+
+        enrolled_count = 0
+        if student.grade_id is not None:
+            try:
+                enrolled_count = auto_enroll_student_into_grade(student)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "auto-enroll failed for student %s", student.id
+                )
+
+        from .serializers import StudentBriefSerializer
+        return Response(
+            {
+                "created": created,
+                "auto_enrolled_count": enrolled_count,
+                "student": StudentBriefSerializer(student).data,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+

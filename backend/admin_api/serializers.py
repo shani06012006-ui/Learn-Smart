@@ -64,6 +64,21 @@ class AdminUserCreateSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default="")
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default="")
     role = serializers.ChoiceField(choices=[User.ROLE_TEACHER, User.ROLE_STUDENT])
+    grade_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_grade_id(self, value):
+        """Ensure the grade belongs to the caller's institution."""
+        if value in (None, ""):
+            return None
+        request = self.context.get("request")
+        from institutions.models import Grade
+        qs = Grade.objects.filter(id=value)
+        if request and getattr(request.user, "institution_id", None) and not request.user.is_superuser:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except Grade.DoesNotExist:
+            raise serializers.ValidationError("Unknown grade for your institution.")
 
     def validate_email(self, value):
         value = value.strip().lower()
@@ -83,6 +98,20 @@ class AdminUserUpdateSerializer(serializers.Serializer):
 
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
+    grade_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_grade_id(self, value):
+        if value in (None, ""):
+            return None
+        request = self.context.get("request")
+        from institutions.models import Grade
+        qs = Grade.objects.filter(id=value)
+        if request and getattr(request.user, "institution_id", None) and not request.user.is_superuser:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except Grade.DoesNotExist:
+            raise serializers.ValidationError("Unknown grade for your institution.")
 
 
 class AdminUserToggleActiveSerializer(serializers.Serializer):
