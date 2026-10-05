@@ -60,6 +60,7 @@ export const realApi = createApi({
     "AdminStats",
     "AdminInstitution",
     "AdminCourse",
+    "AdminGrade",
     "AdminSession",
     "AdminEnrollment",
     "AdminAttendance",
@@ -103,6 +104,37 @@ export const realApi = createApi({
     }),
 
     // ---------- admin users -----------------------------------------
+
+    getGrades: builder.query({
+      query: () => `/grades/`,
+      providesTags: [{ type: "AdminGrade", id: "LIST" }],
+    }),
+
+    createGrade: builder.mutation({
+      query: (body) => ({
+        url: "/grades/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
+    }),
+
+    updateGrade: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/grades/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
+    }),
+
+    deleteGrade: builder.mutation({
+      query: (id) => ({
+        url: `/grades/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
+    }),
 
     getAdminUsers: builder.query({
       query: (params = {}) => {
@@ -499,10 +531,15 @@ export const realApi = createApi({
     }),
 
     addClassStudent: builder.mutation({
-      query: ({ classId, email, first_name, last_name }) => ({
+      query: ({ classId, email, first_name, last_name, grade_id }) => ({
         url: `/classes/${classId}/students/`,
         method: "POST",
-        body: { email, first_name, last_name },
+        body: {
+          email,
+          first_name,
+          last_name,
+          ...(grade_id ? { grade_id } : {}),
+        },
       }),
       invalidatesTags: (result, error, { classId }) => [
         { type: "ClassRoster", id: classId },
@@ -567,6 +604,19 @@ export const realApi = createApi({
         return `/auth/students/${qs ? `?${qs}` : ""}`;
       },
       providesTags: [{ type: "AdminUser", id: "STUDENT_LIST" }],
+    }),
+
+    createTeacherStudent: builder.mutation({
+      query: (body) => ({
+        url: "/auth/students/create/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        { type: "AdminUser", id: "STUDENT_LIST" },
+        { type: "Class", id: "LIST" },
+        { type: "ClassRoster", id: "LIST" },
+      ],
     }),
 
 
@@ -778,6 +828,10 @@ export const {
   useAdminMeQuery,
   useAdminLogoutMutation,
   useGetAdminUsersQuery,
+  useGetGradesQuery,
+  useCreateGradeMutation,
+  useUpdateGradeMutation,
+  useDeleteGradeMutation,
   useGetAdminUserQuery,
   useCreateAdminUserMutation,
   useUpdateAdminUserMutation,
@@ -789,6 +843,7 @@ export const {
   useGetTeacherGroupThreadQuery,
   useGetTeacherGroupMembersQuery,
   useGetStudentsListQuery,
+  useCreateTeacherStudentMutation,
   useGetTeacherGroupMessagesQuery,
   useSendTeacherGroupMessageMutation,
   useToggleMessageReactionMutation,

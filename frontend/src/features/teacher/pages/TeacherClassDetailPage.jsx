@@ -6,6 +6,7 @@ import {
   FileText,
   Download,
   Calendar,
+  GraduationCap,
   Loader2,
   Plus,
   MoreVertical,
@@ -251,9 +252,17 @@ export default function TeacherClassDetailPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
-              {klass.subject || "Class"}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
+                {klass.subject || "Class"}
+              </span>
+              {klass.grade && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-100">
+                  <GraduationCap size={10} />
+                  {klass.grade.name}
+                </span>
+              )}
+            </div>
             <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-navy-950">
               {klass.name}
             </h1>

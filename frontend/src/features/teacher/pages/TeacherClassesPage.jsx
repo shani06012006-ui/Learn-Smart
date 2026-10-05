@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -178,6 +178,21 @@ export default function TeacherClassesPage() {
   const activeClasses = classes.filter((c) => !c.is_archived);
   const archivedClasses = classes.filter((c) => c.is_archived);
 
+  // Group active classes by grade; ungrouped classes go to a final bucket.
+  const groupedActive = useMemo(() => {
+    const byGrade = new Map();
+    for (const c of activeClasses) {
+      const gid = c.grade?.id || "__none__";
+      const gname = c.grade?.name || "No grade assigned";
+      const level = c.grade?.level ?? 999;
+      if (!byGrade.has(gid)) {
+        byGrade.set(gid, { id: gid, name: gname, level, classes: [] });
+      }
+      byGrade.get(gid).classes.push(c);
+    }
+    return Array.from(byGrade.values()).sort((a, b) => a.level - b.level);
+  }, [activeClasses]);
+
   function handleCreate() {
     setEditing(null);
     setFormOpen(true);
@@ -253,22 +268,26 @@ export default function TeacherClassesPage() {
       ) : (
         <>
           {activeClasses.length > 0 && (
-            <section>
-              <h2 className="mb-3 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                Active ({activeClasses.length})
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {activeClasses.map((c) => (
-                  <ClassCard
-                    key={c.id}
-                    klass={c}
-                    onEdit={handleEdit}
-                    onArchiveToggle={handleArchiveToggle}
-                    onDelete={promptDelete}
-                  />
-                ))}
-              </div>
-            </section>
+            <>
+              {groupedActive.map((group) => (
+                <section key={group.id}>
+                  <h2 className="mb-3 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+                    {group.name} ({group.classes.length})
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {group.classes.map((c) => (
+                      <ClassCard
+                        key={c.id}
+                        klass={c}
+                        onEdit={handleEdit}
+                        onArchiveToggle={handleArchiveToggle}
+                        onDelete={promptDelete}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </>
           )}
 
           {archivedClasses.length > 0 && (

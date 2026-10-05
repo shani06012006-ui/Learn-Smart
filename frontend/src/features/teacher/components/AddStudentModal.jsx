@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
-import { UserPlus } from "lucide-react";
+import { UserPlus, GraduationCap } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
-import { useAddClassStudentMutation } from "../../../store/api/realApi";
+import {
+  useAddClassStudentMutation,
+  useGetGradesQuery,
+} from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
 export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [gradeId, setGradeId] = useState("");
   const [error, setError] = useState("");
+
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
 
   const [addStudent, { isLoading }] = useAddClassStudentMutation();
 
@@ -19,6 +26,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
       setEmail("");
       setFirstName("");
       setLastName("");
+      setGradeId("");
       setError("");
     }
   }, [open]);
@@ -32,7 +40,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
     const trimLast = lastName.trim();
 
     if (!trimEmail || !trimFirst || !trimLast) {
-      setError("All three fields are required.");
+      setError("Email, first name, and last name are required.");
       return;
     }
 
@@ -42,6 +50,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
         email: trimEmail,
         first_name: trimFirst,
         last_name: trimLast,
+        grade_id: gradeId || undefined,
       }).unwrap();
       onSuccess?.(res);
       onClose();
@@ -77,8 +86,8 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
             <UserPlus size={16} />
           </span>
           <p className="text-xs text-purple-700">
-            A joining code will be generated automatically. Share it with the
-            student so they can enroll themselves, or keep it for your records.
+            The student is added to this class. If you pick a grade, they are
+            automatically enrolled in every class of that grade.
           </p>
         </div>
 
@@ -123,6 +132,28 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
             />
           </label>
         </div>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <GraduationCap size={12} />
+            Grade (optional)
+          </span>
+          <select
+            value={gradeId}
+            onChange={(e) => setGradeId(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+          >
+            <option value="">— Not assigned —</option>
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-slate-400">
+            Pick a grade to auto-enroll the student in every matching class.
+          </span>
+        </label>
 
         {error && (
           <p className="rounded-xl border border-coral-200 bg-coral-50 px-3 py-2 text-xs font-medium text-coral-700">

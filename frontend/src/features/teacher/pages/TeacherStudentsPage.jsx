@@ -6,6 +6,7 @@ import {
   Search,
   BookOpen,
   Mail,
+  Plus,
   X,
   Loader2,
 } from "lucide-react";
@@ -15,6 +16,8 @@ import ErrorState from "../../../components/feedback/ErrorState";
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
 import StatCard from "../../admin/components/StatCard";
+import Button from "../../../components/ui/Button";
+import CreateTeacherStudentModal from "../components/CreateTeacherStudentModal";
 import {
   useGetStudentsListQuery,
   useGetClassesQuery,
@@ -105,6 +108,7 @@ export default function TeacherStudentsPage() {
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [openStudent, setOpenStudent] = useState(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const {
     data: studentsData,
@@ -187,6 +191,10 @@ export default function TeacherStudentsPage() {
             Every student you teach, grouped by class.
           </p>
         </div>
+        <Button variant="primary" onClick={() => setCreateModalOpen(true)}>
+          <Plus size={16} />
+          New student
+        </Button>
       </header>
 
       {/* Stat cards */}
@@ -361,6 +369,16 @@ export default function TeacherStudentsPage() {
       <StudentDrawer
         student={openStudent}
         onClose={() => setOpenStudent(null)}
+      />
+
+      <CreateTeacherStudentModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={(res) => {
+          console.info(
+            `Created student: enrolled in ${res?.auto_enrolled_count ?? 0} class(es)`
+          );
+        }}
       />
     </div>
   );

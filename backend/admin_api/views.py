@@ -212,6 +212,25 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                 "auto-enroll failed for student %s", user_obj.id
             )
 
+    def _sync_student_grade_enrollments_with_grade(self, user_obj, grade_obj):
+        """
+        Assign the given grade (or clear it if None) and auto-enroll the
+        student into matching classes. Best-effort.
+        """
+        if getattr(user_obj, "role", None) != "student":
+            return
+        user_obj.grade = grade_obj
+        user_obj.save(update_fields=["grade", "updated_at"])
+        if grade_obj is not None:
+            try:
+                from classes.services import auto_enroll_student_into_grade
+                auto_enroll_student_into_grade(user_obj)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "auto-enroll failed for student %s", user_obj.id
+                )
+
 
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -294,6 +313,8 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         else:
             institution = user.institution
 
+        grade_obj = serializer.validated_data.get("grade_id")
+
         new_user = User.objects.create_user(
             email=serializer.validated_data["email"],
             password=serializer.validated_data["password"],
@@ -303,17 +324,37 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             institution=institution,
         )
 
+        # Apply grade (only meaningful for students) and trigger auto-enroll
+        if grade_obj is not None and new_user.role == User.ROLE_STUDENT:
+            self._sync_student_grade_enrollments_with_grade(new_user, grade_obj)
+
         return Response(AdminUserSerializer(new_user).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
         user = self.get_object()
-        serializer = AdminUserUpdateSerializer(data=request.data, partial=True)
+        serializer = AdminUserUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
 
+        update_fields = ["updated_at"]
         for field in ("first_name", "last_name"):
             if field in serializer.validated_data:
                 setattr(user, field, serializer.validated_data[field])
-        user.save(update_fields=["first_name", "last_name", "updated_at"])
+                update_fields.append(field)
+
+        # Grade change (only for students). `grade_id` may be explicitly null
+        # to unassign. Check the raw request data because null vs missing
+        # is meaningful here.
+        grade_was_set = "grade_id" in request.data
+        new_grade = serializer.validated_data.get("grade_id", None)
+
+        user.save(update_fields=update_fields)
+
+        if grade_was_set and user.role == User.ROLE_STUDENT:
+            self._sync_student_grade_enrollments_with_grade(user, new_grade)
 
         return Response(AdminUserSerializer(user).data)
 

@@ -1,11 +1,14 @@
-﻿// frontend/src/features/admin/components/EditUserModal.jsx
+// frontend/src/features/admin/components/EditUserModal.jsx
 import { useEffect, useState } from "react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
 import Badge from "../../../components/ui/Badge";
-import { useUpdateAdminUserMutation } from "../../../store/api/realApi";
+import {
+  useUpdateAdminUserMutation,
+  useGetGradesQuery,
+} from "../../../store/api/realApi";
 
 const ROLE_VARIANT = {
   admin: "brand",
@@ -15,7 +18,9 @@ const ROLE_VARIANT = {
 
 export default function EditUserModal({ open, onClose, user = null }) {
   const [updateUser, { isLoading }] = useUpdateAdminUserMutation();
-  const [form, setForm] = useState({ first_name: "", last_name: "" });
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
+  const [form, setForm] = useState({ first_name: "", last_name: "", grade_id: "" });
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
 
@@ -24,6 +29,7 @@ export default function EditUserModal({ open, onClose, user = null }) {
     setForm({
       first_name: user.first_name || "",
       last_name: user.last_name || "",
+      grade_id: user.grade?.id || "",
     });
     setErrors({});
     setFormError(null);
@@ -51,11 +57,15 @@ export default function EditUserModal({ open, onClose, user = null }) {
     setFormError(null);
 
     try {
-      await updateUser({
+      const payload = {
         id: user.id,
         first_name: form.first_name.trim(),
         last_name: form.last_name.trim(),
-      }).unwrap();
+      };
+      if (user.role === "student") {
+        payload.grade_id = form.grade_id || null;
+      }
+      await updateUser(payload).unwrap();
       onClose();
     } catch (err) {
       const detail = err?.data?.error?.detail;
@@ -126,9 +136,35 @@ export default function EditUserModal({ open, onClose, user = null }) {
           />
         </div>
 
+        {user?.role === "student" && (
+          <div>
+            <label
+              htmlFor="admin-edit-grade"
+              className="block text-xs font-bold text-navy-950"
+            >
+              Grade / Class
+            </label>
+            <select
+              id="admin-edit-grade"
+              value={form.grade_id}
+              onChange={handleChange("grade_id")}
+              className="mt-2 h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+            >
+              <option value="">— Not assigned —</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-slate-400">
+              Changing grade re-syncs auto-enrollment into matching classes.
+            </p>
+          </div>
+        )}
+
         <p className="text-xs text-slate-400">
-          Email, role, and institution cannot be changed here. Use
-          deactivate / activate to manage access.
+          Email, role, and institution cannot be changed here.
         </p>
 
         {formError && (

@@ -10,7 +10,14 @@ from core.utils import generate_unique_code
 from .models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 
 @transaction.atomic
-def add_student_to_class(class_course, email, first_name, last_name):
+def add_student_to_class(class_course, email, first_name, last_name, grade=None):
+    """
+    Create (or fetch) a student and enroll them in the given class.
+
+    If `grade` is provided (a Grade instance), it is set on the student
+    (for new or existing) and the student is auto-enrolled into every
+    matching class of that grade.
+    """
 
     student, student_created = User.objects.get_or_create(
         email=email.lower().strip(),
@@ -19,21 +26,42 @@ def add_student_to_class(class_course, email, first_name, last_name):
             "last_name": last_name,
             "role": User.ROLE_STUDENT,
             "institution": class_course.institution,
+            "grade": grade,
         },
     )
+
     if student_created:
         student.set_unusable_password()
         student.save(update_fields=["password"])
         StudentProfile.objects.create(user=student)
         OnlineStatus.objects.create(user=student)
+    else:
+        # Existing student — update grade if provided
+        if grade is not None and student.grade_id != grade.id:
+            student.grade = grade
+            student.save(update_fields=["grade", "updated_at"])
 
+    # Enrollment in the current class
     enrollment, enrollment_created = StudentEnrollment.objects.get_or_create(
         student=student,
         class_course=class_course,
         defaults={
             "joining_code": generate_unique_code(StudentEnrollment, field_name="joining_code"),
+            "status": StudentEnrollment.STATUS_ACTIVE,
         },
     )
+
+    # If the student now has a grade, auto-enroll into matching classes
+    # (idempotent — won't duplicate the current class).
+    if student.grade_id is not None:
+        try:
+            auto_enroll_student_into_grade(student)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "auto-enroll failed for student %s", student.id
+            )
+
     return enrollment, enrollment_created
 
 

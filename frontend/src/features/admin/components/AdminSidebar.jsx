@@ -11,6 +11,7 @@ import {
   CalendarDays,
   CalendarX,
   MessageSquare,
+  Layers,
 } from "lucide-react";
 
 import { useAdminAuth } from "../../../hooks/useAdminAuth";
@@ -22,6 +23,7 @@ import {
 const NAV_ITEMS = [
   { to: "/admin",              end: true, label: "Dashboard",  icon: LayoutDashboard },
   { to: "/admin/courses",                 label: "Courses",    icon: BookOpen },
+  { to: "/admin/grades",                  label: "Grades",     icon: Layers },
   { to: "/admin/teachers",                label: "Teachers",   icon: UserCog },
   { to: "/admin/students",                label: "Students",   icon: GraduationCap },
   { to: "/admin/attendance",              label: "Attendance", icon: ClipboardCheck },

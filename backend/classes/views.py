@@ -111,14 +111,26 @@ class ClassStudentsView(APIView):
 
     def post(self, request, class_id):
         class_course = self.get_class(class_id, request.user)
-        input_serializer = AddStudentSerializer(data=request.data)
+        input_serializer = AddStudentSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         input_serializer.is_valid(raise_exception=True)
 
+        # `grade_id` in the serializer validates to a Grade instance
+        validated = input_serializer.validated_data
+        grade = validated.pop("grade_id", None)
+
         enrollment, created = services.add_student_to_class(
-            class_course=class_course, **input_serializer.validated_data
+            class_course=class_course,
+            grade=grade,
+            **validated,
         )
         output = StudentEnrollmentSerializer(enrollment)
-        return Response(output.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        return Response(
+            output.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class ClassStudentDetailView(APIView):
