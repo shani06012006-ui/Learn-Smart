@@ -445,6 +445,38 @@ export const realApi = createApi({
       providesTags: (result, error, id) => [{ type: "ClassDetail", id }],
     }),
 
+    createClass: builder.mutation({
+      query: (body) => ({
+        url: "/classes/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [
+        { type: "Class", id: "LIST" },
+        { type: "ClassDetail", id: "NEW" },
+      ],
+    }),
+
+    updateClass: builder.mutation({
+      query: ({ id, ...patch }) => ({
+        url: `/classes/${id}/`,
+        method: "PATCH",
+        body: patch,
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Class", id: "LIST" },
+        { type: "ClassDetail", id },
+      ],
+    }),
+
+    deleteClass: builder.mutation({
+      query: (id) => ({
+        url: `/classes/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "Class", id: "LIST" }],
+    }),
+
     getClassStudents: builder.query({
       query: (id) => `/classes/${id}/students/`,
       providesTags: (result, error, id) => [{ type: "ClassRoster", id }],
@@ -759,6 +791,9 @@ export const {
   useGetClassQuery,
   useGetClassStudentsQuery,
   useGetClassMaterialsQuery,
+  useCreateClassMutation,
+  useUpdateClassMutation,
+  useDeleteClassMutation,
   useGetAllMaterialsQuery,
   useAddClassStudentMutation,
   useUpdateEnrollmentStatusMutation,
