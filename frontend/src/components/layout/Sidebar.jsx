@@ -4,6 +4,7 @@ import clsx from "clsx";
 import {
   LayoutDashboard,
   BookOpen,
+  GraduationCap,
   FileText,
   Megaphone,
   BarChart3,
@@ -21,6 +22,7 @@ import { useAuth } from "../../hooks/useAuth";
 const TEACHER_ITEMS = [
   { label: "Dashboard",     to: "/teacher",                    icon: LayoutDashboard, end: true },
   { label: "Classes",       to: "/teacher/classes",            icon: BookOpen },
+  { label: "Students",      to: "/teacher/students",           icon: GraduationCap },
   { label: "Timetable",     to: "/teacher/timetable",          icon: CalendarDays },
   { label: "Materials",     to: "/teacher/materials",          icon: FileText },
   { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },

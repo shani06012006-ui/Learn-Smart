@@ -17,6 +17,7 @@ tokens are JWTs, validated by accounts/jwt_auth.py which also enforces
 """
 from django.contrib.auth import authenticate
 from django.utils import timezone
+from rest_framework import permissions, status
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -184,3 +185,98 @@ class WsTicketView(APIView):
 
 # Keep a reference so `from .views import User` doesn't break.
 _ = User
+
+
+class StudentListView(APIView):
+    """
+    GET /api/v1/students/
+
+    Cross-class student list for teachers.
+
+    Query parameters:
+      scope   -- "mine" (default, students in teacher's classes) or
+                 "all" (all students in the institution)
+      grade   -- filter by Grade UUID
+      q       -- case-insensitive search on email / first / last name
+
+    Teachers only. Admins use /api/v1/admin/users/?role=student.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        if user.role != "teacher":
+            return Response(
+                {"detail": "Only teachers can access this endpoint."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from .models import User
+        from .serializers import StudentBriefSerializer
+        from classes.models import ClassCourse, StudentEnrollment
+
+        # Base scope: only students of the teacher's institution
+        qs = User.objects.filter(
+            role=User.ROLE_STUDENT,
+            institution=user.institution,
+        ).select_related("grade").order_by("first_name", "last_name", "email")
+
+        scope = request.query_params.get("scope", "mine").lower()
+
+        if scope == "mine":
+            # Restrict to students enrolled in any class this teacher owns
+            my_class_ids = ClassCourse.objects.filter(
+                teacher=user,
+            ).values_list("id", flat=True)
+            student_ids = StudentEnrollment.objects.filter(
+                class_course_id__in=my_class_ids,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            ).values_list("student_id", flat=True).distinct()
+            qs = qs.filter(id__in=student_ids)
+
+        # Filter by grade
+        grade_id = request.query_params.get("grade")
+        if grade_id:
+            qs = qs.filter(grade_id=grade_id)
+
+        # Search
+        q = request.query_params.get("q")
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(email__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+            )
+
+        # Attach "classes the student is enrolled in" for the serialized output.
+        # Build a map[student_id] = list of {id, name, subject} in one query.
+        student_ids = list(qs.values_list("id", flat=True))
+        enrollments = (
+            StudentEnrollment.objects
+            .filter(
+                student_id__in=student_ids,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            )
+            .select_related("class_course")
+        )
+        class_map = {}
+        for e in enrollments:
+            class_map.setdefault(e.student_id, []).append({
+                "id": str(e.class_course.id),
+                "name": e.class_course.name,
+                "subject": e.class_course.subject,
+            })
+
+        # Attach the list to each user object (used by the serializer)
+        students = list(qs)
+        for s in students:
+            setattr(s, "_my_classes", class_map.get(s.id, []))
+
+        serializer = StudentBriefSerializer(students, many=True)
+        return Response({
+            "count": len(students),
+            "results": serializer.data,
+        })
+

@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
@@ -54,6 +54,18 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         null=True,
         blank=True,
         related_name="users",
+    )
+
+    grade = models.ForeignKey(
+        "institutions.Grade",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="students",
+        help_text=(
+            "Only meaningful for role='student'. "
+            "Determines which subject-classes auto-enroll the student."
+        ),
     )
 
     is_active = models.BooleanField(default=True)
