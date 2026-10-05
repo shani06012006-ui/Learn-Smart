@@ -1,4 +1,4 @@
-﻿import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 
 import { useAuth } from "../hooks/useAuth";
 import LoadingState from "../components/feedback/LoadingState";
@@ -16,7 +16,10 @@ export default function RootRoute() {
   }
 
   if (isAuthenticated) {
-    const target = user?.role === "teacher" ? "/teacher" : "/student";
+    const target =
+      user?.role === "teacher" ? "/teacher"
+      : user?.role === "admin" ? "/admin"
+      : "/student";
     return <Navigate to={target} replace />;
   }
 

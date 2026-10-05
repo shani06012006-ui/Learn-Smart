@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/components/AdminSidebar.jsx
+// frontend/src/features/admin/components/AdminSidebar.jsx
 import { NavLink, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   CalendarDays,
   CalendarX,
+  MessageSquare,
 } from "lucide-react";
 
 import { useAdminAuth } from "../../../hooks/useAdminAuth";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: "/admin/timetable",               label: "Timetable",  icon: CalendarDays },
   { to: "/admin/leaves",                  label: "Leaves",     icon: CalendarX, badgeKey: "leaves" },
   { to: "/admin/sessions",                label: "Sessions",   icon: Monitor },
+  { to: "/admin/messages",                label: "Messages",   icon: MessageSquare },
 ];
 
 export default function AdminSidebar() {

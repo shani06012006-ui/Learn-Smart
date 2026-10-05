@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v1/admin/", include("admin_api.urls")),
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
+    path("api/v1/chat/", include("chat.urls")),
 ]
 
 if settings.DEBUG:
