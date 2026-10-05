@@ -202,9 +202,13 @@ class TeacherGroupMessagesView(APIView):
         return Response({"results": serializer.data})
 
     def post(self, request):
-        if not (request.user.is_authenticated and request.user.role == "admin"):
+        # Both admins and teachers may post in the institution group.
+        if not (
+            request.user.is_authenticated
+            and request.user.role in {"admin", "teacher"}
+        ):
             return Response(
-                {"detail": "Only admins can post in this group."},
+                {"detail": "Only admins and teachers can post in this group."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 

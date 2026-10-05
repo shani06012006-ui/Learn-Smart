@@ -1,14 +1,16 @@
 /**
- * ReactionBar - Instagram/WhatsApp-style reactions.
+ * ReactionBar -- Instagram/WhatsApp-style reactions with optimistic UI.
  *
- * Behavior (wishlist-style):
- *  - ONE reaction per user per message (backend enforces via unique constraint).
- *  - Click a chip       -> if it's YOUR emoji, remove it immediately (toggle off).
- *                          if it's NOT yours, ADD it (replacing any existing reaction of yours).
- *  - Hover a chip       -> tooltip with "who reacted".
- *  - Click info icon    -> "who reacted" popover with avatars + names.
- *  - "+" button         -> emoji dropdown with 12 emojis.
- *  - Pop animation      -> framer-motion on tap.
+ * Behavior:
+ *  - ONE reaction per user per message (backend enforces unique constraint).
+ *  - Click a chip -> if it's YOUR emoji, remove immediately. If it's not,
+ *    ADD it (replacing any existing reaction of yours).
+ *  - Click the "+" button -> emoji dropdown with 12 emojis.
+ *  - Info icon on each chip -> "who reacted" popover.
+ *  - Pop animation on tap.
+ *
+ * Optimistic: the click updates the local UI instantly, before the server
+ * responds. If the server fails, we roll back.
  */
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,7 +31,6 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
   const wrapRef = useRef(null);
 
   const reactions = message.reactions || [];
-  const reactedEmojis = new Set(reactions.map((r) => r.emoji));
   const myReaction = reactions.find((r) => r.reacted_by_me);
 
   useEffect(() => {
@@ -54,13 +55,11 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
     };
   }, [pickerOpen, reactorsFor]);
 
-  /* Click chip = always toggle. No popover on click. */
   function handleChipClick(emoji) {
     if (disabled) return;
     onToggle(message.id, emoji);
   }
 
-  /* Info icon click = show who reacted */
   function handleInfoClick(emoji) {
     setReactorsFor((prev) => (prev === emoji ? null : emoji));
   }
@@ -72,7 +71,6 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
 
   return (
     <div ref={wrapRef} className="mt-2 flex flex-wrap items-center gap-1.5">
-      {/* Existing reaction chips */}
       {reactions.map((r) => (
         <ReactionChip
           key={r.emoji}
@@ -82,7 +80,6 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
         />
       ))}
 
-      {/* Emoji picker button */}
       <div className="relative">
         <button
           type="button"
@@ -141,7 +138,6 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
         </AnimatePresence>
       </div>
 
-      {/* "Who reacted" popover */}
       <AnimatePresence>
         {reactorsFor && (
           <ReactorsPopover
@@ -155,9 +151,8 @@ export default function ReactionBar({ message, onToggle, disabled = false }) {
   );
 }
 
-/* -- Individual chip --------------------------------------------------- */
 function ReactionChip({ reaction, onClick, onInfo }) {
-  const { emoji, count, reacted_by_me, users } = reaction;
+  const { emoji, count, reacted_by_me } = reaction;
   return (
     <div
       className={
@@ -178,7 +173,6 @@ function ReactionChip({ reaction, onClick, onInfo }) {
         <span>{count}</span>
       </motion.button>
 
-      {/* Info icon only when count > 0, to see who reacted */}
       {count > 0 && (
         <button
           type="button"
@@ -196,7 +190,6 @@ function ReactionChip({ reaction, onClick, onInfo }) {
   );
 }
 
-/* -- Reactors popover -------------------------------------------------- */
 function ReactorsPopover({ emoji, users, onClose }) {
   return (
     <motion.div
@@ -208,7 +201,7 @@ function ReactorsPopover({ emoji, users, onClose }) {
     >
       <div className="flex items-center justify-between gap-3 px-2 pb-1">
         <p className="text-[11px] font-bold text-slate-600">
-          {emoji} - {users.length} {users.length === 1 ? "person" : "people"}
+          {emoji} -- {users.length} {users.length === 1 ? "person" : "people"}
         </p>
         <button
           type="button"

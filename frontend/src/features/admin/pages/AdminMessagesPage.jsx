@@ -189,10 +189,17 @@ export default function AdminMessagesPage() {
     return [...serverMessages, ...extras];
   }, [serverMessages, liveMessages]);
 
-  useChatSocket(thread?.id, (msg) => {
-    setLiveMessages((prev) =>
-      prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
-    );
+  // WS: merge by ID so reaction updates overwrite existing messages
+  const [messageOverrides, setMessageOverrides] = useState({});
+  useChatSocket(thread?.id, {
+    onNewMessage: (msg) => {
+      setLiveMessages((prev) =>
+        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+      );
+    },
+    onMessageUpdate: (msg) => {
+      setMessageOverrides((prev) => ({ ...prev, [msg.id]: msg }));
+    },
   });
 
   useEffect(() => {

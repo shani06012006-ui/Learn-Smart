@@ -1,34 +1,22 @@
-﻿import { useEffect } from "react";
-
-import { apiSlice } from "../store/api/apiSlice";
-import { subscribeToChanges } from "../mocks/crossTabSync";
-
-// Listens for cross-tab change pings and invalidates every mock-backed
-// RTK Query tag, so open queries refetch from the (shared) mock data layer.
-//
-// Mounted once per authenticated page via Navbar. Safe to mount multiple
-// times -- each instance just holds its own subscription, and invalidation
-// is idempotent.
-//
-// The tag list is intentionally broad: chat threads, messages, members,
-// notifications, and the aggregates that depend on them (unread counts,
-// thread summaries). If a future data module adds a new tag type, add it
-// here too, or subscribers will silently miss updates.
-const SYNCED_TAGS = [
-  "Thread",
-  "Message",
-  "ThreadMember",
-  "Notification",
-];
-
+/**
+ * useCrossTabSync -- DISABLED.
+ *
+ * This hook originally sync'd the mock data layer across browser tabs
+ * via BroadcastChannel + localStorage. It invalidated a broad set of
+ * RTK Query tags on every cross-tab event, which caused:
+ *
+ *   - Cross-session cache invalidation (admin tags firing on teacher
+ *     pages, producing spurious 403s in the server log)
+ *   - WS reconnect storms (the chat socket was torn down and re-opened
+ *     every ~60 seconds because cached queries kept refetching)
+ *
+ * With the app now on the real backend, WebSockets provide the cross-tab
+ * transport we actually need. This hook is intentionally a no-op so any
+ * remaining import site does not break, but it does nothing.
+ *
+ * If a future feature needs true cross-tab sync of *real* data, wire it
+ * against the WebSocket layer -- do not resurrect the mock path.
+ */
 export function useCrossTabSync() {
-  useEffect(() => {
-    const unsubscribe = subscribeToChanges(() => {
-      // Invalidate on the next tick so localStorage has flushed.
-      setTimeout(() => {
-        apiSlice.util.invalidateTags(SYNCED_TAGS);
-      }, 0);
-    });
-    return unsubscribe;
-  }, []);
+  // Intentionally empty.
 }
