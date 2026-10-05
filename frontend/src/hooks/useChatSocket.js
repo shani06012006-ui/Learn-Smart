@@ -1,18 +1,20 @@
 /**
- * useChatSocket — subscribes to a chat thread's WebSocket.
+ * useChatSocket -- subscribes to a chat thread's WebSocket.
  *
  * Auth flow (matches backend middleware):
  *   1. POST /api/v1/auth/ws-ticket/  ->  { ticket: "<opaque>" }
  *   2. Open WS: /ws/chat/thread/<thread_id>/?ticket=<ticket>
  *
- * Token lookup: tries multiple localStorage keys because the app
- * stores JWT under "admin.access" (per useAdminAuth.js), not the
- * generic "accessToken".
+ * Token lookup: tries multiple localStorage keys because the app stores
+ * JWT under "admin.access" (per useAdminAuth.js), not the generic
+ * "accessToken".
  *
- * Reconnect: on unexpected close, retries with exponential backoff.
- * Polling fallback: if WS never opens within 3s, the caller can
- * rely on RTK Query's normal polling. This hook exposes an
- * `isConnected` state so callers can decide.
+ * Callbacks:
+ *   onNewMessage(message)     -- called when a new message arrives
+ *   onMessageUpdate(message)  -- called when an existing message is
+ *                                updated (reaction added/removed, edit)
+ *
+ * Reconnect: exponential backoff on unexpected close.
  */
 import { useEffect, useRef, useState } from "react";
 
@@ -35,15 +37,15 @@ function readToken() {
   return null;
 }
 
-export default function useChatSocket(threadId, onMessage) {
+export default function useChatSocket(threadId, callbacks = {}) {
   const socketRef = useRef(null);
-  const onMessageRef = useRef(onMessage);
+  const callbacksRef = useRef(callbacks);
   const [isConnected, setIsConnected] = useState(false);
 
-  // Keep the latest callback without reconnecting on every render
+  // Keep the latest callbacks without reconnecting on every render
   useEffect(() => {
-    onMessageRef.current = onMessage;
-  }, [onMessage]);
+    callbacksRef.current = callbacks;
+  }, [callbacks]);
 
   useEffect(() => {
     if (!threadId) return;
@@ -89,8 +91,18 @@ export default function useChatSocket(threadId, onMessage) {
         socket.onmessage = (ev) => {
           try {
             const payload = JSON.parse(ev.data);
-            if (payload.type === "chat.message" && onMessageRef.current) {
-              onMessageRef.current(payload.message);
+            if (payload.type === "chat.message" && payload.message) {
+              const cb = callbacksRef.current || {};
+              if (typeof cb.onMessageUpdate === "function") {
+                cb.onMessageUpdate(payload.message);
+              }
+              if (typeof cb.onNewMessage === "function") {
+                cb.onNewMessage(payload.message);
+              }
+              // Backwards-compat: if called with a bare function
+              if (typeof callbacksRef.current === "function") {
+                callbacksRef.current(payload.message);
+              }
             }
           } catch (e) {
             console.warn("[chat-ws] bad payload", e);
@@ -103,8 +115,7 @@ export default function useChatSocket(threadId, onMessage) {
           setIsConnected(false);
           console.debug("[chat-ws] closed", e.code, "attempt:", attempt);
           if (cancelled) return;
-          if (e.code === 4001 || e.code === 4003) return; // auth/forbidden → do not retry
-          // Reconnect with exponential backoff: 1s, 2s, 4s, 8s, max 30s
+          if (e.code === 4001 || e.code === 4003) return;
           const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
           attempt += 1;
           reconnectTimer = setTimeout(connect, delay);

@@ -1,4 +1,3 @@
-﻿import { useCrossTabSync } from "../../hooks/useCrossTabSync";
 import { Menu, LogOut, GraduationCap } from "lucide-react";
 
 import { useAuth } from "../../hooks/useAuth";
@@ -8,7 +7,6 @@ import Badge from "../ui/Badge";
 import NotificationBell from "../../features/notifications/components/NotificationBell";
 
 export default function Navbar() {
-  useCrossTabSync();
   const { user, logout } = useAuth();
   const dispatch = useDispatch();
 

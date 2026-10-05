@@ -19,7 +19,18 @@ class ClassCourseSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "teacher", "is_archived", "student_count", "created_at"]
 
     def get_student_count(self, obj):
-        return obj.enrollments.filter(status=StudentEnrollment.STATUS_ACTIVE).count()
+        """
+        Number of students on this class, excluding blocked and removed.
+
+        PENDING is included: a pending enrollment is a real student who
+        just hasn't redeemed their joining code yet.
+        """
+        return obj.enrollments.exclude(
+            status__in=[
+                StudentEnrollment.STATUS_BLOCKED,
+                StudentEnrollment.STATUS_REMOVED,
+            ]
+        ).count()
 
     def create(self, validated_data):
         request = self.context["request"]

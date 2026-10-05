@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageSquare, Loader2, Users } from "lucide-react";
+import { MessageSquare, Loader2, Users, Send } from "lucide-react";
 
 import {
   useGetTeacherGroupThreadQuery,
   useGetTeacherGroupMessagesQuery,
   useGetTeacherGroupMembersQuery,
+  useSendTeacherGroupMessageMutation,
   useToggleMessageReactionMutation,
 } from "../../../store/api/realApi";
 import useChatSocket from "../../../hooks/useChatSocket";
@@ -154,30 +155,56 @@ export default function TeacherChatPage() {
   const { data: membersData, isLoading: membersLoading } =
     useGetTeacherGroupMembersQuery();
 
+  const [sendMessage, { isLoading: sending }] =
+    useSendTeacherGroupMessageMutation();
   const [toggleReaction] = useToggleMessageReactionMutation();
 
+  const [draft, setDraft] = useState("");
   const [liveMessages, setLiveMessages] = useState([]);
+  const [messageOverrides, setMessageOverrides] = useState({});
   const [membersOpen, setMembersOpen] = useState(false);
   const bottomRef = useRef(null);
 
   const serverMessages = messagesData?.results ?? [];
   const members = membersData?.results ?? [];
 
+  // Merge: apply WS overrides by ID, then append any new WS messages
   const messages = useMemo(() => {
-    const seen = new Set(serverMessages.map((m) => m.id));
+    const overridden = serverMessages.map((m) => messageOverrides[m.id] || m);
+    const seen = new Set(overridden.map((m) => m.id));
     const extras = liveMessages.filter((m) => !seen.has(m.id));
-    return [...serverMessages, ...extras];
-  }, [serverMessages, liveMessages]);
+    return [...overridden, ...extras];
+  }, [serverMessages, liveMessages, messageOverrides]);
 
-  useChatSocket(thread?.id, (msg) => {
-    setLiveMessages((prev) =>
-      prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
-    );
+  // WS: merge by ID (overwrite existing for reaction updates, append for new)
+  useChatSocket(thread?.id, {
+    onNewMessage: (msg) => {
+      setLiveMessages((prev) =>
+        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+      );
+      setMessageOverrides((prev) => ({ ...prev, [msg.id]: msg }));
+    },
+    onMessageUpdate: (msg) => {
+      setMessageOverrides((prev) => ({ ...prev, [msg.id]: msg }));
+    },
   });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  async function handleSend(e) {
+    e.preventDefault();
+    const body = draft.trim();
+    if (!body) return;
+    setDraft("");
+    try {
+      await sendMessage(body).unwrap();
+    } catch (err) {
+      console.error("send failed", err);
+      setDraft(body);
+    }
+  }
 
   async function handleReact(messageId, emoji) {
     try {
@@ -208,7 +235,6 @@ export default function TeacherChatPage() {
   return (
     <>
       <div className="flex h-[calc(100vh-6rem)] flex-col rounded-2xl border border-slate-200 bg-white">
-        {/* Header + members strip */}
         <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-white">
@@ -242,13 +268,10 @@ export default function TeacherChatPage() {
           )}
         </div>
 
-        {/* Info banner */}
         <div className="border-b border-purple-100 bg-purple-50 px-5 py-2 text-[11px] font-medium text-purple-700">
-          Only admins can post in this group. Tap an emoji to share your
-          reaction.
+          You can post here alongside admins. Tap an emoji to react to any message.
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {msgsLoading && messages.length === 0 && (
             <div className="flex justify-center py-6">
@@ -262,7 +285,7 @@ export default function TeacherChatPage() {
                 No messages yet
               </p>
               <p className="mt-1 text-xs text-slate-400">
-                When your admin posts, it appears here instantly.
+                Start the conversation.
               </p>
             </div>
           )}
@@ -283,6 +306,9 @@ export default function TeacherChatPage() {
                     {m.sender?.role === "admin" && (
                       <Badge variant="brand">Admin</Badge>
                     )}
+                    {m.sender?.role === "teacher" && (
+                      <Badge variant="neutral">Teacher</Badge>
+                    )}
                     <span className="text-[11px] text-slate-400">
                       {fmtTime(m.created_at)}
                     </span>
@@ -297,6 +323,31 @@ export default function TeacherChatPage() {
           </ul>
           <div ref={bottomRef} />
         </div>
+
+        <form
+          onSubmit={handleSend}
+          className="flex items-center gap-2 border-t border-slate-100 px-5 py-3"
+        >
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Message the group..."
+            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 focus:bg-white"
+            disabled={sending}
+          />
+          <button
+            type="submit"
+            disabled={sending || !draft.trim()}
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500 text-white transition hover:bg-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {sending ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Send size={16} />
+            )}
+          </button>
+        </form>
       </div>
 
       <MembersDrawer

@@ -72,6 +72,9 @@ export const realApi = createApi({
     "Announcement",
     "ChatThread",
     "ChatMessage",
+    "ClassDetail",
+    "ClassRoster",
+    "ClassMaterial",
   ],
   endpoints: (builder) => ({
     // ---------- auth -------------------------------------------------
@@ -423,6 +426,80 @@ export const realApi = createApi({
     }),
 
     // ─────────────────────────────────────────────────────────
+    // Classes (teacher / student, role-scoped by backend)
+    // ─────────────────────────────────────────────────────────
+
+    getClasses: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.page) search.set("page", params.page);
+        const qs = search.toString();
+        return `/classes/${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: [{ type: "Class", id: "LIST" }],
+    }),
+
+    getClass: builder.query({
+      query: (id) => `/classes/${id}/`,
+      providesTags: (result, error, id) => [{ type: "ClassDetail", id }],
+    }),
+
+    getClassStudents: builder.query({
+      query: (id) => `/classes/${id}/students/`,
+      providesTags: (result, error, id) => [{ type: "ClassRoster", id }],
+    }),
+
+    getClassMaterials: builder.query({
+      query: (id) => `/classes/${id}/materials/`,
+      providesTags: (result, error, id) => [{ type: "ClassMaterial", id }],
+    }),
+
+    addClassStudent: builder.mutation({
+      query: ({ classId, email, first_name, last_name }) => ({
+        url: `/classes/${classId}/students/`,
+        method: "POST",
+        body: { email, first_name, last_name },
+      }),
+      invalidatesTags: (result, error, { classId }) => [
+        { type: "ClassRoster", id: classId },
+        { type: "Class", id: "LIST" },
+        { type: "ClassDetail", id: classId },
+      ],
+    }),
+
+    updateEnrollmentStatus: builder.mutation({
+      query: ({ classId, enrollmentId, status }) => ({
+        url: `/classes/${classId}/students/${enrollmentId}/`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: (result, error, { classId }) => [
+        { type: "ClassRoster", id: classId },
+        { type: "ClassDetail", id: classId },
+      ],
+    }),
+
+    uploadClassMaterial: builder.mutation({
+      query: ({ classId, formData }) => ({
+        url: `/classes/${classId}/materials/`,
+        method: "POST",
+        body: formData,
+      }),
+      invalidatesTags: (result, error, { classId }) => [
+        { type: "ClassMaterial", id: classId },
+        { type: "ClassDetail", id: classId },
+      ],
+    }),
+
+    deleteMaterial: builder.mutation({
+      query: ({ materialId }) => ({
+        url: `/materials/${materialId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ClassMaterial", id: "LIST" }],
+    }),
+
+    // ─────────────────────────────────────────────────────────
     // Chat — institution teacher group
     // ─────────────────────────────────────────────────────────
 
@@ -666,6 +743,14 @@ export const {
   useGetAdminStudentAttendanceQuery,
   useGetAdminTimetableQuery,
   useGetTimetableQuery,
+  useGetClassesQuery,
+  useGetClassQuery,
+  useGetClassStudentsQuery,
+  useGetClassMaterialsQuery,
+  useAddClassStudentMutation,
+  useUpdateEnrollmentStatusMutation,
+  useUploadClassMaterialMutation,
+  useDeleteMaterialMutation,
   useCreateAdminTimetableMutation,
   useUpdateAdminTimetableMutation,
   useGetStudentLeavesQuery,
