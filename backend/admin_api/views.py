@@ -914,7 +914,12 @@ class TimetableView(APIView):
         )
 
         if user.role == "teacher":
-            qs = qs.filter(teacher=user, institution=user.institution)
+            # Match by either the entry's `teacher` FK OR the class's teacher,
+            # so a missing `teacher` on the entry does not hide the schedule.
+            qs = qs.filter(
+                Q(teacher=user) | Q(class_course__teacher=user),
+                institution=user.institution,
+            )
         elif user.role == "student":
             enrolled_class_ids = StudentEnrollment.objects.filter(
                 student=user,
