@@ -196,6 +196,18 @@ export const realApi = createApi({
       ],
     }),
 
+    removeAdminUser: builder.mutation({
+      query: (id) => ({
+        url: `/admin/users/${id}/remove/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: "AdminUser", id },
+        { type: "AdminUser", id: "LIST" },
+        { type: "AdminGrade", id: "LIST" },
+      ],
+    }),
+
     toggleAdminUserActive: builder.mutation({
       query: ({ id, is_active }) => ({
         url: `/admin/users/${id}/toggle-active/`,
@@ -914,6 +926,7 @@ export const {
   useCreateAdminUserMutation,
   useUpdateAdminUserMutation,
   useToggleAdminUserActiveMutation,
+  useRemoveAdminUserMutation,
   useGetAdminStatsQuery,
   useGetAdminUserClassesQuery,
   useGetAdminUserEnrollmentsQuery,

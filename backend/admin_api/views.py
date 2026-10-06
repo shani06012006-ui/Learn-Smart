@@ -362,6 +362,60 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
         return Response(AdminUserSerializer(user).data)
 
+    @action(detail=True, methods=["delete"], url_path="remove")
+    def remove(self, request, pk=None):
+        """
+        Remove a teacher from the institution.
+
+        Safeguards:
+          - Only teachers can be removed here.
+          - Refuses if the teacher still has active (non-deleted) classes.
+            Reassign or archive the classes first.
+
+        The user row is preserved (soft "removal") so chat history,
+        enrollments, and leave records remain intact — we only set
+        `is_active = False`. Hard-deleting would cascade-delete those.
+        """
+        user = self.get_object()
+
+        if user.id == request.user.id:
+            return Response(
+                {"error": {"detail": "You cannot remove your own account.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if user.role != User.ROLE_TEACHER:
+            return Response(
+                {"error": {"detail": "This endpoint only removes teachers.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        active_classes = ClassCourse.objects.filter(
+            teacher=user, is_deleted=False
+        )
+        if active_classes.exists():
+            names = list(active_classes.values_list("name", flat=True)[:5])
+            preview = ", ".join(names)
+            more = active_classes.count() - len(names)
+            suffix = f" and {more} more" if more > 0 else ""
+            return Response(
+                {
+                    "error": {
+                        "detail": (
+                            f"This teacher still has {active_classes.count()} "
+                            f"active class(es): {preview}{suffix}. "
+                            "Reassign or archive them before removing."
+                        ),
+                        "status_code": 400,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.is_active = False
+        user.save(update_fields=["is_active", "updated_at"])
+        return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=["post"], url_path="toggle-active")
     def toggle_active(self, request, pk=None):
         user = self.get_object()
