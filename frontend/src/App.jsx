@@ -29,7 +29,7 @@ import AdminGradeDetailPage from "./features/admin/pages/AdminGradeDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminMessagesPage from "./features/admin/pages/AdminMessagesPage";
-import AdminAttendancePage from "./features/admin/pages/AdminAttendancePage";
+import AttendancePage from "./features/admin/pages/AttendancePage";  // marking UI
 import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
 import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
 import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
@@ -78,7 +78,7 @@ export default function App() {
           <Route path="grades"        element={<AdminGradesPage />} />
           <Route path="grades/:id"    element={<AdminGradeDetailPage />} />
           <Route path="courses/:id"   element={<AdminCourseDetailPage />} />
-          <Route path="attendance"     element={<AdminAttendancePage />} />
+          <Route path="attendance"     element={<AttendancePage />} />
           <Route path="timetable"      element={<AdminTimetablePage />} />
           <Route path="leaves"         element={<AdminLeavesPage />} />
           <Route path="sessions"       element={<AdminSessionsPage />} />
