@@ -65,6 +65,13 @@ class ClassCourseListCreateView(generics.ListCreateAPIView):
             ).distinct()
         if user.role == "admin":
             qs = ClassCourse.objects.all()
+            # Scope to the admin's own institution
+            if getattr(user, "institution_id", None):
+                qs = qs.filter(institution_id=user.institution_id)
+            # Hide archived by default; ?include_archived=1 to show
+            include_archived = self.request.query_params.get("include_archived")
+            if include_archived not in ("1", "true", "yes"):
+                qs = qs.filter(is_archived=False)
             teacher_id = self.request.query_params.get("teacher")
             if teacher_id:
                 qs = qs.filter(teacher_id=teacher_id)
