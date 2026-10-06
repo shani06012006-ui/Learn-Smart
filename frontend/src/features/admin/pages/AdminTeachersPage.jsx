@@ -75,7 +75,7 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, isToggling }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg"
+            className="absolute right-0 top-10 z-50 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg"
           >
             <button
               type="button"
@@ -183,15 +183,15 @@ export default function AdminTeachersPage() {
       onConfirm: async () => {
         try {
           await removeUser(teacher.id).unwrap();
+          setConfirm(null);
           refetch();
         } catch (err) {
           const msg =
             err?.data?.error?.detail ||
             err?.data?.detail ||
-            "Could not remove this teacher.";
-          alert(msg);
+            (typeof err === "string" ? err : "Could not remove this teacher.");
+          setConfirm((prev) => prev ? { ...prev, error: msg } : null);
         }
-        setConfirm(null);
       },
     });
   };
@@ -316,9 +316,9 @@ export default function AdminTeachersPage() {
 
       {!isLoading && !isError && teachers.length > 0 && (
         <>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+          <div className="relative rounded-2xl border border-slate-200 bg-white shadow-card">
             {/* Table header */}
-            <div className="hidden grid-cols-[1.6fr_1fr_auto_auto_auto] items-center gap-4 border-b border-slate-100 bg-slate-50/60 px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 lg:grid">
+            <div className="hidden grid-cols-[1.6fr_1fr_auto_auto_auto] items-center gap-4 rounded-t-2xl border-b border-slate-100 bg-slate-50/60 px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 lg:grid">
               <span>Teacher</span>
               <span>Institution</span>
               <span>Status</span>
@@ -342,7 +342,7 @@ export default function AdminTeachersPage() {
                   <li
                     key={t.id}
                     onClick={() => navigate(`/admin/teachers/${t.id}`)}
-                    className="group cursor-pointer px-5 py-4 transition-colors hover:bg-slate-50/60"
+                    className="group relative cursor-pointer px-5 py-4 transition-colors hover:bg-slate-50/60"
                   >
                     {/* Desktop layout */}
                     <div className="hidden grid-cols-[1.6fr_1fr_auto_auto_auto] items-center gap-4 lg:grid">
@@ -461,6 +461,7 @@ export default function AdminTeachersPage() {
         confirmLabel={confirm?.confirmLabel}
         tone={confirm?.tone}
         loading={isRemoving}
+        error={confirm?.error}
       />
     </div>
   );
