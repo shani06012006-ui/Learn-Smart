@@ -273,6 +273,16 @@ class StudentAttendance(TimeStampedModel):
         "classes.ClassCourse",
         on_delete=models.CASCADE,
         related_name="student_attendance",
+        null=True,
+        blank=True,
+    )
+    grade = models.ForeignKey(
+        "institutions.Grade",
+        on_delete=models.CASCADE,
+        related_name="student_attendance",
+        null=True,
+        blank=True,
+        help_text="Set when attendance is recorded at the grade level (daily roll call).",
     )
     institution = models.ForeignKey(
         "institutions.Institution",
@@ -317,7 +327,13 @@ class StudentAttendance(TimeStampedModel):
             models.UniqueConstraint(
                 fields=["student", "class_course", "date"],
                 name="unique_student_attendance_per_class_per_day",
-            )
+                condition=models.Q(class_course__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=["student", "grade", "date"],
+                name="unique_student_attendance_per_grade_per_day",
+                condition=models.Q(grade__isnull=False),
+            ),
         ]
         indexes = [
             models.Index(fields=["institution", "date"]),

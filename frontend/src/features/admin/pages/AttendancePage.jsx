@@ -8,7 +8,7 @@ import {
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import {
-  useGetClassesQuery,
+  useGetGradesQuery,
   useGetAttendanceQuery,
   useGetAttendanceSummaryQuery,
 } from "../../../store/api/realApi";
@@ -116,23 +116,23 @@ function DownloadCsv({ klassName, date, rows }) {
 
 export default function AttendancePage() {
   const [tab, setTab] = useState("daily");
-  const [klassId, setKlassId] = useState("");
+  const [gradeId, setGradeId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [from, setFrom] = useState(daysAgoIso(30));
   const [to, setTo] = useState(todayIso());
   const [search, setSearch] = useState("");
 
-  const { data: classesData } = useGetClassesQuery({ page: 1 });
-  const classes = classesData?.results || classesData || [];
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results || gradesData || [];
 
   const dailyQuery = useGetAttendanceQuery(
-    { klass: klassId, date },
-    { skip: !klassId || !date || tab !== "daily" },
+    { grade: gradeId, date },
+    { skip: !gradeId || !date || tab !== "daily" },
   );
 
   const summaryQuery = useGetAttendanceSummaryQuery(
-    { klass: klassId, from, to },
-    { skip: !klassId || tab !== "summary" },
+    { grade: gradeId, from, to },
+    { skip: !gradeId || tab !== "summary" },
   );
 
   const active = tab === "daily" ? dailyQuery : summaryQuery;
@@ -204,16 +204,16 @@ export default function AttendancePage() {
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Class
+              Grade
             </label>
             <select
-              value={klassId}
-              onChange={(e) => setKlassId(e.target.value)}
+              value={gradeId}
+              onChange={(e) => setGradeId(e.target.value)}
               className="h-10 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none transition focus:border-purple-400"
             >
-              <option value="">— Select class —</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              <option value="">— Select grade —</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
               ))}
             </select>
           </div>
@@ -267,20 +267,20 @@ export default function AttendancePage() {
 
           <div className="ml-auto">
             {tab === "daily" && (
-              <DownloadCsv klassName={dailyQuery.data?.klass_name} date={date} rows={filteredDaily} />
+              <DownloadCsv klassName={dailyQuery.data?.grade_name} date={date} rows={filteredDaily} />
             )}
           </div>
         </div>
       </div>
 
       {/* Empty state */}
-      {!klassId && (
+      {!gradeId && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
             <BookOpen size={24} />
           </span>
           <h2 className="mt-4 font-display text-xl font-extrabold text-navy-950">
-            Pick a class to view attendance
+            Pick a grade to view attendance
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {tab === "daily"
@@ -291,11 +291,11 @@ export default function AttendancePage() {
       )}
 
       {/* Loading / error */}
-      {klassId && isLoading && <LoadingState label="Loading attendance..." />}
-      {klassId && isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
+      {gradeId && isLoading && <LoadingState label="Loading attendance..." />}
+      {gradeId && isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
 
       {/* Daily view */}
-      {klassId && !isLoading && !isError && tab === "daily" && (
+      {gradeId && !isLoading && !isError && tab === "daily" && (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <StatTile label="Records"  value={totalRecords}         tone="violet"  icon={CalendarIcon} />
@@ -305,7 +305,7 @@ export default function AttendancePage() {
             <StatTile label="Excused"  value={dailyCounts.excused}  tone="slate"   icon={AlertCircle} />
           </div>
 
-          {filteredDaily.length === 0 ? (
+          {dailyRows.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
                 <CalendarIcon size={24} />
@@ -316,6 +316,10 @@ export default function AttendancePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Teachers mark attendance from their dashboard. Once they do, the records will show up here.
               </p>
+            </div>
+          ) : filteredDaily.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+              No records match your search.
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
@@ -354,7 +358,7 @@ export default function AttendancePage() {
       )}
 
       {/* Summary view */}
-      {klassId && !isLoading && !isError && tab === "summary" && (
+      {gradeId && !isLoading && !isError && tab === "summary" && (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <StatTile label="Students with records"  value={summaryRows.filter((r) => r.total > 0).length} tone="violet"  icon={BookOpen} />
