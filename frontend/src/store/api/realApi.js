@@ -82,9 +82,9 @@ export const realApi = createApi({
   endpoints: (builder) => ({
     // ---- Teacher attendance ----
     getTeacherAttendance: builder.query({
-      query: ({ klass, date }) => ({
+      query: ({ klass, grade, date }) => ({
         url: `/teacher/attendance/`,
-        params: { klass, date },
+        params: { klass, grade, date },
       }),
       providesTags: ["Attendance"],
     }),
@@ -113,16 +113,16 @@ export const realApi = createApi({
 
     // ---- Attendance ----
     getAttendanceSummary: builder.query({
-      query: ({ klass, from, to } = {}) => ({
+      query: ({ klass, grade, from, to } = {}) => ({
         url: `/admin/attendance/summary/`,
-        params: { klass, from, to },
+        params: { klass, grade, from, to },
       }),
       providesTags: ["Attendance"],
     }),
     getAttendance: builder.query({
-      query: ({ klass, date }) => ({
+      query: ({ klass, grade, date }) => ({
         url: `/admin/attendance/`,
-        params: { klass, date },
+        params: { klass, grade, date },
       }),
       providesTags: ["Attendance"],
     }),

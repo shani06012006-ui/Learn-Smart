@@ -8,7 +8,7 @@ import {
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import {
-  useGetClassesQuery,
+  useGetGradesQuery,
   useGetTeacherAttendanceQuery,
   useMarkTeacherAttendanceMutation,
 } from "../../../store/api/realApi";
@@ -30,17 +30,17 @@ const STATUSES = [
 ];
 
 export default function TeacherAttendancePage() {
-  const [klassId, setKlassId] = useState("");
+  const [gradeId, setGradeId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [draft, setDraft] = useState({});
   const [notice, setNotice] = useState(null);
 
-  const { data: classesData } = useGetClassesQuery({ page: 1 });
-  const classes = classesData?.results || classesData || [];
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results || gradesData || [];
 
   const { data, isFetching, refetch } = useGetTeacherAttendanceQuery(
-    { klass: klassId, date },
-    { skip: !klassId || !date },
+    { grade: gradeId, date },
+    { skip: !gradeId || !date },
   );
 
   const [markAttendance, { isLoading: saving }] = useMarkTeacherAttendanceMutation();
@@ -75,13 +75,13 @@ export default function TeacherAttendancePage() {
       .filter((r) => r.effectiveStatus)
       .map((r) => ({ student: r.student, status: r.effectiveStatus, note: r.note || "" }));
 
-    if (!klassId || !date || records.length === 0) {
+    if (!gradeId || !date || records.length === 0) {
       setNotice({ tone: "warn", text: "Pick a class, a date, and mark at least one student." });
       return;
     }
 
     try {
-      const res = await markAttendance({ klass: klassId, date, records }).unwrap();
+      const res = await markAttendance({ grade: gradeId, date, records }).unwrap();
       setDraft({});
       setNotice({ tone: "ok", text: `Saved ${res.saved || records.length} record(s) for ${date}.` });
       refetch();
@@ -107,15 +107,15 @@ export default function TeacherAttendancePage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Class</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Grade</label>
             <select
-              value={klassId}
-              onChange={(e) => { setKlassId(e.target.value); setDraft({}); }}
+              value={gradeId}
+              onChange={(e) => { setGradeId(e.target.value); setDraft({}); }}
               className="h-10 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
             >
               <option value="">— Select class —</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              {grades.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
               ))}
             </select>
           </div>
@@ -134,7 +134,7 @@ export default function TeacherAttendancePage() {
             <button
               type="button"
               onClick={() => markAll("present")}
-              disabled={!klassId}
+              disabled={!gradeId}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
             >
               <Check size={13} /> Mark all present
@@ -142,7 +142,7 @@ export default function TeacherAttendancePage() {
             <button
               type="button"
               onClick={() => setDraft({})}
-              disabled={!klassId}
+              disabled={!gradeId}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
             >
               <Eraser size={13} /> Clear
@@ -150,7 +150,7 @@ export default function TeacherAttendancePage() {
             <button
               type="button"
               onClick={save}
-              disabled={!klassId || saving}
+              disabled={!gradeId || saving}
               className="inline-flex items-center gap-1.5 rounded-xl bg-purple-500 px-4 py-2 text-xs font-bold text-white shadow-purple-glow transition hover:bg-purple-600 disabled:opacity-40"
             >
               <Save size={13} /> {saving ? "Saving…" : "Save attendance"}
@@ -176,24 +176,24 @@ export default function TeacherAttendancePage() {
       )}
 
       {/* Empty state */}
-      {!klassId && (
+      {!gradeId && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
             <BookOpen size={24} />
           </span>
           <h2 className="mt-4 font-display text-xl font-extrabold text-navy-950">
-            Pick a class to begin
+            Pick a grade to begin
           </h2>
           <p className="mt-1 text-sm text-slate-500">
-            Choose one of your classes and a date, then mark each student.
+            Choose a grade and a date, then mark each student.
           </p>
         </div>
       )}
 
-      {klassId && isFetching && <LoadingState label="Loading roster..." />}
+      {gradeId && isFetching && <LoadingState label="Loading roster..." />}
 
       {/* Stats strip */}
-      {klassId && !isFetching && merged.length > 0 && (
+      {gradeId && !isFetching && merged.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <Tile label="Present"  value={counts.present}  tone="emerald" />
           <Tile label="Absent"   value={counts.absent}   tone="rose" />
@@ -204,7 +204,7 @@ export default function TeacherAttendancePage() {
       )}
 
       {/* Grid */}
-      {klassId && !isFetching && merged.length > 0 && (
+      {gradeId && !isFetching && merged.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
@@ -248,7 +248,7 @@ export default function TeacherAttendancePage() {
         </div>
       )}
 
-      {klassId && !isFetching && merged.length === 0 && (
+      {gradeId && !isFetching && merged.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           No students in this class yet. Ask your admin to add students or share the join code.
         </div>

@@ -10,7 +10,8 @@ class StudentAttendanceReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentAttendance
         fields = [
-            "id", "student", "student_name", "class_course",
+            "id", "student", "student_name",
+            "class_course", "grade",
             "date", "status", "note", "source",
             "joined_at", "left_at", "duration_seconds",
             "marked_by", "created_at", "updated_at",
@@ -36,6 +37,21 @@ class AttendanceMarkItemSerializer(serializers.Serializer):
 
 
 class AttendanceBulkMarkSerializer(serializers.Serializer):
-    klass = serializers.UUIDField()
+    """Accepts either `klass` (class) or `grade` — not both, not neither."""
+    klass = serializers.UUIDField(required=False, allow_null=True)
+    grade = serializers.UUIDField(required=False, allow_null=True)
     date = serializers.DateField()
     records = AttendanceMarkItemSerializer(many=True)
+
+    def validate(self, attrs):
+        klass = attrs.get("klass")
+        grade = attrs.get("grade")
+        if not klass and not grade:
+            raise serializers.ValidationError(
+                "Provide either 'klass' or 'grade'."
+            )
+        if klass and grade:
+            raise serializers.ValidationError(
+                "Provide only one of 'klass' or 'grade', not both."
+            )
+        return attrs
