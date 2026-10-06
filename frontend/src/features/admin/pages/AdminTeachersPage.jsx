@@ -1,9 +1,9 @@
-﻿// frontend/src/features/admin/pages/AdminTeachersPage.jsx
+// frontend/src/features/admin/pages/AdminTeachersPage.jsx
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search, UserCog, Plus, Shield, ShieldOff, MoreVertical,
-  Eye, Pencil, Building2, Calendar, X,
+  Eye, Pencil, Building2, Calendar, X, Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,9 +15,11 @@ import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import CreateUserModal from "../components/CreateUserModal";
 import EditUserModal from "../components/EditUserModal";
+import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import {
   useGetAdminUsersQuery,
   useToggleAdminUserActiveMutation,
+  useRemoveAdminUserMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -39,7 +41,7 @@ function formatDate(iso) {
 }
 
 /* ── Row dropdown menu ─────────────────────────────────────────── */
-function RowMenu({ teacher, onView, onEdit, onToggle, isToggling }) {
+function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, isToggling }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -110,12 +112,27 @@ function RowMenu({ teacher, onView, onEdit, onToggle, isToggling }) {
               }}
               className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors ${
                 teacher.is_active
-                  ? "text-coral-600 hover:bg-coral-50"
+                  ? "text-amber-600 hover:bg-amber-50"
                   : "text-emerald-600 hover:bg-emerald-50"
               } disabled:opacity-50`}
             >
               {teacher.is_active ? <ShieldOff size={13} /> : <Shield size={13} />}
               {teacher.is_active ? "Deactivate" : "Activate"}
+            </button>
+
+            <div className="my-1 h-px bg-slate-100" />
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onRemove();
+              }}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-coral-600 transition-colors hover:bg-coral-50"
+            >
+              <Trash2 size={13} />
+              Remove teacher
             </button>
           </motion.div>
         )}
@@ -134,7 +151,9 @@ export default function AdminTeachersPage() {
   const [editUser, setEditUser] = useState(null);
 
   const [toggleActive, { isLoading: isToggling }] = useToggleAdminUserActiveMutation();
+  const [removeUser, { isLoading: isRemoving }] = useRemoveAdminUserMutation();
   const [pendingId, setPendingId] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
   useEffect(() => {
     setPage(1);
@@ -153,6 +172,29 @@ export default function AdminTeachersPage() {
   // Compute stats from current page (approx — the API supports is_active filter)
   const activeCount = teachers.filter((t) => t.is_active).length;
   const inactiveCount = teachers.length - activeCount;
+
+  const promptRemove = (teacher) => {
+    setConfirm({
+      title: `Remove "${teacher.full_name || teacher.email}"?`,
+      description:
+        "They will lose access to the platform. Their chat history, leaves, and other records are preserved. You can reactivate them later.",
+      confirmLabel: "Remove teacher",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await removeUser(teacher.id).unwrap();
+          refetch();
+        } catch (err) {
+          const msg =
+            err?.data?.error?.detail ||
+            err?.data?.detail ||
+            "Could not remove this teacher.";
+          alert(msg);
+        }
+        setConfirm(null);
+      },
+    });
+  };
 
   const handleToggle = async (teacher) => {
     setPendingId(teacher.id);
@@ -338,6 +380,7 @@ export default function AdminTeachersPage() {
                           onView={() => navigate(`/admin/teachers/${t.id}`)}
                           onEdit={() => setEditUser(t)}
                           onToggle={() => handleToggle(t)}
+                          onRemove={() => promptRemove(t)}
                           isToggling={isPending}
                         />
                       </div>
@@ -360,6 +403,7 @@ export default function AdminTeachersPage() {
                           onView={() => navigate(`/admin/teachers/${t.id}`)}
                           onEdit={() => setEditUser(t)}
                           onToggle={() => handleToggle(t)}
+                          onRemove={() => promptRemove(t)}
                           isToggling={isPending}
                         />
                       </div>
@@ -406,6 +450,17 @@ export default function AdminTeachersPage() {
           setEditUser(null);
           refetch();
         }}
+      />
+
+      <ConfirmDialog
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => confirm?.onConfirm?.()}
+        title={confirm?.title}
+        description={confirm?.description}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        loading={isRemoving}
       />
     </div>
   );
