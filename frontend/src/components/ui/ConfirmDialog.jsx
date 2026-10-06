@@ -16,6 +16,7 @@ export default function ConfirmDialog({
   cancelLabel = "Cancel",
   tone = "danger",
   loading = false,
+  error = null,
 }) {
   return (
     <Modal
@@ -36,6 +37,12 @@ export default function ConfirmDialog({
       <p className="text-sm text-slate-600">
         {description || "This action cannot be undone."}
       </p>
+
+      {error && (
+        <div className="mt-4 rounded-xl border border-coral-200 bg-coral-50 px-3.5 py-2.5 text-sm font-semibold text-coral-700">
+          {error}
+        </div>
+      )}
     </Modal>
   );
 }
