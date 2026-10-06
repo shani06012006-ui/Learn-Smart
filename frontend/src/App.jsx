@@ -41,6 +41,7 @@ import TeacherDashboardPage from "./features/teacher/pages/TeacherDashboardPage"
 import TeacherClassesPage from "./features/teacher/pages/TeacherClassesPage";
 import TeacherClassDetailPage from "./features/teacher/pages/TeacherClassDetailPage";
 import TeacherTimetablePage from "./features/teacher/pages/TeacherTimetablePage";
+import TeacherAttendancePage from "./features/teacher/pages/TeacherAttendancePage";
 import TeacherMaterialsPage from "./features/teacher/pages/TeacherMaterialsPage";
 import TeacherStudentsPage from "./features/teacher/pages/TeacherStudentsPage";
 import TeacherLeavesPage from "./features/teacher/pages/TeacherLeavesPage";
@@ -97,6 +98,7 @@ export default function App() {
             <Route path="classes/:id" element={<TeacherClassDetailPage />} />
             <Route path="students" element={<TeacherStudentsPage />} />
             <Route path="timetable" element={<TeacherTimetablePage />} />
+            <Route path="attendance" element={<TeacherAttendancePage />} />
             <Route path="leaves" element={<TeacherLeavesPage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
             <Route path="announcements" element={<TeacherPlaceholder title="Announcements" />} />

@@ -1,240 +1,45 @@
+// frontend/src/features/admin/pages/AttendancePage.jsx
 import { useMemo, useState } from "react";
 import {
-  useGetAttendanceQuery,
-  useMarkAttendanceMutation,
+  Search, Calendar as CalendarIcon, Download,
+  UserCheck, UserX, Clock, AlertCircle, BookOpen,
+} from "lucide-react";
+
+import LoadingState from "../../../components/feedback/LoadingState";
+import ErrorState from "../../../components/feedback/ErrorState";
+import {
   useGetClassesQuery,
+  useGetAttendanceQuery,
+  useGetAttendanceSummaryQuery,
 } from "../../../store/api/realApi";
+import { extractErrorMessage } from "../../../utils/apiError";
 
-const STATUSES = [
-  { key: "present", label: "Present", cls: "bg-emerald-100 text-emerald-700 border-emerald-300" },
-  { key: "absent",  label: "Absent",  cls: "bg-rose-100 text-rose-700 border-rose-300" },
-  { key: "late",    label: "Late",    cls: "bg-amber-100 text-amber-700 border-amber-300" },
-  { key: "excused", label: "Excused", cls: "bg-slate-100 text-slate-700 border-slate-300" },
-];
+const todayIso = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
-const today = new Date().toISOString().slice(0, 10);
+const daysAgoIso = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
-export default function AttendancePage() {
-  const [klassId, setKlassId] = useState("");
-  const [date, setDate] = useState(today);
-  const [draft, setDraft] = useState({}); // { studentId: status }
-  const [notice, setNotice] = useState(null);
+const STATUS_META = {
+  present: { label: "Present", chip: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  absent:  { label: "Absent",  chip: "bg-rose-100 text-rose-700 border-rose-200" },
+  late:    { label: "Late",    chip: "bg-amber-100 text-amber-700 border-amber-200" },
+  excused: { label: "Excused", chip: "bg-slate-100 text-slate-700 border-slate-200" },
+  unset:   { label: "—",       chip: "bg-slate-50 text-slate-400 border-slate-100" },
+};
 
-  const { data: classesData } = useGetClassesQuery({ page: 1 });
-  const classes = classesData?.results || classesData || [];
-
-  const { data, isFetching } = useGetAttendanceQuery(
-    { klass: klassId, date },
-    { skip: !klassId || !date }
-  );
-
-  const [markAttendance, { isLoading: saving }] = useMarkAttendanceMutation();
-
-  const rows = data?.rows || [];
-
-  // merge server data with local draft
-  const merged = useMemo(() => {
-    return rows.map((r) => ({
-      ...r,
-      effectiveStatus: draft[r.student] ?? r.status,
-    }));
-  }, [rows, draft]);
-
-  const counts = useMemo(() => {
-    const c = { present: 0, absent: 0, late: 0, excused: 0, unset: 0 };
-    merged.forEach((r) => {
-      if (r.effectiveStatus && c[r.effectiveStatus] !== undefined) {
-        c[r.effectiveStatus]++;
-      } else {
-        c.unset++;
-      }
-    });
-    return c;
-  }, [merged]);
-
-  const setStatus = (studentId, status) => {
-    setDraft((prev) => ({ ...prev, [studentId]: status }));
-  };
-
-  const markAll = (status) => {
-    const next = {};
-    merged.forEach((r) => { next[r.student] = status; });
-    setDraft(next);
-  };
-
-  const save = async () => {
-    setNotice(null);
-    const records = merged
-      .filter((r) => r.effectiveStatus)
-      .map((r) => ({
-        student: r.student,
-        status: r.effectiveStatus,
-        note: r.note || "",
-      }));
-
-    if (!klassId || !date || records.length === 0) {
-      setNotice({ tone: "warn", text: "Pick a class, a date, and mark at least one student." });
-      return;
-    }
-
-    try {
-      await markAttendance({ klass: klassId, date, records }).unwrap();
-      setDraft({});
-      setNotice({ tone: "ok", text: `Saved ${records.length} record(s) for ${date}.` });
-    } catch (err) {
-      const msg =
-        err?.data?.error?.detail ||
-        err?.data?.detail ||
-        "Could not save attendance.";
-      setNotice({ tone: "err", text: typeof msg === "string" ? msg : JSON.stringify(msg) });
-    }
-  };
-
-  return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Attendance</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Mark attendance for a class on a given day.
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-wrap gap-3 items-end mb-5">
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Class</label>
-          <select
-            value={klassId}
-            onChange={(e) => { setKlassId(e.target.value); setDraft({}); }}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm min-w-[200px]"
-          >
-            <option value="">— Select class —</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => { setDate(e.target.value); setDraft({}); }}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="ml-auto flex gap-2">
-          <button
-            onClick={() => markAll("present")}
-            className="rounded-xl bg-emerald-100 text-emerald-700 px-3 py-2 text-sm font-semibold"
-          >
-            Mark all present
-          </button>
-          <button
-            onClick={() => setDraft({})}
-            className="rounded-xl bg-slate-100 text-slate-700 px-3 py-2 text-sm font-semibold"
-          >
-            Clear changes
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="rounded-xl bg-violet-600 text-white px-4 py-2 text-sm font-semibold disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-
-      {/* Notice */}
-      {notice && (
-        <div
-          className={
-            "mb-4 rounded-xl px-3.5 py-2.5 text-sm font-semibold " +
-            (notice.tone === "ok"
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : notice.tone === "warn"
-              ? "bg-amber-50 text-amber-700 border border-amber-200"
-              : "bg-rose-50 text-rose-700 border border-rose-200")
-          }
-        >
-          {notice.text}
-        </div>
-      )}
-
-      {/* Stats strip */}
-      {klassId && (
-        <div className="mb-5 grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Stat label="Present" value={counts.present} tone="emerald" />
-          <Stat label="Absent"  value={counts.absent}  tone="rose" />
-          <Stat label="Late"    value={counts.late}    tone="amber" />
-          <Stat label="Excused" value={counts.excused} tone="slate" />
-          <Stat label="Unmarked" value={counts.unset}  tone="violet" />
-        </div>
-      )}
-
-      {/* Grid */}
-      {!klassId ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-          Pick a class above to start marking attendance.
-        </div>
-      ) : isFetching ? (
-        <div className="rounded-2xl border border-slate-200 p-10 text-center text-slate-500">
-          Loading…
-        </div>
-      ) : merged.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-          No students found in this class.
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-semibold">Student</th>
-                <th className="text-left px-4 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {merged.map((r) => (
-                <tr key={r.student} className="border-t border-slate-100">
-                  <td className="px-4 py-3 font-medium text-slate-800">
-                    {r.student_name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      {STATUSES.map((s) => {
-                        const active = r.effectiveStatus === s.key;
-                        return (
-                          <button
-                            key={s.key}
-                            onClick={() => setStatus(r.student, s.key)}
-                            className={
-                              "rounded-lg px-3 py-1.5 text-xs font-semibold border transition " +
-                              (active
-                                ? s.cls + " ring-2 ring-offset-1 ring-violet-300"
-                                : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50")
-                            }
-                          >
-                            {s.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }) {
+function StatTile({ label, value, tone, icon: Icon }) {
   const toneMap = {
     emerald: "bg-emerald-50 text-emerald-700",
     rose:    "bg-rose-50 text-rose-700",
@@ -243,9 +48,332 @@ function Stat({ label, value, tone }) {
     violet:  "bg-violet-50 text-violet-700",
   };
   return (
-    <div className={"rounded-xl px-4 py-3 " + (toneMap[tone] || toneMap.slate)}>
-      <div className="text-xs font-semibold opacity-80">{label}</div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {label}
+        </p>
+        <span className={"flex h-8 w-8 items-center justify-center rounded-lg " + (toneMap[tone] || toneMap.slate)}>
+          {Icon && <Icon size={14} />}
+        </span>
+      </div>
+      <p className="mt-2 font-display text-2xl font-extrabold tabular-nums text-navy-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function DownloadCsv({ klassName, date, rows }) {
+  const handle = () => {
+    const header = "Student,Status,Note\n";
+    const body = rows
+      .map((r) => {
+        const name = (r.student_name || "").replace(/"/g, '""');
+        const status = r.status || "unmarked";
+        const note = (r.note || "").replace(/"/g, '""');
+        return `"${name}","${status}","${note}"`;
+      })
+      .join("\n");
+    const blob = new Blob([header + body], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `attendance-${klassName || "class"}-${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      disabled={rows.length === 0}
+      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
+    >
+      <Download size={13} />
+      Export CSV
+    </button>
+  );
+}
+
+export default function AttendancePage() {
+  const [tab, setTab] = useState("daily"); // daily | summary
+  const [klassId, setKlassId] = useState("");
+  const [date, setDate] = useState(todayIso());
+  const [from, setFrom] = useState(daysAgoIso(30));
+  const [to, setTo] = useState(todayIso());
+  const [search, setSearch] = useState("");
+
+  const { data: classesData } = useGetClassesQuery({ page: 1 });
+  const classes = classesData?.results || classesData || [];
+
+  const dailyQuery = useGetAttendanceQuery(
+    { klass: klassId, date },
+    { skip: !klassId || !date || tab !== "daily" },
+  );
+
+  const summaryQuery = useGetAttendanceSummaryQuery(
+    { klass: klassId, from, to },
+    { skip: !klassId || tab !== "summary" },
+  );
+
+  const active = tab === "daily" ? dailyQuery : summaryQuery;
+  const { isLoading, isError, error, refetch } = active;
+
+  const dailyRows = dailyQuery.data?.rows || [];
+  const summaryRows = summaryQuery.data?.rows || [];
+
+  // filter daily rows by search
+  const filteredDaily = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return dailyRows;
+    return dailyRows.filter((r) => (r.student_name || "").toLowerCase().includes(q));
+  }, [dailyRows, search]);
+
+  const dailyCounts = useMemo(() => {
+    const c = { present: 0, absent: 0, late: 0, excused: 0, unset: 0 };
+    dailyRows.forEach((r) => {
+      if (r.status && c[r.status] !== undefined) c[r.status]++;
+      else c.unset++;
+    });
+    return c;
+  }, [dailyRows]);
+
+  const overallRate = useMemo(() => {
+    if (!summaryRows.length) return 0;
+    const totalP = summaryRows.reduce((a, r) => a + r.present, 0);
+    const totalD = summaryRows.reduce((a, r) => a + r.total, 0);
+    return totalD ? Math.round((totalP / totalD) * 1000) / 10 : 0;
+  }, [summaryRows]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
+            Attendance
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            View attendance records. Teachers mark attendance from their dashboard.
+          </p>
+        </div>
+      </header>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 self-start rounded-full bg-slate-50 p-1">
+        {[{ v: "daily", l: "Daily" }, { v: "summary", l: "Summary" }].map(({ v, l }) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTab(v)}
+            className={
+              "rounded-full px-4 py-2 text-xs font-bold transition " +
+              (tab === v
+                ? "bg-purple-500 text-white shadow-purple-glow"
+                : "text-slate-500 hover:text-navy-950")
+            }
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Class
+            </label>
+            <select
+              value={klassId}
+              onChange={(e) => setKlassId(e.target.value)}
+              className="h-10 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none transition focus:border-purple-400"
+            >
+              <option value="">— Select class —</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {tab === "daily" ? (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Date
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">From</label>
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500">To</label>
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
+                />
+              </div>
+            </>
+          )}
+
+          {tab === "daily" && (
+            <div className="relative min-w-[14rem] flex-1">
+              <Search size={14} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search student"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-purple-400"
+              />
+            </div>
+          )}
+
+          <div className="ml-auto">
+            {tab === "daily" && (
+              <DownloadCsv klassName={dailyQuery.data?.klass_name} date={date} rows={filteredDaily} />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Empty state */}
+      {!klassId && (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+            <BookOpen size={24} />
+          </span>
+          <h2 className="mt-4 font-display text-xl font-extrabold text-navy-950">
+            Pick a class to begin
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {tab === "daily"
+              ? "See one day's attendance for any class."
+              : "See per-student totals across a date range."}
+          </p>
+        </div>
+      )}
+
+      {/* Loading / error */}
+      {klassId && isLoading && <LoadingState label="Loading attendance..." />}
+      {klassId && isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
+
+      {/* Daily view */}
+      {klassId && !isLoading && !isError && tab === "daily" && (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatTile label="Present"  value={dailyCounts.present}  tone="emerald" icon={UserCheck} />
+            <StatTile label="Absent"   value={dailyCounts.absent}   tone="rose"    icon={UserX} />
+            <StatTile label="Late"     value={dailyCounts.late}     tone="amber"   icon={Clock} />
+            <StatTile label="Excused"  value={dailyCounts.excused}  tone="slate"   icon={AlertCircle} />
+            <StatTile label="Unmarked" value={dailyCounts.unset}    tone="violet"  icon={CalendarIcon} />
+          </div>
+
+          {filteredDaily.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+              No students found.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Student</th>
+                    <th className="px-4 py-3 text-left font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDaily.map((r) => {
+                    const key = r.status || "unset";
+                    const meta = STATUS_META[key] || STATUS_META.unset;
+                    return (
+                      <tr key={r.student} className="border-t border-slate-100">
+                        <td className="px-4 py-3 font-medium text-navy-950">{r.student_name}</td>
+                        <td className="px-4 py-3">
+                          <span className={"inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider " + meta.chip}>
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{r.note || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Summary view */}
+      {klassId && !isLoading && !isError && tab === "summary" && (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatTile label="Students"       value={summaryRows.length} tone="violet"  icon={BookOpen} />
+            <StatTile label="Records total"  value={summaryRows.reduce((a, r) => a + r.total, 0)} tone="slate" icon={CalendarIcon} />
+            <StatTile label="Overall rate"   value={overallRate + "%"}  tone="emerald" icon={UserCheck} />
+          </div>
+
+          {summaryRows.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+              No students found.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Student</th>
+                    <th className="px-4 py-3 text-center font-semibold">Present</th>
+                    <th className="px-4 py-3 text-center font-semibold">Absent</th>
+                    <th className="px-4 py-3 text-center font-semibold">Late</th>
+                    <th className="px-4 py-3 text-center font-semibold">Excused</th>
+                    <th className="px-4 py-3 text-center font-semibold">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map((r) => (
+                    <tr key={r.student} className="border-t border-slate-100">
+                      <td className="px-4 py-3 font-medium text-navy-950">{r.student_name}</td>
+                      <td className="px-4 py-3 text-center tabular-nums text-emerald-700 font-semibold">{r.present}</td>
+                      <td className="px-4 py-3 text-center tabular-nums text-rose-700 font-semibold">{r.absent}</td>
+                      <td className="px-4 py-3 text-center tabular-nums text-amber-700 font-semibold">{r.late}</td>
+                      <td className="px-4 py-3 text-center tabular-nums text-slate-700 font-semibold">{r.excused}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={
+                          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold " +
+                          (r.attendance_rate >= 85 ? "bg-emerald-100 text-emerald-700" :
+                           r.attendance_rate >= 70 ? "bg-amber-100 text-amber-700" :
+                                                     "bg-rose-100 text-rose-700")
+                        }>
+                          {r.attendance_rate}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

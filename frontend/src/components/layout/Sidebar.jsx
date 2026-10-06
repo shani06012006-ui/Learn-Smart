@@ -14,6 +14,7 @@ import {
   KeyRound,
   CalendarDays,
   CalendarX,
+  ClipboardCheck,
   LogOut,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ const TEACHER_ITEMS = [
   { label: "Classes",       to: "/teacher/classes",            icon: BookOpen },
   { label: "Students",      to: "/teacher/students",           icon: GraduationCap },
   { label: "Timetable",     to: "/teacher/timetable",          icon: CalendarDays },
+  { label: "Attendance",    to: "/teacher/attendance",         icon: ClipboardCheck },
   { label: "Leaves",        to: "/teacher/leaves",             icon: CalendarX },
   { label: "Materials",     to: "/teacher/materials",          icon: FileText },
   { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },

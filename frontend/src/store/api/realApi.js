@@ -80,7 +80,45 @@ export const realApi = createApi({
     "MaterialList",
   ],
   endpoints: (builder) => ({
+    // ---- Teacher attendance ----
+    getTeacherAttendance: builder.query({
+      query: ({ klass, date }) => ({
+        url: `/teacher/attendance/`,
+        params: { klass, date },
+      }),
+      providesTags: ["Attendance"],
+    }),
+    markTeacherAttendance: builder.mutation({
+      query: (body) => ({
+        url: `/teacher/attendance/mark/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Attendance"],
+    }),
+    getTeacherAttendanceStats: builder.query({
+      query: ({ klass, from, to } = {}) => ({
+        url: `/teacher/attendance/stats/`,
+        params: { klass, from, to },
+      }),
+      providesTags: ["Attendance"],
+    }),
+    getTeacherAttendanceSummary: builder.query({
+      query: ({ klass, from, to } = {}) => ({
+        url: `/teacher/attendance/summary/`,
+        params: { klass, from, to },
+      }),
+      providesTags: ["Attendance"],
+    }),
+
     // ---- Attendance ----
+    getAttendanceSummary: builder.query({
+      query: ({ klass, from, to } = {}) => ({
+        url: `/admin/attendance/summary/`,
+        params: { klass, from, to },
+      }),
+      providesTags: ["Attendance"],
+    }),
     getAttendance: builder.query({
       query: ({ klass, date }) => ({
         url: `/admin/attendance/`,
@@ -932,6 +970,12 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetAttendanceSummaryQuery,
+  useGetTeacherAttendanceQuery,
+  useMarkTeacherAttendanceMutation,
+  useGetTeacherAttendanceStatsQuery,
+  useGetTeacherAttendanceSummaryQuery,
+
   useGetAttendanceQuery,
   useMarkAttendanceMutation,
   useGetAttendanceStatsQuery,
