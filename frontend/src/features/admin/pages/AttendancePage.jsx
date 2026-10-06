@@ -31,12 +31,25 @@ const daysAgoIso = (n) => {
   return `${y}-${m}-${day}`;
 };
 
+const formatTime = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+};
+
 const STATUS_META = {
   present: { label: "Present", chip: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   absent:  { label: "Absent",  chip: "bg-rose-100 text-rose-700 border-rose-200" },
   late:    { label: "Late",    chip: "bg-amber-100 text-amber-700 border-amber-200" },
   excused: { label: "Excused", chip: "bg-slate-100 text-slate-700 border-slate-200" },
-  unset:   { label: "—",       chip: "bg-slate-50 text-slate-400 border-slate-100" },
 };
 
 function StatTile({ label, value, tone, icon: Icon }) {
@@ -66,13 +79,17 @@ function StatTile({ label, value, tone, icon: Icon }) {
 
 function DownloadCsv({ klassName, date, rows }) {
   const handle = () => {
-    const header = "Student,Status,Note\n";
+    const header = "Student,Status,Marked By,Marked At,Note\n";
     const body = rows
       .map((r) => {
-        const name = (r.student_name || "").replace(/"/g, '""');
-        const status = r.status || "unmarked";
-        const note = (r.note || "").replace(/"/g, '""');
-        return `"${name}","${status}","${note}"`;
+        const esc = (s) => `"${(String(s || "")).replace(/"/g, '""')}"`;
+        return [
+          esc(r.student_name),
+          esc(r.status || ""),
+          esc(r.marked_by || ""),
+          esc(formatTime(r.marked_at)),
+          esc(r.note || ""),
+        ].join(",");
       })
       .join("\n");
     const blob = new Blob([header + body], { type: "text/csv" });
@@ -98,7 +115,7 @@ function DownloadCsv({ klassName, date, rows }) {
 }
 
 export default function AttendancePage() {
-  const [tab, setTab] = useState("daily"); // daily | summary
+  const [tab, setTab] = useState("daily");
   const [klassId, setKlassId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [from, setFrom] = useState(daysAgoIso(30));
@@ -124,21 +141,24 @@ export default function AttendancePage() {
   const dailyRows = dailyQuery.data?.rows || [];
   const summaryRows = summaryQuery.data?.rows || [];
 
-  // filter daily rows by search
   const filteredDaily = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return dailyRows;
-    return dailyRows.filter((r) => (r.student_name || "").toLowerCase().includes(q));
+    return dailyRows.filter((r) =>
+      (r.student_name || "").toLowerCase().includes(q) ||
+      (r.marked_by || "").toLowerCase().includes(q)
+    );
   }, [dailyRows, search]);
 
   const dailyCounts = useMemo(() => {
-    const c = { present: 0, absent: 0, late: 0, excused: 0, unset: 0 };
+    const c = { present: 0, absent: 0, late: 0, excused: 0 };
     dailyRows.forEach((r) => {
       if (r.status && c[r.status] !== undefined) c[r.status]++;
-      else c.unset++;
     });
     return c;
   }, [dailyRows]);
+
+  const totalRecords = dailyRows.length;
 
   const overallRate = useMemo(() => {
     if (!summaryRows.length) return 0;
@@ -155,7 +175,7 @@ export default function AttendancePage() {
             Attendance
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            View attendance records. Teachers mark attendance from their dashboard.
+            Attendance records recorded by teachers. This is a read-only report.
           </p>
         </div>
       </header>
@@ -239,7 +259,7 @@ export default function AttendancePage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search student"
+                placeholder="Search student or teacher"
                 className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none focus:border-purple-400"
               />
             </div>
@@ -260,11 +280,11 @@ export default function AttendancePage() {
             <BookOpen size={24} />
           </span>
           <h2 className="mt-4 font-display text-xl font-extrabold text-navy-950">
-            Pick a class to begin
+            Pick a class to view attendance
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             {tab === "daily"
-              ? "See one day's attendance for any class."
+              ? "See the records teachers have marked on any given date."
               : "See per-student totals across a date range."}
           </p>
         </div>
@@ -278,16 +298,24 @@ export default function AttendancePage() {
       {klassId && !isLoading && !isError && tab === "daily" && (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatTile label="Records"  value={totalRecords}         tone="violet"  icon={CalendarIcon} />
             <StatTile label="Present"  value={dailyCounts.present}  tone="emerald" icon={UserCheck} />
             <StatTile label="Absent"   value={dailyCounts.absent}   tone="rose"    icon={UserX} />
             <StatTile label="Late"     value={dailyCounts.late}     tone="amber"   icon={Clock} />
             <StatTile label="Excused"  value={dailyCounts.excused}  tone="slate"   icon={AlertCircle} />
-            <StatTile label="Unmarked" value={dailyCounts.unset}    tone="violet"  icon={CalendarIcon} />
           </div>
 
           {filteredDaily.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-              No students found.
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
+              <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+                <CalendarIcon size={24} />
+              </span>
+              <h2 className="mt-4 font-display text-lg font-extrabold text-navy-950">
+                No attendance recorded for this date
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Teachers mark attendance from their dashboard. Once they do, the records will show up here.
+              </p>
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
@@ -296,21 +324,24 @@ export default function AttendancePage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-semibold">Student</th>
                     <th className="px-4 py-3 text-left font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold">Marked by</th>
+                    <th className="px-4 py-3 text-left font-semibold">Marked at</th>
                     <th className="px-4 py-3 text-left font-semibold">Note</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredDaily.map((r) => {
-                    const key = r.status || "unset";
-                    const meta = STATUS_META[key] || STATUS_META.unset;
+                    const meta = STATUS_META[r.status] || STATUS_META.present;
                     return (
-                      <tr key={r.student} className="border-t border-slate-100">
+                      <tr key={r.record_id || r.student} className="border-t border-slate-100">
                         <td className="px-4 py-3 font-medium text-navy-950">{r.student_name}</td>
                         <td className="px-4 py-3">
                           <span className={"inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider " + meta.chip}>
                             {meta.label}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-slate-600">{r.marked_by || "—"}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 tabular-nums">{formatTime(r.marked_at)}</td>
                         <td className="px-4 py-3 text-slate-500">{r.note || "—"}</td>
                       </tr>
                     );
@@ -326,14 +357,14 @@ export default function AttendancePage() {
       {klassId && !isLoading && !isError && tab === "summary" && (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatTile label="Students"       value={summaryRows.length} tone="violet"  icon={BookOpen} />
-            <StatTile label="Records total"  value={summaryRows.reduce((a, r) => a + r.total, 0)} tone="slate" icon={CalendarIcon} />
-            <StatTile label="Overall rate"   value={overallRate + "%"}  tone="emerald" icon={UserCheck} />
+            <StatTile label="Students with records"  value={summaryRows.filter((r) => r.total > 0).length} tone="violet"  icon={BookOpen} />
+            <StatTile label="Records total"          value={summaryRows.reduce((a, r) => a + r.total, 0)}  tone="slate"   icon={CalendarIcon} />
+            <StatTile label="Overall rate"           value={overallRate + "%"}                              tone="emerald" icon={UserCheck} />
           </div>
 
           {summaryRows.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-              No students found.
+              No attendance data in this range.
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
@@ -345,6 +376,7 @@ export default function AttendancePage() {
                     <th className="px-4 py-3 text-center font-semibold">Absent</th>
                     <th className="px-4 py-3 text-center font-semibold">Late</th>
                     <th className="px-4 py-3 text-center font-semibold">Excused</th>
+                    <th className="px-4 py-3 text-center font-semibold">Records</th>
                     <th className="px-4 py-3 text-center font-semibold">Rate</th>
                   </tr>
                 </thead>
@@ -356,15 +388,20 @@ export default function AttendancePage() {
                       <td className="px-4 py-3 text-center tabular-nums text-rose-700 font-semibold">{r.absent}</td>
                       <td className="px-4 py-3 text-center tabular-nums text-amber-700 font-semibold">{r.late}</td>
                       <td className="px-4 py-3 text-center tabular-nums text-slate-700 font-semibold">{r.excused}</td>
+                      <td className="px-4 py-3 text-center tabular-nums text-slate-500 font-semibold">{r.total}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={
-                          "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold " +
-                          (r.attendance_rate >= 85 ? "bg-emerald-100 text-emerald-700" :
-                           r.attendance_rate >= 70 ? "bg-amber-100 text-amber-700" :
-                                                     "bg-rose-100 text-rose-700")
-                        }>
-                          {r.attendance_rate}%
-                        </span>
+                        {r.total === 0 ? (
+                          <span className="text-xs text-slate-400">No data</span>
+                        ) : (
+                          <span className={
+                            "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold " +
+                            (r.attendance_rate >= 85 ? "bg-emerald-100 text-emerald-700" :
+                             r.attendance_rate >= 70 ? "bg-amber-100 text-amber-700" :
+                                                       "bg-rose-100 text-rose-700")
+                          }>
+                            {r.attendance_rate}%
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
