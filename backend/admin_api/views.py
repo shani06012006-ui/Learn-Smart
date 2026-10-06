@@ -256,6 +256,10 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             active_bool = active.lower() in {"true", "1", "yes"}
             qs = qs.filter(is_active=active_bool)
 
+        grade_id = self.request.query_params.get("grade")
+        if grade_id:
+            qs = qs.filter(grade_id=grade_id)
+
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(
@@ -591,6 +595,10 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         subject = self.request.query_params.get("subject")
         if subject:
             qs = qs.filter(subject__iexact=subject)
+
+        grade_id = self.request.query_params.get("grade")
+        if grade_id:
+            qs = qs.filter(grade_id=grade_id)
 
         q = self.request.query_params.get("q")
         if q:

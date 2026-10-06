@@ -111,6 +111,11 @@ export const realApi = createApi({
       providesTags: [{ type: "AdminGrade", id: "LIST" }],
     }),
 
+    getGrade: builder.query({
+      query: (id) => `/grades/${id}/`,
+      providesTags: (result, error, id) => [{ type: "AdminGrade", id }],
+    }),
+
     createGrade: builder.mutation({
       query: (body) => ({
         url: "/grades/",
@@ -142,6 +147,7 @@ export const realApi = createApi({
         const search = new URLSearchParams();
         if (params.role) search.set("role", params.role);
         if (params.q) search.set("q", params.q);
+        if (params.grade) search.set("grade", params.grade);
         if (params.is_active !== undefined)
           search.set("is_active", String(params.is_active));
         if (params.page) search.set("page", String(params.page));
@@ -401,6 +407,7 @@ export const realApi = createApi({
         if (params.is_archived !== undefined)
           search.set("is_archived", String(params.is_archived));
         if (params.subject) search.set("subject", params.subject);
+        if (params.grade) search.set("grade", params.grade);
         if (params.q) search.set("q", params.q);
         if (params.page) search.set("page", String(params.page));
         const qs = search.toString();
@@ -896,6 +903,7 @@ export const {
   useAdminLogoutMutation,
   useGetAdminUsersQuery,
   useGetGradesQuery,
+  useGetGradeQuery,
   useCreateGradeMutation,
   useUpdateGradeMutation,
   useDeleteGradeMutation,
