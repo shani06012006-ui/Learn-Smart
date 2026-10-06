@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import {
   useGetAttendanceQuery,
   useMarkAttendanceMutation,
-  useGetAdminClassesQuery,
+  useGetClassesQuery,
 } from "../../../store/api/realApi";
 
 const STATUSES = [
@@ -20,7 +20,7 @@ export default function AttendancePage() {
   const [draft, setDraft] = useState({}); // { studentId: status }
   const [notice, setNotice] = useState(null);
 
-  const { data: classesData } = useGetAdminClassesQuery({ page: 1 });
+  const { data: classesData } = useGetClassesQuery({ page: 1 });
   const classes = classesData?.results || classesData || [];
 
   const { data, isFetching } = useGetAttendanceQuery(

@@ -932,6 +932,10 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetAttendanceQuery,
+  useMarkAttendanceMutation,
+  useGetAttendanceStatsQuery,
+
   useAdminLoginMutation,
   useGetAdminCoursesQuery,
   useGetAdminCourseQuery,
