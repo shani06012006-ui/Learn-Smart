@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Layers,
   Plus,
@@ -179,6 +180,7 @@ export default function AdminGradesPage() {
 
   const { data, isLoading, isError, error, refetch } = useGetGradesQuery();
   const [deleteGrade, { isLoading: deleting }] = useDeleteGradeMutation();
+  const navigate = useNavigate();
 
   const grades = data?.results ?? data ?? [];
 
@@ -282,7 +284,8 @@ export default function AdminGradesPage() {
             {grades.map((g) => (
               <li
                 key={g.id}
-                className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/50"
+                onClick={() => navigate(`/admin/grades/${g.id}`)}
+                className="flex cursor-pointer items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/50"
               >
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-50 font-bold text-purple-600 ring-1 ring-purple-100">
                   {g.level}
@@ -319,7 +322,7 @@ export default function AdminGradesPage() {
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => { setEditing(g); setFormOpen(true); }}
+                    onClick={(e) => { e.stopPropagation(); setEditing(g); setFormOpen(true); }}
                     className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
                     title="Edit grade"
                   >
@@ -327,7 +330,7 @@ export default function AdminGradesPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => promptDelete(g)}
+                    onClick={(e) => { e.stopPropagation(); promptDelete(g); }}
                     className="rounded-lg p-2 text-slate-400 transition hover:bg-coral-50 hover:text-coral-600"
                     title="Delete grade"
                   >

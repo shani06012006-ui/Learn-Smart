@@ -25,6 +25,7 @@ import AdminStudentsPage from "./features/admin/pages/AdminStudentsPage";
 import AdminStudentDetailPage from "./features/admin/pages/AdminStudentDetailPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminGradesPage from "./features/admin/pages/AdminGradesPage";
+import AdminGradeDetailPage from "./features/admin/pages/AdminGradeDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminMessagesPage from "./features/admin/pages/AdminMessagesPage";
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="students/:id"   element={<AdminStudentDetailPage />} />
           <Route path="courses"       element={<AdminCoursesPage />} />
           <Route path="grades"        element={<AdminGradesPage />} />
+          <Route path="grades/:id"    element={<AdminGradeDetailPage />} />
           <Route path="courses/:id"   element={<AdminCourseDetailPage />} />
           <Route path="attendance"     element={<AdminAttendancePage />} />
           <Route path="timetable"      element={<AdminTimetablePage />} />
