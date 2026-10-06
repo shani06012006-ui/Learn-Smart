@@ -192,6 +192,7 @@ export const realApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: "AdminUser", id },
         { type: "AdminUser", id: "LIST" },
+        { type: "AdminGrade", id: "LIST" },
       ],
     }),
 
@@ -439,6 +440,7 @@ export const realApi = createApi({
       invalidatesTags: [
         { type: "AdminCourse", id: "LIST" },
         { type: "AdminStats" },
+        { type: "AdminGrade", id: "LIST" },
       ],
     }),
 
@@ -452,6 +454,7 @@ export const realApi = createApi({
         { type: "AdminCourse", id },
         { type: "AdminCourse", id: "LIST" },
         { type: "AdminStats" },
+        { type: "AdminGrade", id: "LIST" },
       ],
     }),
 
