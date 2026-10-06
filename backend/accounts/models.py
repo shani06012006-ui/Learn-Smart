@@ -245,13 +245,21 @@ class StudentAttendance(TimeStampedModel):
     """Student attendance for a class on a given day."""
 
     STATUS_PRESENT = "present"
+    STATUS_ABSENT = "absent"
+    STATUS_LATE = "late"
+    STATUS_EXCUSED = "excused"
     STATUS_CHOICES = [
         (STATUS_PRESENT, "Present"),
+        (STATUS_ABSENT, "Absent"),
+        (STATUS_LATE, "Late"),
+        (STATUS_EXCUSED, "Excused"),
     ]
 
     SOURCE_AUTO = "auto"
+    SOURCE_MANUAL = "manual"
     SOURCE_CHOICES = [
         (SOURCE_AUTO, "Auto"),
+        (SOURCE_MANUAL, "Manual"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -281,7 +289,7 @@ class StudentAttendance(TimeStampedModel):
         related_name="student_attendance",
     )
     date = models.DateField(db_index=True)
-    joined_at = models.DateTimeField()
+    joined_at = models.DateTimeField(null=True, blank=True)
     left_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20,
@@ -294,6 +302,15 @@ class StudentAttendance(TimeStampedModel):
         choices=SOURCE_CHOICES,
         default=SOURCE_AUTO,
     )
+    marked_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marked_student_attendance",
+        help_text="Who marked this record (null for auto-generated).",
+    )
+    note = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
         constraints = [

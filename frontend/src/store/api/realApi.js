@@ -80,6 +80,30 @@ export const realApi = createApi({
     "MaterialList",
   ],
   endpoints: (builder) => ({
+    // ---- Attendance ----
+    getAttendance: builder.query({
+      query: ({ klass, date }) => ({
+        url: `/admin/attendance/`,
+        params: { klass, date },
+      }),
+      providesTags: ["Attendance"],
+    }),
+    markAttendance: builder.mutation({
+      query: (body) => ({
+        url: `/admin/attendance/mark/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Attendance"],
+    }),
+    getAttendanceStats: builder.query({
+      query: ({ klass, from, to } = {}) => ({
+        url: `/admin/attendance/stats/`,
+        params: { klass, from, to },
+      }),
+      providesTags: ["Attendance"],
+    }),
+
     // ---------- auth -------------------------------------------------
 
     adminLogin: builder.mutation({
