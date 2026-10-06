@@ -762,11 +762,42 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         course = self.get_object()
         serializer = AdminCourseWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
+        # Plain scalar fields
         for field in ("name", "subject", "description", "is_archived"):
-            if field in serializer.validated_data:
-                setattr(course, field, serializer.validated_data[field])
+            if field in data:
+                setattr(course, field, data[field])
+
+        # teacher_id -> course.teacher
+        if "teacher_id" in data:
+            from accounts.models import User as _U
+            try:
+                course.teacher = _U.objects.get(id=data["teacher_id"])
+            except _U.DoesNotExist:
+                return Response(
+                    {"error": {"detail": "Teacher not found.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # grade_id is already a Grade instance (validated by the serializer)
+        grade_changed = False
+        if "grade_id" in data:
+            course.grade = data["grade_id"]
+            grade_changed = True
+
         course.save()
+
+        # If grade changed, auto-enroll all students of the new grade
+        if grade_changed and course.grade is not None:
+            try:
+                from classes.services import auto_enroll_class_into_grade
+                auto_enroll_class_into_grade(course)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "auto-enroll after grade attach failed for %s", course.id
+                )
 
         return Response(AdminCourseReadSerializer(course).data)
 
