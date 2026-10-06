@@ -166,11 +166,38 @@ class AttendanceViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        rows = _list_class_attendance(klass, date_str)
+        # Admin view: show ONLY records actually saved by teachers.
+        # Do NOT show a full roster — that's the teacher's UI.
+        qs = (
+            StudentAttendance.objects
+            .filter(class_course=klass, date=date_str)
+            .select_related("student", "marked_by")
+            .order_by("student__first_name", "student__last_name")
+        )
+
+        rows = []
+        for a in qs:
+            s = a.student
+            full = f"{s.first_name or ''} {s.last_name or ''}".strip() or s.email
+            rows.append({
+                "student": str(s.id),
+                "student_name": full,
+                "status": a.status,
+                "note": a.note or "",
+                "record_id": str(a.id),
+                "marked_by": (
+                    f"{(a.marked_by.first_name or '').strip()} {(a.marked_by.last_name or '').strip()}".strip()
+                    or (a.marked_by.email if a.marked_by else None)
+                ) if a.marked_by else None,
+                "marked_at": a.updated_at.isoformat() if a.updated_at else None,
+                "source": a.source,
+            })
+
         return Response({
             "klass": str(klass.id),
             "klass_name": klass.name,
             "date": date_str,
+            "count": len(rows),
             "rows": rows,
         })
 
