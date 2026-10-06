@@ -63,6 +63,12 @@ class ClassCourseListCreateView(generics.ListCreateAPIView):
                 enrollments__student=user,
                 enrollments__status=StudentEnrollment.STATUS_ACTIVE,
             ).distinct()
+        if user.role == "admin":
+            qs = ClassCourse.objects.all()
+            teacher_id = self.request.query_params.get("teacher")
+            if teacher_id:
+                qs = qs.filter(teacher_id=teacher_id)
+            return qs
         return ClassCourse.objects.none()
 
 
