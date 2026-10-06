@@ -391,7 +391,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         user.save(update_fields=["is_active", "updated_at"])
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
 
-        @action(detail=True, methods=["post"], url_path="toggle-active")
+    @action(detail=True, methods=["post"], url_path="toggle-active")
     def toggle_active(self, request, pk=None):
         user = self.get_object()
 
