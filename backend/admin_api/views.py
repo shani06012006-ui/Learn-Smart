@@ -740,10 +740,13 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
 
     # ------------------------------------------------------------------ relations
 
-    @action(detail=True, methods=["get"], url_path="students")
+    @action(detail=True, methods=["get", "post"], url_path="students")
     def students(self, request, pk=None):
 
         course = self.get_object()
+
+        if request.method == "POST":
+            return self._add_student_to_course(request, course)
 
         qs = (
             StudentEnrollment.objects.filter(class_course=course)
@@ -755,6 +758,7 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
             {
                 "id": str(e.id),
                 "status": e.status,
+                "joining_code": e.joining_code,
                 "joined_at": e.joined_at.isoformat() if e.joined_at else None,
                 "created_at": e.created_at.isoformat() if e.created_at else None,
                 "student": {
@@ -767,6 +771,102 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
             for e in qs
         ]
         return Response({"results": data, "count": len(data)})
+
+    def _add_student_to_course(self, request, course):
+        """Admin-side add of a student (email + name + optional grade)."""
+        from classes.services import add_student_to_class
+        from institutions.models import Grade
+
+        email = (request.data.get("email") or "").strip().lower()
+        first_name = (request.data.get("first_name") or "").strip()
+        last_name = (request.data.get("last_name") or "").strip()
+        grade_id = request.data.get("grade_id")
+
+        if not email or not first_name or not last_name:
+            return Response(
+                {"detail": "email, first_name and last_name are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        grade = None
+        if grade_id:
+            try:
+                grade = Grade.objects.get(id=grade_id)
+            except Grade.DoesNotExist:
+                return Response(
+                    {"detail": "Unknown grade."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            # institution scoping
+            if not request.user.is_superuser and grade.institution_id != request.user.institution_id:
+                return Response(
+                    {"detail": "Grade not in your institution."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        enrollment, created = add_student_to_class(
+            class_course=course,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            grade=grade,
+        )
+
+        return Response(
+            {
+                "id": str(enrollment.id),
+                "status": enrollment.status,
+                "joining_code": enrollment.joining_code,
+                "created": created,
+                "student": {
+                    "id": str(enrollment.student.id),
+                    "full_name": enrollment.student.get_full_name(),
+                    "email": enrollment.student.email,
+                    "is_active": enrollment.student.is_active,
+                },
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path=r"students/(?P<enrollment_id>[^/.]+)",
+    )
+    def student_status(self, request, pk=None, enrollment_id=None):
+        """PATCH enrollment status (block/remove/active)."""
+        course = self.get_object()
+
+        try:
+            enrollment = StudentEnrollment.objects.select_related("student").get(
+                id=enrollment_id,
+                class_course=course,
+            )
+        except StudentEnrollment.DoesNotExist:
+            return Response(
+                {"detail": "Enrollment not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        new_status = request.data.get("status")
+        valid = {
+            StudentEnrollment.STATUS_ACTIVE,
+            StudentEnrollment.STATUS_BLOCKED,
+            StudentEnrollment.STATUS_REMOVED,
+        }
+        if new_status not in valid:
+            return Response(
+                {"detail": f"status must be one of {sorted(valid)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        enrollment.status = new_status
+        enrollment.save(update_fields=["status", "updated_at"])
+
+        return Response({
+            "id": str(enrollment.id),
+            "status": enrollment.status,
+        })
 
 
 class AdminTimetableViewSet(viewsets.GenericViewSet):

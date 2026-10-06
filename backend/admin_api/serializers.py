@@ -276,6 +276,7 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
     teacher = AdminCourseTeacherBriefSerializer(read_only=True)
     institution = InstitutionBriefSerializer(read_only=True)
     student_count = serializers.SerializerMethodField()
+    grade = serializers.SerializerMethodField()
 
     class Meta:
         model = ClassCourse
@@ -286,6 +287,7 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
             "description",
             "teacher",
             "institution",
+            "grade",
             "is_archived",
             "student_count",
             "created_at",
@@ -299,6 +301,12 @@ class AdminCourseReadSerializer(serializers.ModelSerializer):
             return count
         return obj.enrollments.filter(status=StudentEnrollment.STATUS_ACTIVE).count()
 
+    def get_grade(self, obj):
+        if not obj.grade_id:
+            return None
+        g = obj.grade
+        return {"id": str(g.id), "level": g.level, "name": g.name}
+
 
 class AdminCourseWriteSerializer(serializers.Serializer):
 
@@ -307,6 +315,20 @@ class AdminCourseWriteSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     teacher_id = serializers.UUIDField(required=False)
     is_archived = serializers.BooleanField(required=False)
+    grade_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_grade_id(self, value):
+        if value in (None, ""):
+            return None
+        request = self.context.get("request")
+        from institutions.models import Grade
+        qs = Grade.objects.filter(id=value)
+        if request and getattr(request.user, "institution_id", None) and not request.user.is_superuser:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except Grade.DoesNotExist:
+            raise serializers.ValidationError("Unknown grade for your institution.")
 
     def validate_name(self, value):
         value = value.strip()
