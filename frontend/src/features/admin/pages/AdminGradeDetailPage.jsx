@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,8 +9,11 @@ import {
   Trash2,
   Search,
   Loader2,
-  CheckCircle2,
-  XCircle,
+  Plus,
+  MoreVertical,
+  ShieldOff,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
@@ -20,11 +23,16 @@ import StatCard from "../components/StatCard";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import ConfirmDialog from "../../../components/ui/ConfirmDialog";
+import GradeFormModal from "../components/GradeFormModal";
+import AddStudentToGradeModal from "../components/AddStudentToGradeModal";
+import AttachClassToGradeModal from "../components/AttachClassToGradeModal";
 import {
   useGetGradeQuery,
   useGetAdminUsersQuery,
   useGetAdminCoursesQuery,
   useDeleteGradeMutation,
+  useUpdateAdminUserMutation,
+  useUpdateAdminCourseMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -33,34 +41,101 @@ const TABS = [
   { id: "classes",  label: "Classes",  icon: BookOpen },
 ];
 
-
 function initialsOf(name) {
   const parts = (name || "").split(/\s+/).filter(Boolean);
   if (!parts.length) return "?";
   return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 }
 
+/* Row ⋯ menu */
+function RowMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
+        aria-label="Row actions"
+      >
+        <MoreVertical size={15} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-9 z-20 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg">
+          {items.map(({ label, icon: Icon, onClick, tone = "default" }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onClick();
+              }}
+              className={
+                "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition " +
+                (tone === "danger"
+                  ? "text-coral-600 hover:bg-coral-50"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-navy-950")
+              }
+            >
+              {Icon && <Icon size={13} />}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminGradeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [tab, setTab] = useState("students");
   const [search, setSearch] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [addStudentsOpen, setAddStudentsOpen] = useState(false);
+  const [attachClassOpen, setAttachClassOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
-  const { data: grade, isLoading: gradeLoading, isError: gradeError, error: gradeErr, refetch: refetchGrade } = useGetGradeQuery(id);
+  const {
+    data: grade,
+    isLoading: gradeLoading,
+    isError: gradeError,
+    error: gradeErr,
+    refetch: refetchGrade,
+  } = useGetGradeQuery(id);
 
-  const { data: studentsData, isLoading: studentsLoading } = useGetAdminUsersQuery(
+  const {
+    data: studentsData,
+    isLoading: studentsLoading,
+    refetch: refetchStudents,
+  } = useGetAdminUsersQuery(
     { role: "student", grade: id },
     { skip: !grade },
   );
 
-  const { data: coursesData, isLoading: coursesLoading } = useGetAdminCoursesQuery(
-    { grade: id },
-    { skip: !grade },
-  );
+  const {
+    data: coursesData,
+    isLoading: coursesLoading,
+    refetch: refetchCourses,
+  } = useGetAdminCoursesQuery({ grade: id }, { skip: !grade });
 
   const [deleteGrade, { isLoading: deleting }] = useDeleteGradeMutation();
+  const [updateUser] = useUpdateAdminUserMutation();
+  const [updateCourse] = useUpdateAdminCourseMutation();
 
   const students = studentsData?.results ?? studentsData ?? [];
   const courses = coursesData?.results ?? coursesData ?? [];
@@ -68,9 +143,10 @@ export default function AdminGradeDetailPage() {
   const filteredStudents = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return students;
-    return students.filter((s) =>
-      (s.full_name || "").toLowerCase().includes(q) ||
-      (s.email || "").toLowerCase().includes(q)
+    return students.filter(
+      (s) =>
+        (s.full_name || "").toLowerCase().includes(q) ||
+        (s.email || "").toLowerCase().includes(q),
     );
   }, [students, search]);
 
@@ -86,6 +162,46 @@ export default function AdminGradeDetailPage() {
           navigate("/admin/grades", { replace: true });
         } catch (err) {
           console.error("delete grade failed", err);
+        }
+        setConfirm(null);
+      },
+    });
+  }
+
+  function promptRemoveStudent(student) {
+    setConfirm({
+      title: `Remove ${student.full_name || student.email} from this grade?`,
+      description:
+        "They will no longer be assigned to this grade. Their existing class enrollments remain.",
+      confirmLabel: "Remove",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await updateUser({ id: student.id, grade_id: null }).unwrap();
+          refetchStudents();
+          refetchGrade();
+        } catch (err) {
+          console.error("remove student failed", err);
+        }
+        setConfirm(null);
+      },
+    });
+  }
+
+  function promptDetachClass(course) {
+    setConfirm({
+      title: `Detach "${course.name}" from this grade?`,
+      description:
+        "The class will no longer be linked to this grade. Existing enrollments are unaffected.",
+      confirmLabel: "Detach",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await updateCourse({ id: course.id, grade_id: null }).unwrap();
+          refetchCourses();
+          refetchGrade();
+        } catch (err) {
+          console.error("detach class failed", err);
         }
         setConfirm(null);
       },
@@ -135,12 +251,9 @@ export default function AdminGradeDetailPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => navigate("/admin/grades")}
-            >
+            <Button variant="secondary" onClick={() => setEditOpen(true)}>
               <Pencil size={13} />
-              Edit
+              Edit grade
             </Button>
             <Button variant="danger" onClick={promptDelete}>
               <Trash2 size={13} />
@@ -167,26 +280,43 @@ export default function AdminGradeDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        {TABS.map(({ id: tid, label, icon: Icon }) => (
-          <button
-            key={tid}
-            type="button"
-            onClick={() => setTab(tid)}
-            className={
-              "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors " +
-              (tab === tid
-                ? "border-purple-500 text-purple-600"
-                : "border-transparent text-slate-500 hover:text-navy-950")
-            }
-          >
-            <Icon size={15} />
-            {label}
-            <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-              {tid === "students" ? students.length : courses.length}
-            </span>
-          </button>
-        ))}
+      <div className="flex items-center justify-between border-b border-slate-200">
+        <div className="flex gap-2">
+          {TABS.map(({ id: tid, label, icon: Icon }) => (
+            <button
+              key={tid}
+              type="button"
+              onClick={() => setTab(tid)}
+              className={
+                "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors " +
+                (tab === tid
+                  ? "border-purple-500 text-purple-600"
+                  : "border-transparent text-slate-500 hover:text-navy-950")
+              }
+            >
+              <Icon size={15} />
+              {label}
+              <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                {tid === "students" ? students.length : courses.length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="pb-2">
+          {tab === "students" && (
+            <Button variant="primary" size="sm" onClick={() => setAddStudentsOpen(true)}>
+              <Plus size={14} />
+              Add students
+            </Button>
+          )}
+          {tab === "classes" && (
+            <Button variant="primary" size="sm" onClick={() => setAttachClassOpen(true)}>
+              <Plus size={14} />
+              Attach class
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Students tab */}
@@ -222,15 +352,16 @@ export default function AdminGradeDetailPage() {
                   No students in this grade yet
                 </p>
                 <p className="text-xs text-slate-400">
-                  Assign a grade to a student to see them here.
+                  Assign students to this grade to see them here.
                 </p>
                 <Button
                   variant="primary"
                   size="sm"
-                  onClick={() => navigate("/admin/students")}
+                  onClick={() => setAddStudentsOpen(true)}
                   className="mt-1"
                 >
-                  Go to students
+                  <Plus size={14} />
+                  Add students
                 </Button>
               </div>
             ) : filteredStudents.length === 0 ? (
@@ -263,6 +394,16 @@ export default function AdminGradeDetailPage() {
                     <Badge variant={s.is_active ? "success" : "danger"} dot>
                       {s.is_active ? "Active" : "Inactive"}
                     </Badge>
+                    <RowMenu
+                      items={[
+                        {
+                          label: "Remove from grade",
+                          icon: X,
+                          tone: "danger",
+                          onClick: () => promptRemoveStudent(s),
+                        },
+                      ]}
+                    />
                   </li>
                 ))}
               </ul>
@@ -284,7 +425,7 @@ export default function AdminGradeDetailPage() {
                 <BookOpen size={26} />
               </span>
               <p className="text-sm font-semibold text-navy-950">
-                No classes in this grade yet
+                No classes attached to this grade
               </p>
               <p className="text-xs text-slate-400">
                 Attach a class to this grade to see it here.
@@ -292,10 +433,11 @@ export default function AdminGradeDetailPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => navigate("/admin/courses")}
+                onClick={() => setAttachClassOpen(true)}
                 className="mt-1"
               >
-                Go to courses
+                <Plus size={14} />
+                Attach class
               </Button>
             </div>
           ) : (
@@ -326,12 +468,49 @@ export default function AdminGradeDetailPage() {
                   <Badge variant={c.is_archived ? "neutral" : "success"}>
                     {c.is_archived ? "Archived" : "Active"}
                   </Badge>
+                  <RowMenu
+                    items={[
+                      {
+                        label: "Detach from grade",
+                        icon: X,
+                        tone: "danger",
+                        onClick: () => promptDetachClass(c),
+                      },
+                    ]}
+                  />
                 </li>
               ))}
             </ul>
           )}
         </div>
       )}
+
+      <GradeFormModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        grade={grade}
+        onSuccess={() => refetchGrade()}
+      />
+
+      <AddStudentToGradeModal
+        open={addStudentsOpen}
+        onClose={() => setAddStudentsOpen(false)}
+        gradeId={grade.id}
+        onSuccess={() => {
+          refetchStudents();
+          refetchGrade();
+        }}
+      />
+
+      <AttachClassToGradeModal
+        open={attachClassOpen}
+        onClose={() => setAttachClassOpen(false)}
+        gradeId={grade.id}
+        onSuccess={() => {
+          refetchCourses();
+          refetchGrade();
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirm}
@@ -340,6 +519,7 @@ export default function AdminGradeDetailPage() {
         title={confirm?.title}
         description={confirm?.description}
         confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
         loading={deleting}
       />
     </div>
