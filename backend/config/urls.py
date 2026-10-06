@@ -22,6 +22,7 @@ urlpatterns = [
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),
+    path("api/v1/leaves/", include("leaves.urls")),
 ]
 
 if settings.DEBUG:

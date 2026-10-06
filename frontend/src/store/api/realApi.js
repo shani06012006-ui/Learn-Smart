@@ -67,6 +67,7 @@ export const realApi = createApi({
     "AdminTimetable",
     "StudentLeave",
     "TeacherLeave",
+    "MyLeave",
     "Class",
     "Enrollment",
     "Material",
@@ -594,6 +595,42 @@ export const realApi = createApi({
       providesTags: [{ type: "ChatThread", id: "teacher-group-members" }],
     }),
 
+    // ─────────────────────────────────────────────────────────
+    // My leaves (teacher or student)
+    // ─────────────────────────────────────────────────────────
+
+    getMyLeaves: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.status) search.set("status", params.status);
+        const qs = search.toString();
+        return `/leaves/my/${qs ? `?${qs}` : ""}`;
+      },
+      providesTags: [{ type: "MyLeave", id: "LIST" }],
+    }),
+
+    createMyLeave: builder.mutation({
+      query: (body) => ({
+        url: "/leaves/my/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "MyLeave", id: "LIST" }],
+    }),
+
+    cancelMyLeave: builder.mutation({
+      query: ({ leaveId }) => ({
+        url: `/leaves/${leaveId}/cancel/`,
+        method: "POST",
+      }),
+      invalidatesTags: [{ type: "MyLeave", id: "LIST" }],
+    }),
+
+    getMyLeaveSummary: builder.query({
+      query: () => `/leaves/summary/`,
+      providesTags: [{ type: "MyLeave", id: "SUMMARY" }],
+    }),
+
     getStudentsList: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -657,6 +694,36 @@ export const realApi = createApi({
       query: (id) => `/admin/courses/${id}/students/`,
       providesTags: (result, error, id) => [
         { type: "AdminCourse", id: `students-${id}` },
+      ],
+    }),
+
+    addAdminCourseStudent: builder.mutation({
+      query: ({ courseId, email, first_name, last_name, grade_id }) => ({
+        url: `/admin/courses/${courseId}/students/`,
+        method: "POST",
+        body: {
+          email,
+          first_name,
+          last_name,
+          ...(grade_id ? { grade_id } : {}),
+        },
+      }),
+      invalidatesTags: (result, error, { courseId }) => [
+        { type: "AdminCourse", id: `students-${courseId}` },
+        { type: "AdminCourse", id: courseId },
+        { type: "AdminCourse", id: "LIST" },
+      ],
+    }),
+
+    updateAdminCourseStudentStatus: builder.mutation({
+      query: ({ courseId, enrollmentId, status }) => ({
+        url: `/admin/courses/${courseId}/students/${enrollmentId}/`,
+        method: "PATCH",
+        body: { status },
+      }),
+      invalidatesTags: (result, error, { courseId }) => [
+        { type: "AdminCourse", id: `students-${courseId}` },
+        { type: "AdminCourse", id: courseId },
       ],
     }),
 
@@ -840,8 +907,14 @@ export const {
   useGetAdminUserClassesQuery,
   useGetAdminUserEnrollmentsQuery,
   useGetAdminCourseStudentsQuery,
+  useAddAdminCourseStudentMutation,
+  useUpdateAdminCourseStudentStatusMutation,
   useGetTeacherGroupThreadQuery,
   useGetTeacherGroupMembersQuery,
+  useGetMyLeavesQuery,
+  useCreateMyLeaveMutation,
+  useCancelMyLeaveMutation,
+  useGetMyLeaveSummaryQuery,
   useGetStudentsListQuery,
   useCreateTeacherStudentMutation,
   useGetTeacherGroupMessagesQuery,

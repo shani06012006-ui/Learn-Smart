@@ -42,6 +42,7 @@ import TeacherClassDetailPage from "./features/teacher/pages/TeacherClassDetailP
 import TeacherTimetablePage from "./features/teacher/pages/TeacherTimetablePage";
 import TeacherMaterialsPage from "./features/teacher/pages/TeacherMaterialsPage";
 import TeacherStudentsPage from "./features/teacher/pages/TeacherStudentsPage";
+import TeacherLeavesPage from "./features/teacher/pages/TeacherLeavesPage";
 import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="classes/:id" element={<TeacherClassDetailPage />} />
             <Route path="students" element={<TeacherStudentsPage />} />
             <Route path="timetable" element={<TeacherTimetablePage />} />
+            <Route path="leaves" element={<TeacherLeavesPage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
             <Route path="announcements" element={<TeacherPlaceholder title="Announcements" />} />
             <Route path="live-classes" element={<TeacherPlaceholder title="Live Classes" />} />
