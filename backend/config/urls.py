@@ -2,7 +2,7 @@
 Root URL configuration.
 
 Route layout:
-    /admin/             Django's built-in admin (developer fallback only —
+    /admin/             Django's built-in admin (developer fallback only â€”
                         the institution admin experience is the React app)
     /api/v1/auth/       Login, refresh, me, logout (JWT)
     /api/v1/admin/      Institution admin API (users, stats)
@@ -19,6 +19,7 @@ urlpatterns = [
 
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/admin/", include("admin_api.urls")),
+path("api/v1/admin/", include("attendance.urls")),
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),
