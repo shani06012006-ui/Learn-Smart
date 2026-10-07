@@ -65,6 +65,12 @@ class AdminUserCreateSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default="")
     role = serializers.ChoiceField(choices=[User.ROLE_TEACHER, User.ROLE_STUDENT])
     grade_id = serializers.UUIDField(required=False, allow_null=True)
+    class_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
 
     def validate_grade_id(self, value):
         """Ensure the grade belongs to the caller's institution."""
@@ -79,6 +85,23 @@ class AdminUserCreateSerializer(serializers.Serializer):
             return qs.get()
         except Grade.DoesNotExist:
             raise serializers.ValidationError("Unknown grade for your institution.")
+
+    def validate_class_ids(self, value):
+        """Ensure each class belongs to the caller's institution."""
+        if not value:
+            return []
+        request = self.context.get("request")
+        from classes.models import ClassCourse
+        qs = ClassCourse.objects.filter(id__in=value)
+        if request and getattr(request.user, "institution_id", None) and not request.user.is_superuser:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        found_ids = set(str(c.id) for c in qs)
+        missing = [str(v) for v in value if str(v) not in found_ids]
+        if missing:
+            raise serializers.ValidationError(
+                "Some classes are not in your institution: " + ", ".join(missing)
+            )
+        return list(qs.values_list("id", flat=True))
 
     def validate_email(self, value):
         value = value.strip().lower()

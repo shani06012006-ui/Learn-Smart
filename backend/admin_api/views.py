@@ -332,6 +332,41 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         if grade_obj is not None and new_user.role == User.ROLE_STUDENT:
             self._sync_student_grade_enrollments_with_grade(new_user, grade_obj)
 
+        # Apply explicit class_ids (from the admin Create-User modal).
+        class_ids = serializer.validated_data.get("class_ids") or []
+        if class_ids:
+            from classes.models import ClassCourse, StudentEnrollment
+            from core.utils import generate_unique_code
+            from django.utils import timezone
+
+            classes_qs = ClassCourse.objects.filter(id__in=class_ids)
+            if institution is not None:
+                classes_qs = classes_qs.filter(institution=institution)
+
+            if new_user.role == User.ROLE_TEACHER:
+                # Assign the new teacher to each picked class
+                classes_qs.update(teacher=new_user)
+
+            elif new_user.role == User.ROLE_STUDENT:
+                # Enroll the student in each picked class
+                for klass in classes_qs:
+                    StudentEnrollment.objects.get_or_create(
+                        student=new_user,
+                        class_course=klass,
+                        defaults={
+                            "joining_code": generate_unique_code(
+                                StudentEnrollment, field_name="joining_code"
+                            ),
+                            "status": StudentEnrollment.STATUS_ACTIVE,
+                            "joined_at": timezone.now(),
+                        },
+                    )
+
+        return Response(
+            AdminUserSerializer(new_user).data,
+            status=status.HTTP_201_CREATED,
+        )
+
         return Response(AdminUserSerializer(new_user).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
