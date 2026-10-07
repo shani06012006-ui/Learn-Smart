@@ -22,6 +22,21 @@ class InstitutionBriefSerializer(serializers.ModelSerializer):
 
 
 class AdminUserSerializer(serializers.ModelSerializer):
+    grade_ids = serializers.SerializerMethodField()
+    grade_names = serializers.SerializerMethodField()
+
+    def get_grade_ids(self, obj):
+        try:
+            return [str(a.grade_id) for a in obj.grade_assignments.all()]
+        except Exception:
+            return []
+
+    def get_grade_names(self, obj):
+        try:
+            return [a.grade.name for a in obj.grade_assignments.all() if a.grade]
+        except Exception:
+            return []
+
     """Read representation of a user for the admin UI."""
 
     institution = InstitutionBriefSerializer(read_only=True)
@@ -44,6 +59,8 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "is_superuser",
             "created_at",
             "updated_at",
+            "grade_ids",
+            "grade_names",
         ]
         read_only_fields = fields
 
@@ -71,6 +88,12 @@ class AdminUserCreateSerializer(serializers.Serializer):
         allow_empty=True,
         default=list,
     )
+    grade_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+        default=list,
+    )
 
     def validate_grade_id(self, value):
         """Ensure the grade belongs to the caller's institution."""
@@ -85,6 +108,23 @@ class AdminUserCreateSerializer(serializers.Serializer):
             return qs.get()
         except Grade.DoesNotExist:
             raise serializers.ValidationError("Unknown grade for your institution.")
+
+    def validate_grade_ids(self, value):
+        """Ensure each grade belongs to the caller's institution."""
+        if not value:
+            return []
+        request = self.context.get("request")
+        from institutions.models import Grade
+        qs = Grade.objects.filter(id__in=value)
+        if request and getattr(request.user, "institution_id", None) and not request.user.is_superuser:
+            qs = qs.filter(institution_id=request.user.institution_id)
+        found_ids = set(str(g.id) for g in qs)
+        missing = [str(v) for v in value if str(v) not in found_ids]
+        if missing:
+            raise serializers.ValidationError(
+                "Some grades are not in your institution: " + ", ".join(missing)
+            )
+        return list(qs.values_list("id", flat=True))
 
     def validate_class_ids(self, value):
         """Ensure each class belongs to the caller's institution."""

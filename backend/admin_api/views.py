@@ -256,9 +256,15 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             active_bool = active.lower() in {"true", "1", "yes"}
             qs = qs.filter(is_active=active_bool)
 
+        # ?grade=<uuid> — filter by grade. For teachers, filters by
+        # teacher's assigned grades; for students, filters by their grade.
         grade_id = self.request.query_params.get("grade")
         if grade_id:
-            qs = qs.filter(grade_id=grade_id)
+            role_param = self.request.query_params.get("role")
+            if role_param == User.ROLE_TEACHER:
+                qs = qs.filter(grade_assignments__grade_id=grade_id).distinct()
+            else:
+                qs = qs.filter(grade_id=grade_id)
 
         q = self.request.query_params.get("q")
         if q:
@@ -331,6 +337,23 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         # Apply grade (only meaningful for students) and trigger auto-enroll
         if grade_obj is not None and new_user.role == User.ROLE_STUDENT:
             self._sync_student_grade_enrollments_with_grade(new_user, grade_obj)
+
+        # Grade assignments (teachers only) — admin decides which grades
+        # each teacher handles.
+        grade_ids = serializer.validated_data.get("grade_ids") or []
+        if grade_ids and new_user.role == User.ROLE_TEACHER:
+            from accounts.models import TeacherGradeAssignment
+            from institutions.models import Grade
+
+            grades_qs = Grade.objects.filter(id__in=grade_ids)
+            if institution is not None:
+                grades_qs = grades_qs.filter(institution=institution)
+            for grade in grades_qs:
+                TeacherGradeAssignment.objects.get_or_create(
+                    teacher=new_user,
+                    grade=grade,
+                    defaults={"institution": institution},
+                )
 
         # Apply explicit class_ids (from the admin Create-User modal).
         class_ids = serializer.validated_data.get("class_ids") or []
