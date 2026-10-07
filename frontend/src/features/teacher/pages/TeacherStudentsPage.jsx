@@ -1,34 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
+// frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   GraduationCap,
   Users,
   Search,
   BookOpen,
-  Mail,
   Plus,
   X,
-  Loader2,
 } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import Avatar from "../../../components/ui/Avatar";
-import Badge from "../../../components/ui/Badge";
 import StatCard from "../../admin/components/StatCard";
 import Button from "../../../components/ui/Button";
 import CreateTeacherStudentModal from "../components/CreateTeacherStudentModal";
-import {
-  useGetStudentsListQuery,
-  useGetClassesQuery,
-} from "../../../store/api/realApi";
+import { useGetTeacherStudentsQuery } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
-const SCOPES = [
-  { id: "mine", label: "My students" },
-  { id: "all", label: "All students" },
-];
-
+function initialsOf(name) {
+  const parts = (name || "").split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
 
 function StudentDrawer({ student, onClose }) {
   if (!student) return null;
@@ -54,10 +49,10 @@ function StudentDrawer({ student, onClose }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <div className="flex items-center gap-3">
-            <Avatar userId={student.id} initials={student.initials} size="lg" />
+            <Avatar userId={student.student} initials={initialsOf(student.student_name)} size="lg" />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-navy-950">
-                {student.full_name || student.email}
+                {student.student_name}
               </p>
               <p className="truncate text-xs text-slate-400">{student.email}</p>
             </div>
@@ -69,13 +64,13 @@ function StudentDrawer({ student, onClose }) {
                 Grade
               </p>
               <p className="mt-1 text-sm text-navy-950">
-                {student.grade?.name || "Not assigned"}
+                {student.grade_name || "Not assigned"}
               </p>
             </div>
 
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Classes ({student.classes?.length || 0})
+                Your classes ({student.classes?.length || 0})
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {(student.classes || []).map((c) => (
@@ -90,7 +85,7 @@ function StudentDrawer({ student, onClose }) {
                 ))}
                 {(!student.classes || student.classes.length === 0) && (
                   <p className="text-xs text-slate-400">
-                    Not enrolled in any active class.
+                    Not enrolled in any of your classes.
                   </p>
                 )}
               </div>
@@ -102,82 +97,61 @@ function StudentDrawer({ student, onClose }) {
   );
 }
 
-
 export default function TeacherStudentsPage() {
-  const [scope, setScope] = useState("mine");
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [openStudent, setOpenStudent] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  const {
-    data: studentsData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useGetStudentsListQuery({ scope });
+  const { data, isLoading, isError, error, refetch } = useGetTeacherStudentsQuery({});
 
-  const { data: classesData } = useGetClassesQuery();
+  const rows = data?.rows || [];
+  const grades = data?.grades || [];
 
-  const students = studentsData?.results ?? studentsData ?? [];
-  const classes = classesData?.results ?? classesData ?? [];
-
-  // Filter + group
   const filtered = useMemo(() => {
-    let list = students;
+    let list = rows;
     if (gradeFilter !== "all") {
-      list = list.filter((s) => s.grade?.id === gradeFilter);
+      list = list.filter((s) => s.grade_id === gradeFilter);
     }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
         (s) =>
-          (s.full_name || "").toLowerCase().includes(q) ||
+          (s.student_name || "").toLowerCase().includes(q) ||
           (s.email || "").toLowerCase().includes(q),
       );
     }
     return list;
-  }, [students, gradeFilter, search]);
+  }, [rows, gradeFilter, search]);
 
   const grouped = useMemo(() => {
-    // Build a map keyed by grade (id + label). Null grades go to a final bucket.
     const byGrade = new Map();
     for (const s of filtered) {
-      const gid = s.grade?.id || "__none__";
-      const gname = s.grade?.name || "No grade assigned";
-      const level = s.grade?.level ?? 999;
+      const gid = s.grade_id || "__none__";
+      const gname = s.grade_name || "No grade assigned";
       if (!byGrade.has(gid)) {
-        byGrade.set(gid, { id: gid, name: gname, level, students: [] });
+        byGrade.set(gid, { id: gid, name: gname, students: [] });
       }
       byGrade.get(gid).students.push(s);
     }
-    return Array.from(byGrade.values()).sort((a, b) => a.level - b.level);
+    return Array.from(byGrade.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true })
+    );
   }, [filtered]);
 
-  // Distinct grades present among the loaded students (for filter chips)
-  const gradesPresent = useMemo(() => {
-    const seen = new Map();
-    for (const s of students) {
-      if (s.grade?.id && !seen.has(s.grade.id)) {
-        seen.set(s.grade.id, s.grade);
-      }
-    }
-    return Array.from(seen.values()).sort((a, b) => a.level - b.level);
-  }, [students]);
+  // Distinct classes across all my students (for the stat card)
+  const distinctClasses = useMemo(() => {
+    const s = new Set();
+    rows.forEach((r) => (r.classes || []).forEach((c) => s.add(c.id)));
+    return s.size;
+  }, [rows]);
 
-  const totalInScope = students.length;
-  const distinctGrades = gradesPresent.length;
-  const classesCovered = classes.length;
+  const totalInScope = rows.length;
+  const distinctGrades = grades.length;
 
-  if (isLoading) return <LoadingState label="Loading students..." />;
+  if (isLoading) return <LoadingState label="Loading your students..." />;
   if (isError) {
-    return (
-      <ErrorState
-        message={extractErrorMessage(error)}
-        onRetry={refetch}
-      />
-    );
+    return <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />;
   }
 
   return (
@@ -188,7 +162,7 @@ export default function TeacherStudentsPage() {
             Students
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Every student you teach, grouped by class.
+            Students actively enrolled in classes you teach.
           </p>
         </div>
         <Button variant="primary" onClick={() => setCreateModalOpen(true)}>
@@ -197,48 +171,14 @@ export default function TeacherStudentsPage() {
         </Button>
       </header>
 
-      {/* Stat cards */}
+      {/* Stat cards — real counts */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={Users}
-          label="Students"
-          value={totalInScope}
-          tone="purple"
-        />
-        <StatCard
-          icon={BookOpen}
-          label="Classes taught"
-          value={classesCovered}
-          tone="mint"
-        />
-        <StatCard
-          icon={GraduationCap}
-          label="Grades"
-          value={distinctGrades}
-          tone="amber"
-        />
+        <StatCard icon={Users} label="Students" value={totalInScope} tone="purple" />
+        <StatCard icon={BookOpen} label="Your classes" value={distinctClasses} tone="mint" />
+        <StatCard icon={GraduationCap} label="Grades" value={distinctGrades} tone="amber" />
       </div>
 
-      {/* Scope tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        {SCOPES.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setScope(s.id)}
-            className={
-              "border-b-2 px-4 py-3 text-sm font-semibold transition-colors " +
-              (scope === s.id
-                ? "border-purple-500 text-purple-600"
-                : "border-transparent text-slate-500 hover:text-navy-950")
-            }
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Search + grade filters */}
+      {/* Search + grade chips */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
           <Search
@@ -267,7 +207,7 @@ export default function TeacherStudentsPage() {
           >
             All grades
           </button>
-          {gradesPresent.map((g) => {
+          {grades.map((g) => {
             const active = gradeFilter === g.id;
             return (
               <button
@@ -288,19 +228,17 @@ export default function TeacherStudentsPage() {
         </div>
       </div>
 
-      {/* Grouped sections */}
+      {/* Roster */}
       {grouped.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
             <Users size={26} />
           </span>
           <p className="mt-4 text-sm font-semibold text-navy-950">
-            No students found
+            No students yet
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {scope === "mine"
-              ? "Students appear here once they are enrolled in your classes."
-              : "Try clearing the filters or switching tabs."}
+            Students appear here once they are enrolled in classes you teach.
           </p>
         </div>
       ) : (
@@ -322,18 +260,18 @@ export default function TeacherStudentsPage() {
                 <ul className="divide-y divide-slate-100">
                   {g.students.map((s) => (
                     <li
-                      key={s.id}
+                      key={s.student}
                       className="flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/50"
                       onClick={() => setOpenStudent(s)}
                     >
                       <Avatar
-                        userId={s.id}
-                        initials={s.initials || "?"}
+                        userId={s.student}
+                        initials={initialsOf(s.student_name)}
                         size="sm"
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-navy-950">
-                          {s.full_name || s.email}
+                          {s.student_name}
                         </p>
                         <p className="truncate text-[11px] text-slate-400">
                           {s.email}
@@ -354,9 +292,6 @@ export default function TeacherStudentsPage() {
                           </span>
                         )}
                       </div>
-                      {!s.is_active && (
-                        <Badge variant="neutral">Inactive</Badge>
-                      )}
                     </li>
                   ))}
                 </ul>
@@ -366,10 +301,7 @@ export default function TeacherStudentsPage() {
         </div>
       )}
 
-      <StudentDrawer
-        student={openStudent}
-        onClose={() => setOpenStudent(null)}
-      />
+      <StudentDrawer student={openStudent} onClose={() => setOpenStudent(null)} />
 
       <CreateTeacherStudentModal
         open={createModalOpen}

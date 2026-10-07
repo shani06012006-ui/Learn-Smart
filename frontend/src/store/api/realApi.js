@@ -80,6 +80,15 @@ export const realApi = createApi({
     "MaterialList",
   ],
   endpoints: (builder) => ({
+    // ---- Teacher students (real enrollments only) ----
+    getTeacherStudents: builder.query({
+      query: ({ grade } = {}) => ({
+        url: `/teacher/students/`,
+        params: { grade },
+      }),
+      providesTags: ["Attendance"],
+    }),
+
     // ---- Teacher attendance ----
     getTeacherAttendance: builder.query({
       query: ({ klass, grade, date }) => ({
@@ -970,6 +979,8 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetTeacherStudentsQuery,
+
   useGetAttendanceSummaryQuery,
   useGetTeacherAttendanceQuery,
   useMarkTeacherAttendanceMutation,
