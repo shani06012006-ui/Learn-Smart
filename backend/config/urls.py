@@ -12,7 +12,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from attendance.views import TeacherAttendanceViewSet
+from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -34,6 +34,11 @@ path("api/v1/admin/", include("attendance.urls")),
     path("api/v1/teacher/attendance/summary/",
          TeacherAttendanceViewSet.as_view({"get": "summary"}),
          name="teacher-attendance-summary"),
+
+    # teacher-scoped roster
+    path("api/v1/teacher/students/",
+         TeacherStudentsViewSet.as_view({"get": "list"}),
+         name="teacher-students-list"),
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),

@@ -447,3 +447,71 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
             "to": to_str,
             "rows": rows,
         })
+
+
+# ═══════════════════════════════════════════════════════════════
+# Teacher: enrolled students (real enrollments only)
+# ═══════════════════════════════════════════════════════════════
+
+class TeacherStudentsViewSet(viewsets.ViewSet):
+    """
+    GET /api/v1/teacher/students/
+    Returns ONLY students actively enrolled in classes the requesting
+    teacher teaches. Groups by grade, tags each student with the classes
+    they're in (for this teacher).
+    """
+    permission_classes = [IsTeacherOnly]
+
+    def list(self, request):
+        from classes.models import StudentEnrollment
+
+        # Filter param: ?grade=<uuid>
+        grade_id = request.query_params.get("grade")
+
+        enrollments = (
+            StudentEnrollment.objects
+            .filter(
+                class_course__teacher=request.user,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            )
+            .select_related("student", "class_course", "student__grade")
+            .order_by("student__first_name", "student__last_name")
+        )
+
+        if grade_id:
+            enrollments = enrollments.filter(student__grade_id=grade_id)
+
+        # Aggregate per student
+        by_student = {}
+        for e in enrollments:
+            s = e.student
+            entry = by_student.setdefault(s.id, {
+                "student": str(s.id),
+                "student_name": _full_name(s),
+                "email": s.email,
+                "grade_id": str(s.grade_id) if s.grade_id else None,
+                "grade_name": s.grade.name if s.grade_id else None,
+                "classes": [],
+            })
+            entry["classes"].append({
+                "id": str(e.class_course_id),
+                "name": e.class_course.name,
+                "subject": e.class_course.subject,
+            })
+
+        rows = list(by_student.values())
+        rows.sort(key=lambda r: r["student_name"].lower())
+
+        # Grade buckets for the chip filter
+        grades_seen = {}
+        for r in rows:
+            if r["grade_id"]:
+                grades_seen[r["grade_id"]] = r["grade_name"]
+
+        return Response({
+            "count": len(rows),
+            "grades": [{"id": gid, "name": gname}
+                       for gid, gname in sorted(grades_seen.items(), key=lambda x: x[1])],
+            "rows": rows,
+        })
+
