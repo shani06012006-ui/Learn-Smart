@@ -343,3 +343,53 @@ class StudentAttendance(TimeStampedModel):
 
     def __str__(self):
         return f"{self.student.email} @ {self.class_course.name} on {self.date}"
+
+
+class TeacherGradeAssignment(models.Model):
+    """
+    Links a teacher to the grades they are responsible for.
+
+    The admin decides which grades each teacher handles when creating or
+    editing the teacher. Students whose `grade` matches one of these rows
+    are considered "students of that teacher" — independent of any
+    ClassCourse enrollment.
+
+    Managed by admin only.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="grade_assignments",
+    )
+    grade = models.ForeignKey(
+        "institutions.Grade",
+        on_delete=models.CASCADE,
+        related_name="teacher_assignments",
+    )
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.CASCADE,
+        related_name="teacher_grade_assignments",
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["teacher", "grade"],
+                name="unique_teacher_per_grade",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["teacher"]),
+            models.Index(fields=["grade"]),
+        ]
+        ordering = ["grade__level"]
+
+    def __str__(self):
+        return f"{self.teacher.email} handles {self.grade.name}"
+

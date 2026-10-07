@@ -468,36 +468,65 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
         # Filter param: ?grade=<uuid>
         grade_id = request.query_params.get("grade")
 
-        enrollments = (
+        from accounts.models import TeacherGradeAssignment
+        from django.db.models import Q
+
+        # 1. Students in grades this teacher handles
+        handled_grade_ids = list(
+            TeacherGradeAssignment.objects
+            .filter(teacher=request.user)
+            .values_list("grade_id", flat=True)
+        )
+
+        # 2. Students enrolled in classes this teacher teaches
+        enrolled_student_ids = list(
             StudentEnrollment.objects
             .filter(
                 class_course__teacher=request.user,
                 status=StudentEnrollment.STATUS_ACTIVE,
             )
-            .select_related("student", "class_course", "student__grade")
-            .order_by("student__first_name", "student__last_name")
+            .values_list("student_id", flat=True)
         )
 
-        if grade_id:
-            enrollments = enrollments.filter(student__grade_id=grade_id)
+        # Union
+        from accounts.models import User as _User
+        student_qs = _User.objects.filter(
+            role=getattr(_User, "ROLE_STUDENT", "student"),
+        ).filter(
+            Q(grade_id__in=handled_grade_ids) | Q(id__in=enrolled_student_ids)
+        ).select_related("grade")
 
-        # Aggregate per student
+        if grade_id:
+            student_qs = student_qs.filter(grade_id=grade_id)
+
+        # Rebuild class list from enrollments (for the "classes" tag on each row)
+        enrollments_by_student = {}
+        for e in (
+            StudentEnrollment.objects
+            .filter(
+                class_course__teacher=request.user,
+                status=StudentEnrollment.STATUS_ACTIVE,
+                student_id__in=[s.id for s in student_qs],
+            )
+            .select_related("class_course")
+        ):
+            enrollments_by_student.setdefault(e.student_id, []).append({
+                "id": str(e.class_course_id),
+                "name": e.class_course.name,
+                "subject": e.class_course.subject,
+            })
+
+        # Aggregate
         by_student = {}
-        for e in enrollments:
-            s = e.student
-            entry = by_student.setdefault(s.id, {
+        for s in student_qs.order_by("first_name", "last_name"):
+            by_student[s.id] = {
                 "student": str(s.id),
                 "student_name": _full_name(s),
                 "email": s.email,
                 "grade_id": str(s.grade_id) if s.grade_id else None,
                 "grade_name": s.grade.name if s.grade_id else None,
-                "classes": [],
-            })
-            entry["classes"].append({
-                "id": str(e.class_course_id),
-                "name": e.class_course.name,
-                "subject": e.class_course.subject,
-            })
+                "classes": enrollments_by_student.get(s.id, []),
+            }
 
         rows = list(by_student.values())
         rows.sort(key=lambda r: r["student_name"].lower())
