@@ -2,6 +2,12 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 // Auth
 import LoginPage from "./features/auth/LoginPage";
+import StudentLoginPage from "./features/student/StudentLoginPage";
+import StudentProgressPage from "./features/student/pages/StudentProgressPage";
+import StudentLayout from "./components/layout/StudentLayout";
+import StudentMyClassesPage from "./features/student/pages/StudentMyClassesPage";
+import StudentPerformancePage from "./features/student/pages/StudentPerformancePage";
+import StudentPlaceholderPage from "./features/student/pages/StudentPlaceholderPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import RootRoute from "./routes/RootRoute";
 
@@ -55,6 +61,73 @@ export default function App() {
       {/* ── Public ─────────────────────────────────────────────── */}
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/student-login" element={<StudentLoginPage />} />
+
+      {/* Student (PIN-based login) */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<RoleRoute allow={["student"]} />}>
+          <Route path="/student" element={<StudentLayout />}>
+            <Route index element={<StudentProgressPage />} />
+            <Route path="progress" element={<StudentProgressPage />} />
+            <Route path="classes" element={<StudentMyClassesPage />} />
+            <Route path="performance" element={<StudentPerformancePage />} />
+            <Route
+              path="timetable"
+              element={
+                <StudentPlaceholderPage
+                  title="Timetable"
+                  description="Your weekly schedule will appear here."
+                />
+              }
+            />
+            <Route
+              path="join-class"
+              element={
+                <StudentPlaceholderPage
+                  title="Join a class"
+                  description="Enter a joining code from your teacher to enroll."
+                />
+              }
+            />
+            <Route
+              path="materials"
+              element={
+                <StudentPlaceholderPage
+                  title="Materials"
+                  description="Study materials shared by your teachers will appear here."
+                />
+              }
+            />
+            <Route
+              path="announcements"
+              element={
+                <StudentPlaceholderPage
+                  title="Announcements"
+                  description="Notices and updates from your teachers and admin."
+                />
+              }
+            />
+            <Route
+              path="live-classes"
+              element={
+                <StudentPlaceholderPage
+                  title="Live Classes"
+                  description="Your scheduled live class sessions will appear here."
+                />
+              }
+            />
+            <Route
+              path="chat"
+              element={
+                <StudentPlaceholderPage
+                  title="Messages"
+                  description="Chat with your teachers and classmates."
+                />
+              }
+            />
+          </Route>
+        </Route>
+      </Route>
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/shop" element={<ShopPage />} />
       <Route path="/courses" element={<CoursesPage />} />

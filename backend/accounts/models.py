@@ -393,3 +393,57 @@ class TeacherGradeAssignment(models.Model):
     def __str__(self):
         return f"{self.teacher.email} handles {self.grade.name}"
 
+
+class StudentCredentials(models.Model):
+    """
+    Alternative credential for young students: a 6-digit PIN.
+
+    - One-to-one with the student.
+    - PIN is unique across the whole platform.
+    - `is_active=False` revokes login without changing the PIN.
+    - Rate limiting: `failed_attempts` + `locked_until` block brute-force.
+    """
+    student = models.OneToOneField(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="credentials",
+        limit_choices_to={"role": "student"},
+    )
+    pin = models.CharField(max_length=8, unique=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    failed_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = "Student credentials"
+        indexes = [
+            models.Index(fields=["pin"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return f"PIN for {self.student.email} (active={self.is_active})"
+
+    def is_locked(self):
+        from django.utils import timezone
+        return self.locked_until is not None and self.locked_until > timezone.now()
+
+    def register_failure(self, lock_after=5, lock_minutes=15):
+        from django.utils import timezone
+        from datetime import timedelta
+        self.failed_attempts = (self.failed_attempts or 0) + 1
+        if self.failed_attempts >= lock_after:
+            self.locked_until = timezone.now() + timedelta(minutes=lock_minutes)
+            self.failed_attempts = 0
+        self.save(update_fields=["failed_attempts", "locked_until", "updated_at"])
+
+    def register_success(self):
+        from django.utils import timezone
+        self.failed_attempts = 0
+        self.locked_until = None
+        self.last_login_at = timezone.now()
+        self.save(update_fields=["failed_attempts", "locked_until", "last_login_at", "updated_at"])
+

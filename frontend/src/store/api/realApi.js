@@ -80,6 +80,27 @@ export const realApi = createApi({
     "MaterialList",
   ],
   endpoints: (builder) => ({
+    // ---- Student self-service ----
+    getStudentMe: builder.query({
+      query: () => `/student/me/`,
+      providesTags: ["StudentSelf"],
+    }),
+    getStudentMyClasses: builder.query({
+      query: () => `/student/my-classes/`,
+      providesTags: ["StudentSelf"],
+    }),
+    getStudentMyAttendance: builder.query({
+      query: ({ from, to } = {}) => ({
+        url: `/student/my-attendance/`,
+        params: { from, to },
+      }),
+      providesTags: ["StudentSelf"],
+    }),
+    getStudentMyGrades: builder.query({
+      query: () => `/student/my-grades/`,
+      providesTags: ["StudentSelf"],
+    }),
+
     // ---- Teacher students (real enrollments only) ----
     getTeacherStudents: builder.query({
       query: ({ grade } = {}) => ({
@@ -160,6 +181,14 @@ export const realApi = createApi({
         body: credentials,
       }),
       invalidatesTags: ["AdminUser", "AdminStats"],
+    }),
+
+    studentPinLogin: builder.mutation({
+      query: (body) => ({
+        url: "/auth/student-login/",
+        method: "POST",
+        body,
+      }),
     }),
 
     adminMe: builder.query({
@@ -987,6 +1016,11 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetStudentMyGradesQuery,
+  useGetStudentMyAttendanceQuery,
+  useGetStudentMyClassesQuery,
+  useGetStudentMeQuery,
+  useStudentPinLoginMutation,
   useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
 

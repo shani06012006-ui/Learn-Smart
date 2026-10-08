@@ -43,6 +43,15 @@ class AdminUserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     grade = serializers.SerializerMethodField()
 
+    student_pin = serializers.SerializerMethodField()
+
+    def get_student_pin(self, obj):
+        try:
+            creds = obj.credentials
+        except Exception:
+            return None
+        return creds.pin if creds and creds.is_active else None
+
     class Meta:
         model = User
         fields = [
@@ -61,6 +70,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "updated_at",
             "grade_ids",
             "grade_names",
+            "student_pin",
         ]
         read_only_fields = fields
 

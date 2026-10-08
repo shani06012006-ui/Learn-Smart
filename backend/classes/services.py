@@ -62,6 +62,18 @@ def add_student_to_class(class_course, email, first_name, last_name, grade=None)
                 "auto-enroll failed for student %s", student.id
             )
 
+    # Ensure the student has a PIN credential for the quick-login page.
+    try:
+        from accounts.services import generate_student_pin
+        from accounts.models import StudentCredentials
+        if not StudentCredentials.objects.filter(student=student).exists():
+            generate_student_pin(student)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "PIN generation failed for student %s", student.id
+        )
+
     return enrollment, enrollment_created
 
 
