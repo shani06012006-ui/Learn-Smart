@@ -397,12 +397,12 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         serializer = AdminUserUpdateSerializer(
             data=request.data,
             partial=True,
-            context={"request": request},
+            context={"request": request, "instance": user},
         )
         serializer.is_valid(raise_exception=True)
 
         update_fields = ["updated_at"]
-        for field in ("first_name", "last_name"):
+        for field in ("first_name", "last_name", "email"):
             if field in serializer.validated_data:
                 setattr(user, field, serializer.validated_data[field])
                 update_fields.append(field)
@@ -417,6 +417,38 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
         if grade_was_set and user.role == User.ROLE_STUDENT:
             self._sync_student_grade_enrollments_with_grade(user, new_grade)
+
+        # Teacher-grade assignments (grade_ids may be absent → skip).
+        # When present, treat the incoming list as the desired final state:
+        #   - create missing TeacherGradeAssignment rows
+        #   - delete assignments not in the list
+        if "grade_ids" in serializer.validated_data and user.role == User.ROLE_TEACHER:
+            from accounts.models import TeacherGradeAssignment
+            from institutions.models import Grade as _Grade
+
+            target_ids = set(str(g) for g in serializer.validated_data["grade_ids"])
+            existing_ids = set(
+                str(a.grade_id)
+                for a in TeacherGradeAssignment.objects.filter(teacher=user)
+            )
+
+            # Add
+            for gid in target_ids - existing_ids:
+                try:
+                    grade = _Grade.objects.get(id=gid)
+                except _Grade.DoesNotExist:
+                    continue
+                TeacherGradeAssignment.objects.get_or_create(
+                    teacher=user,
+                    grade=grade,
+                    defaults={"institution": user.institution},
+                )
+
+            # Remove
+            for gid in existing_ids - target_ids:
+                TeacherGradeAssignment.objects.filter(
+                    teacher=user, grade_id=gid
+                ).delete()
 
         return Response(AdminUserSerializer(user).data)
 
@@ -448,6 +480,39 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         user.is_active = False
         user.save(update_fields=["is_active", "updated_at"])
         return Response(AdminUserSerializer(user).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["delete"], url_path="hard")
+    def hard_delete(self, request, pk=None):
+        """
+        PERMANENT delete. Unlike `remove` (soft / is_active=False), this
+        actually removes the user row and cascades to their enrollments,
+        attendance, classes, etc.
+
+        Guardrails:
+          - cannot delete yourself
+          - only teachers/students (admins must be handled by platform ops)
+          - requires ?confirm=YES to prevent accidents
+        """
+        user = self.get_object()
+
+        if user.id == request.user.id:
+            return Response(
+                {"error": {"detail": "You cannot permanently delete your own account.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if user.role not in (User.ROLE_TEACHER, User.ROLE_STUDENT):
+            return Response(
+                {"error": {"detail": "Only teachers and students can be permanently deleted.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if request.query_params.get("confirm") != "YES":
+            return Response(
+                {"error": {"detail": "Add ?confirm=YES to confirm permanent deletion.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="toggle-active")
     def toggle_active(self, request, pk=None):

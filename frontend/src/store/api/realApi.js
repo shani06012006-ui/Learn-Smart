@@ -279,6 +279,14 @@ export const realApi = createApi({
       ],
     }),
 
+    hardDeleteAdminUser: builder.mutation({
+      query: (id) => ({
+        url: `/admin/users/${id}/hard/?confirm=YES`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["AdminUser"],
+    }),
+
     toggleAdminUserActive: builder.mutation({
       query: ({ id, is_active }) => ({
         url: `/admin/users/${id}/toggle-active/`,
@@ -979,6 +987,7 @@ export const realApi = createApi({
 });
 
 export const {
+  useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
 
   useGetAttendanceSummaryQuery,
@@ -1062,4 +1071,5 @@ export const {
   useRejectTeacherLeaveMutation,
   useCancelTeacherLeaveMutation,
   useDeactivateAdminTimetableMutation,
+
 } = realApi;

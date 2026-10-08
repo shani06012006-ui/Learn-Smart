@@ -20,6 +20,7 @@ import {
   useGetAdminUsersQuery,
   useToggleAdminUserActiveMutation,
   useRemoveAdminUserMutation,
+  useHardDeleteAdminUserMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -41,7 +42,7 @@ function formatDate(iso) {
 }
 
 /* ── Row dropdown menu ─────────────────────────────────────────── */
-function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, isToggling }) {
+function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, onHardDelete, isToggling }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -134,6 +135,19 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, isToggling }) {
               <Trash2 size={13} />
               Remove teacher
             </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onHardDelete?.();
+              }}
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+            >
+              <Trash2 size={13} />
+              Delete permanently
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -144,7 +158,7 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, isToggling }) {
 /* ── Page ──────────────────────────────────────────────────────── */
 export default function AdminTeachersPage() {
   const navigate = useNavigate();
-  const [activeFilter, setActiveFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState("active");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -152,6 +166,7 @@ export default function AdminTeachersPage() {
 
   const [toggleActive, { isLoading: isToggling }] = useToggleAdminUserActiveMutation();
   const [removeUser, { isLoading: isRemoving }] = useRemoveAdminUserMutation();
+  const [hardDeleteUser, { isLoading: isHardDeleting }] = useHardDeleteAdminUserMutation();
   const [pendingId, setPendingId] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
@@ -190,6 +205,29 @@ export default function AdminTeachersPage() {
             err?.data?.error?.detail ||
             err?.data?.detail ||
             (typeof err === "string" ? err : "Could not remove this teacher.");
+          setConfirm((prev) => prev ? { ...prev, error: msg } : null);
+        }
+      },
+    });
+  };
+
+  const promptHardDelete = (teacher) => {
+    setConfirm({
+      title: `Permanently delete "${teacher.full_name || teacher.email}"?`,
+      description:
+        "This cannot be undone. Their classes, enrollments, attendance, chat history, and all related records will be deleted forever. Consider using 'Remove teacher' instead (it just deactivates them).",
+      confirmLabel: "Delete permanently",
+      tone: "danger",
+      onConfirm: async () => {
+        try {
+          await hardDeleteUser(teacher.id).unwrap();
+          setConfirm(null);
+          refetch();
+        } catch (err) {
+          const msg =
+            err?.data?.error?.detail ||
+            err?.data?.detail ||
+            (typeof err === "string" ? err : "Could not delete this teacher.");
           setConfirm((prev) => prev ? { ...prev, error: msg } : null);
         }
       },
@@ -355,6 +393,23 @@ export default function AdminTeachersPage() {
                           <p className="truncate text-xs text-slate-400">
                             {t.email}
                           </p>
+                          {Array.isArray(t.grade_names) && t.grade_names.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {t.grade_names.slice(0, 3).map((name, i) => (
+                                <span
+                                  key={i}
+                                  className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700"
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                              {t.grade_names.length > 3 && (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                  +{t.grade_names.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -381,6 +436,7 @@ export default function AdminTeachersPage() {
                           onEdit={() => setEditUser(t)}
                           onToggle={() => handleToggle(t)}
                           onRemove={() => promptRemove(t)}
+                          onHardDelete={() => promptHardDelete(t)}
                           isToggling={isPending}
                         />
                       </div>
@@ -404,6 +460,7 @@ export default function AdminTeachersPage() {
                           onEdit={() => setEditUser(t)}
                           onToggle={() => handleToggle(t)}
                           onRemove={() => promptRemove(t)}
+                          onHardDelete={() => promptHardDelete(t)}
                           isToggling={isPending}
                         />
                       </div>
@@ -460,7 +517,7 @@ export default function AdminTeachersPage() {
         description={confirm?.description}
         confirmLabel={confirm?.confirmLabel}
         tone={confirm?.tone}
-        loading={isRemoving}
+        loading={isRemoving || isHardDeleting}
         error={confirm?.error}
       />
     </div>
