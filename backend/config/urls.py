@@ -15,6 +15,7 @@ from django.urls import include, path
 from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
 from accounts.student_login import StudentLoginView
 from attendance.student_views import StudentSelfViewSet
+from chat.student_views import StudentChatViewSet
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -35,6 +36,23 @@ urlpatterns = [
          StudentSelfViewSet.as_view({"get": "my_attendance"}), name="student-my-attendance"),
     path("api/v1/student/my-grades/",
          StudentSelfViewSet.as_view({"get": "my_grades"}), name="student-my-grades"),
+    path("api/v1/student/my-timetable/",
+         StudentSelfViewSet.as_view({"get": "my_timetable"}), name="student-my-timetable"),
+    path("api/v1/student/my-materials/",
+         StudentSelfViewSet.as_view({"get": "my_materials"}), name="student-my-materials"),
+    # student chat
+    path("api/v1/student/chat/rooms/",
+         StudentChatViewSet.as_view({"get": "list"}), name="student-chat-rooms"),
+    path("api/v1/student/chat/rooms/<uuid:pk>/",
+         StudentChatViewSet.as_view({"get": "retrieve"}), name="student-chat-room"),
+    path("api/v1/student/chat/rooms/<uuid:pk>/messages/",
+         StudentChatViewSet.as_view({"get": "messages"}), name="student-chat-messages"),
+    path("api/v1/student/chat/rooms/<uuid:pk>/send/",
+         StudentChatViewSet.as_view({"post": "send"}), name="student-chat-send"),
+    path("api/v1/student/chat/rooms/dm/<uuid:teacher_id>/",
+         StudentChatViewSet.as_view({"post": "dm"}), name="student-chat-dm"),
+    path("api/v1/student/chat/rooms/teachers/",
+         StudentChatViewSet.as_view({"get": "teachers"}), name="student-chat-teachers"),
 path("api/v1/admin/", include("attendance.urls")),
     # teacher-scoped attendance
     path("api/v1/teacher/attendance/",

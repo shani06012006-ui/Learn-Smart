@@ -115,6 +115,63 @@ class StudentSelfViewSet(viewsets.ViewSet):
             "recent": recent_rows,
         })
 
+    @action(detail=False, methods=["get"], url_path="my-timetable")
+    def my_timetable(self, request):
+        """Timetable entries for the student's enrolled classes."""
+        from classes.models import TimetableEntry
+        u = request.user
+        entries = (
+            TimetableEntry.objects
+            .filter(
+                class_course__enrollments__student=u,
+                class_course__enrollments__status="active",
+                is_active=True,
+            )
+            .select_related("class_course", "teacher")
+            .order_by("day_of_week", "start_time")
+            .distinct()
+        )
+        rows = [{
+            "id": str(e.id),
+            "day_of_week": e.day_of_week,
+            "day_name": e.get_day_of_week_display(),
+            "start_time": e.start_time.strftime("%H:%M"),
+            "end_time": e.end_time.strftime("%H:%M"),
+            "room": e.room,
+            "class_name": e.class_course.name,
+            "subject": e.class_course.subject,
+            "teacher": _full_name(e.teacher) if e.teacher else None,
+        } for e in entries]
+        return Response({"count": len(rows), "results": rows})
+
+    @action(detail=False, methods=["get"], url_path="my-materials")
+    def my_materials(self, request):
+        """Materials shared with the student's enrolled classes."""
+        from classes.models import Material
+        u = request.user
+        mats = (
+            Material.objects
+            .filter(
+                class_course__enrollments__student=u,
+                class_course__enrollments__status="active",
+            )
+            .select_related("class_course", "uploaded_by")
+            .order_by("-created_at")
+            .distinct()
+        )
+        rows = [{
+            "id": str(m.id),
+            "title": m.title,
+            "description": m.description,
+            "file_name": m.file_name,
+            "file_url": m.file.url if m.file else None,
+            "file_size": m.file_size,
+            "class_name": m.class_course.name,
+            "uploaded_by": _full_name(m.uploaded_by) if m.uploaded_by else None,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        } for m in mats]
+        return Response({"count": len(rows), "results": rows})
+
     @action(detail=False, methods=["get"], url_path="my-grades")
     def my_grades(self, request):
         # Placeholder until the grades schema lands. Returns an empty list
