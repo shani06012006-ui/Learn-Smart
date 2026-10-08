@@ -40,6 +40,7 @@ from .models import RefreshToken
 
 
 REFRESH_TOKEN_LIFETIME = timedelta(days=7)
+REMEMBER_ME_LIFETIME = timedelta(days=30)
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +121,7 @@ def issue_access_token(user) -> str:
 # Refresh token issuance
 # ---------------------------------------------------------------------------
 
-def issue_refresh_token(user, *, family_id=None, ip_address=None, user_agent=""):
+def issue_refresh_token(user, *, family_id=None, ip_address=None, user_agent="", lifetime=None):
     """Create a new refresh token row and return (plaintext, row)."""
     raw = generate_opaque_token()
     token_hash = hash_token(raw)
@@ -132,7 +133,7 @@ def issue_refresh_token(user, *, family_id=None, ip_address=None, user_agent="")
         user=user,
         token_hash=token_hash,
         family_id=family_id,
-        expires_at=timezone.now() + REFRESH_TOKEN_LIFETIME,
+        expires_at=timezone.now() + (lifetime or REFRESH_TOKEN_LIFETIME),
         ip_address=ip_address or None,
         user_agent=user_agent or "",
         device_label=parse_device_label(user_agent or ""),

@@ -35,6 +35,7 @@ from .token_service import (
 from .ws_tickets import mint_ticket
 
 
+from .services import generate_login_otp, verify_login_otp
 def _client_ip(request):
     return request.META.get("REMOTE_ADDR") or None
 
@@ -84,11 +85,16 @@ class LoginView(APIView):
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
 
+        # Remember-me? Extended refresh TTL (30 days) vs default (7 days).
+        remember_me = bool(request.data.get("remember_me"))
+        lifetime = REMEMBER_ME_LIFETIME if remember_me else None
+
         # Issue our own stateful refresh token (new family).
         raw_refresh, _row = issue_refresh_token(
             user,
             ip_address=_client_ip(request),
             user_agent=_user_agent(request),
+            lifetime=lifetime,
         )
         access = issue_access_token(user)
 
@@ -97,6 +103,7 @@ class LoginView(APIView):
                 "access": access,
                 "refresh": raw_refresh,
                 "user": UserSerializer(user).data,
+                "remember_me": remember_me,
             },
             status=status.HTTP_200_OK,
         )
@@ -381,5 +388,75 @@ class TeacherStudentCreateView(APIView):
                 "student": StudentBriefSerializer(student).data,
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Passwordless email OTP
+# ═══════════════════════════════════════════════════════════════
+
+class RequestOTPView(APIView):
+    """
+    POST /api/v1/auth/request-otp/   body: { email }
+    Generates a 6-digit code, prints to console (dev mode).
+    Returns 200 always to avoid email enumeration.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        if email:
+            from .models import User as _U
+            if _U.objects.filter(email=email, is_active=True).exists():
+                try:
+                    generate_login_otp(email)
+                except Exception:
+                    import logging
+                    logging.getLogger(__name__).exception("OTP generation failed")
+        return Response({"detail": "If that email exists, a code was sent."})
+
+
+class VerifyOTPView(APIView):
+    """
+    POST /api/v1/auth/verify-otp/   body: { email, code }
+    Returns the same { access, refresh, user } shape as LoginView.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        code = (request.data.get("code") or "").strip()
+
+        if not email or not code:
+            return Response(
+                {"error": {"detail": "Email and code are required.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = verify_login_otp(email, code)
+        if user is None:
+            return Response(
+                {"error": {"detail": "Invalid or expired code.", "status_code": 401}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
+
+        raw_refresh, _row = issue_refresh_token(
+            user,
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+        )
+        access = issue_access_token(user)
+        return Response(
+            {
+                "access": access,
+                "refresh": raw_refresh,
+                "user": UserSerializer(user).data,
+            },
+            status=status.HTTP_200_OK,
         )
 

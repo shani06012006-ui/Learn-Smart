@@ -8,6 +8,8 @@ from .views import (
     StudentListView,
     TeacherStudentCreateView,
     WsTicketView,
+    RequestOTPView,
+    VerifyOTPView,
 )
 
 urlpatterns = [
@@ -18,4 +20,6 @@ urlpatterns = [
     path("ws-ticket/", WsTicketView.as_view(), name="auth-ws-ticket"),
     path("students/", StudentListView.as_view(), name="auth-students"),
     path("students/create/", TeacherStudentCreateView.as_view(), name="auth-students-create"),
+    path("request-otp/", RequestOTPView.as_view(), name="auth-request-otp"),
+    path("verify-otp/", VerifyOTPView.as_view(), name="auth-verify-otp"),
 ]
