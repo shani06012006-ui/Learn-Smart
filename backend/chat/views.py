@@ -384,3 +384,186 @@ class MessageReactionView(APIView):
                 )
         except Exception:
             pass
+
+
+# ═══════════════════════════════════════════════════════════════
+# Thread membership (group chat management)
+# ═══════════════════════════════════════════════════════════════
+
+def _can_manage_thread(user, thread):
+    """True if the user may add/remove members on this thread."""
+    if getattr(user, "role", None) == "admin":
+        return True
+    if thread.kind == Thread.KIND_GROUP and thread.class_course_id:
+        return thread.class_course.teacher_id == user.id
+    return False
+
+
+def _post_system_message(thread, text):
+    """Create a system Message and broadcast it via the group."""
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from .serializers import ChatMessageReadSerializer
+
+    msg = Message.objects.create(
+        thread=thread,
+        sender=None,
+        kind=Message.KIND_SYSTEM,
+        body=text,
+    )
+    payload = ChatMessageReadSerializer(msg).data
+    try:
+        async_to_sync(get_channel_layer().group_send)(
+            f"chat_thread_{thread.id}",
+            {"type": "chat.message", "message": payload},
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception("system message broadcast failed")
+    return msg
+
+
+class ThreadMembersView(APIView):
+    """
+    GET    /api/v1/chat/threads/<uuid:thread_id>/members/
+    POST   /api/v1/chat/threads/<uuid:thread_id>/members/      body: {user_id}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _get_thread(self, request, thread_id):
+        try:
+            thread = Thread.objects.select_related("class_course").get(pk=thread_id)
+        except Thread.DoesNotExist:
+            return None
+        # Access control: caller must be a member OR an admin in the institution
+        if not request.user.is_superuser and thread.institution_id != request.user.institution_id:
+            return None
+        return thread
+
+    def get(self, request, thread_id):
+        thread = self._get_thread(request, thread_id)
+        if not thread:
+            return Response({"detail": "Thread not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not ThreadMember.objects.filter(thread=thread, user=request.user).exists()                 and request.user.role != "admin":
+            return Response({"detail": "Not a member."}, status=status.HTTP_403_FORBIDDEN)
+
+        memberships = (
+            thread.memberships
+            .select_related("user")
+            .order_by("user__role", "user__first_name", "user__last_name")
+        )
+        from .serializers import ChatMemberReadSerializer
+        ser = ChatMemberReadSerializer(memberships, many=True)
+        return Response({"count": memberships.count(), "results": ser.data})
+
+    def post(self, request, thread_id):
+        thread = self._get_thread(request, thread_id)
+        if not thread:
+            return Response({"detail": "Thread not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_thread(request.user, thread):
+            return Response({"detail": "You cannot manage this group."}, status=status.HTTP_403_FORBIDDEN)
+
+        from .serializers import ChatAddMemberSerializer
+        ser = ChatAddMemberSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user_id = ser.validated_data["user_id"]
+
+        from accounts.models import User
+        try:
+            target = User.objects.get(pk=user_id, institution=request.user.institution)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        membership, created = ThreadMember.objects.get_or_create(
+            thread=thread, user=target
+        )
+        if created:
+            actor_name = request.user.get_full_name() or request.user.email
+            target_name = target.get_full_name() or target.email
+            _post_system_message(thread, f"{actor_name} added {target_name} to the group.")
+
+        from .serializers import ChatMemberReadSerializer
+        return Response(
+            ChatMemberReadSerializer(membership).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class ThreadMemberDetailView(APIView):
+    """
+    DELETE /api/v1/chat/threads/<uuid:thread_id>/members/<uuid:user_id>/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, thread_id, user_id):
+        try:
+            thread = Thread.objects.select_related("class_course").get(pk=thread_id)
+        except Thread.DoesNotExist:
+            return Response({"detail": "Thread not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_thread(request.user, thread):
+            return Response({"detail": "You cannot manage this group."}, status=status.HTTP_403_FORBIDDEN)
+
+        from accounts.models import User
+        try:
+            target = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Don't allow removing the class teacher
+        if thread.class_course_id and thread.class_course.teacher_id == target.id:
+            return Response(
+                {"detail": "Cannot remove the class teacher."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted, _ = ThreadMember.objects.filter(thread=thread, user=target).delete()
+        if deleted:
+            actor_name = request.user.get_full_name() or request.user.email
+            target_name = target.get_full_name() or target.email
+            _post_system_message(thread, f"{actor_name} removed {target_name} from the group.")
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ThreadAvailableMembersView(APIView):
+    """
+    GET /api/v1/chat/threads/<uuid:thread_id>/available-members/
+    Returns students enrolled in the class who are NOT yet members of the thread.
+    Only for teachers/admins of the class.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, thread_id):
+        try:
+            thread = Thread.objects.select_related("class_course").get(pk=thread_id)
+        except Thread.DoesNotExist:
+            return Response({"detail": "Thread not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not _can_manage_thread(request.user, thread):
+            return Response({"detail": "You cannot manage this group."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not thread.class_course_id:
+            return Response({"count": 0, "results": []})
+
+        from classes.models import StudentEnrollment
+        from .serializers import ChatUserBriefSerializer
+
+        current_member_ids = set(
+            thread.memberships.values_list("user_id", flat=True)
+        )
+        enrollments = (
+            StudentEnrollment.objects
+            .filter(
+                class_course=thread.class_course,
+                status=StudentEnrollment.STATUS_ACTIVE,
+            )
+            .exclude(student_id__in=current_member_ids)
+            .select_related("student")
+        )
+        students = [e.student for e in enrollments]
+        ser = ChatUserBriefSerializer(students, many=True)
+        return Response({"count": len(students), "results": ser.data})
+

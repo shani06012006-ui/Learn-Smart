@@ -78,8 +78,40 @@ export const realApi = createApi({
     "ClassRoster",
     "ClassMaterial",
     "MaterialList",
+    "ChatMembers",
   ],
   endpoints: (builder) => ({
+    // ---- Chat thread membership (shared student + teacher) ----
+    getChatThreadMembers: builder.query({
+      query: (threadId) => `/chat/threads/${threadId}/members/`,
+      providesTags: (r, e, id) => [{ type: "ChatMembers", id }],
+    }),
+    addChatThreadMember: builder.mutation({
+      query: ({ threadId, userId }) => ({
+        url: `/chat/threads/${threadId}/members/`,
+        method: "POST",
+        body: { user_id: userId },
+      }),
+      invalidatesTags: (r, e, { threadId }) => [
+        { type: "ChatMembers", id: threadId },
+        "StudentChat",
+      ],
+    }),
+    removeChatThreadMember: builder.mutation({
+      query: ({ threadId, userId }) => ({
+        url: `/chat/threads/${threadId}/members/${userId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (r, e, { threadId }) => [
+        { type: "ChatMembers", id: threadId },
+        "StudentChat",
+      ],
+    }),
+    getChatThreadAvailableMembers: builder.query({
+      query: (threadId) => `/chat/threads/${threadId}/available-members/`,
+      providesTags: (r, e, id) => [{ type: "ChatMembers", id: `avail-${id}` }],
+    }),
+
     // ---- Student chat ----
     getStudentChatRooms: builder.query({
       query: () => `/student/chat/rooms/`,
@@ -1062,6 +1094,10 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetChatThreadAvailableMembersQuery,
+  useRemoveChatThreadMemberMutation,
+  useAddChatThreadMemberMutation,
+  useGetChatThreadMembersQuery,
   useGetStudentMyMaterialsQuery,
   useGetStudentMyTimetableQuery,
   useCreateStudentDmMutation,

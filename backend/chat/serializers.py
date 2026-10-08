@@ -374,3 +374,34 @@ class TeacherGroupThreadSerializer(serializers.ModelSerializer):
         if obj.kind == Thread.KIND_GROUP and obj.class_course_id is None:
             return user.role == "admin"
         return obj.memberships.filter(user=user).exists()
+
+
+class ChatMemberReadSerializer(serializers.ModelSerializer):
+    """A single member row for the group info drawer."""
+    user = ChatUserBriefSerializer(read_only=True)
+    is_online = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ThreadMember
+        fields = ["id", "user", "last_read_at", "is_online", "created_at"]
+        read_only_fields = fields
+
+    def get_is_online(self, obj):
+        # V1: presence is not tracked yet. Always return False.
+        return False
+
+
+class ChatMessageReadSerializer(serializers.ModelSerializer):
+    """Full message payload for the chat UI (user + system messages)."""
+    sender = ChatUserBriefSerializer(read_only=True)
+    kind = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ["id", "sender", "kind", "body", "created_at", "edited_at", "deleted_at"]
+        read_only_fields = fields
+
+
+class ChatAddMemberSerializer(serializers.Serializer):
+    user_id = serializers.UUIDField()
+

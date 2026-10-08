@@ -99,6 +99,13 @@ class ThreadMember(TimeStampedModel):
 class Message(TimeStampedModel):
     """A single message in a Thread."""
 
+    KIND_USER = "user"
+    KIND_SYSTEM = "system"
+    KIND_CHOICES = [
+        (KIND_USER, "User"),
+        (KIND_SYSTEM, "System"),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     thread = models.ForeignKey(
         Thread,
@@ -109,6 +116,14 @@ class Message(TimeStampedModel):
         "accounts.User",
         on_delete=models.CASCADE,
         related_name="chat_messages_sent",
+        null=True,
+        blank=True,
+        help_text="Null for system messages.",
+    )
+    kind = models.CharField(
+        max_length=10,
+        choices=KIND_CHOICES,
+        default=KIND_USER,
     )
     body = models.TextField()
     edited_at = models.DateTimeField(null=True, blank=True)
