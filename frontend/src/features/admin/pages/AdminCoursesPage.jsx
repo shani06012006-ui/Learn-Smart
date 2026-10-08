@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/pages/AdminCoursesPage.jsx
+// frontend/src/features/admin/pages/AdminCoursesPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -412,7 +412,7 @@ export default function AdminCoursesPage() {
         </div>
         <Button onClick={handleCreate}>
           <Plus size={15} />
-          Create course
+          Create class
         </Button>
       </header>
 
@@ -506,7 +506,7 @@ export default function AdminCoursesPage() {
           {!statusFilter && !subjectFilter && !search && (
             <Button onClick={handleCreate} className="mt-2">
               <Plus size={15} />
-              Create course
+              Create class
             </Button>
           )}
         </div>

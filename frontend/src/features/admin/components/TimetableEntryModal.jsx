@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/components/TimetableEntryModal.jsx
+// frontend/src/features/admin/components/TimetableEntryModal.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Plus, BookOpen, X } from "lucide-react";
 
@@ -138,6 +138,24 @@ export default function TimetableEntryModal({ open, onClose, entry = null }) {
     setForm((f) => ({ ...f, class_course_id: "", class_name: "" }));
     setOpen_(true);
   };
+
+  // Duration quick-picks: adjust end_time based on start_time
+  const applyDuration = (minutes) => {
+    const start = form.start_time;
+    if (!start) return;
+    const [h, m] = start.split(":").map(Number);
+    const totalStart = h * 60 + m;
+    const totalEnd = totalStart + minutes;
+    const endH = String(Math.floor(totalEnd / 60) % 24).padStart(2, "0");
+    const endM = String(totalEnd % 60).padStart(2, "0");
+    setForm((f) => ({ ...f, end_time: `${endH}:${endM}` }));
+  };
+
+  // Currently-selected course (for showing assigned teacher)
+  const selectedCourse = useMemo(
+    () => courses.find((c) => c.id === form.class_course_id),
+    [courses, form.class_course_id],
+  );
 
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -357,6 +375,49 @@ export default function TimetableEntryModal({ open, onClose, entry = null }) {
               {errors.class_course_id[0]}
             </p>
           )}
+        </div>
+
+        {/* Assigned teacher — auto from selected class */}
+        {selectedCourse && (
+          <div className="flex items-center gap-2 rounded-xl border border-purple-100 bg-purple-50 px-3 py-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-purple-500 text-[10px] font-black text-white">
+              {(selectedCourse.teacher?.full_name || "?")
+                .split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
+            </span>
+            <p className="text-xs font-semibold text-purple-700">
+              Assigned Teacher:{" "}
+              <span className="font-extrabold">
+                {selectedCourse.teacher?.full_name
+                  || selectedCourse.teacher?.email
+                  || "Unassigned"}
+              </span>
+            </p>
+          </div>
+        )}
+
+        {/* Duration quick-picks */}
+        <div>
+          <label className="block text-xs font-bold text-navy-950">
+            Quick duration
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[
+              { m: 30, l: "30m" },
+              { m: 45, l: "45m" },
+              { m: 60, l: "1h" },
+              { m: 90, l: "1h 30m" },
+              { m: 120, l: "2h" },
+            ].map((d) => (
+              <button
+                key={d.m}
+                type="button"
+                onClick={() => applyDuration(d.m)}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
+              >
+                {d.l}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Day */}

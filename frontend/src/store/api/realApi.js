@@ -603,7 +603,10 @@ export const realApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "AdminTimetable", id: "LIST" }],
+      invalidatesTags: [
+        { type: "AdminTimetable", id: "LIST" },
+        "Timetable",
+      ],
     }),
 
     updateAdminTimetable: builder.mutation({
@@ -615,6 +618,7 @@ export const realApi = createApi({
       invalidatesTags: (result, error, { id }) => [
         { type: "AdminTimetable", id },
         { type: "AdminTimetable", id: "LIST" },
+        "Timetable",
       ],
     }),
 
