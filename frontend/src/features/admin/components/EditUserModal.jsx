@@ -1,5 +1,6 @@
 // frontend/src/features/admin/components/EditUserModal.jsx
 import { useEffect, useState } from "react";
+import { Check } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
@@ -20,7 +21,13 @@ export default function EditUserModal({ open, onClose, user = null }) {
   const [updateUser, { isLoading }] = useUpdateAdminUserMutation();
   const { data: gradesData } = useGetGradesQuery();
   const grades = gradesData?.results ?? gradesData ?? [];
-  const [form, setForm] = useState({ first_name: "", last_name: "", grade_id: "" });
+
+  const [form, setForm] = useState({
+    first_name: "",
+    last_name: "",
+    grade_id: "",     // students
+    grade_ids: [],    // teachers
+  });
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
 
@@ -30,6 +37,7 @@ export default function EditUserModal({ open, onClose, user = null }) {
       first_name: user.first_name || "",
       last_name: user.last_name || "",
       grade_id: user.grade?.id || "",
+      grade_ids: user.grade_ids || [],
     });
     setErrors({});
     setFormError(null);
@@ -44,6 +52,18 @@ export default function EditUserModal({ open, onClose, user = null }) {
         return next;
       });
     }
+  };
+
+  const toggleGrade = (gradeId) => {
+    setForm((f) => {
+      const has = f.grade_ids.includes(gradeId);
+      return {
+        ...f,
+        grade_ids: has
+          ? f.grade_ids.filter((x) => x !== gradeId)
+          : [...f.grade_ids, gradeId],
+      };
+    });
   };
 
   const handleClose = () => {
@@ -64,6 +84,9 @@ export default function EditUserModal({ open, onClose, user = null }) {
       };
       if (user.role === "student") {
         payload.grade_id = form.grade_id || null;
+      }
+      if (user.role === "teacher") {
+        payload.grade_ids = form.grade_ids;
       }
       await updateUser(payload).unwrap();
       onClose();
@@ -98,9 +121,9 @@ export default function EditUserModal({ open, onClose, user = null }) {
       <form
         id="admin-edit-user-form"
         onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
+        className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto pr-1"
       >
-        {/* Identity summary — read only */}
+        {/* Identity summary */}
         <div className="rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -136,6 +159,7 @@ export default function EditUserModal({ open, onClose, user = null }) {
           />
         </div>
 
+        {/* Student grade picker (single) */}
         {user?.role === "student" && (
           <div>
             <label
@@ -160,6 +184,54 @@ export default function EditUserModal({ open, onClose, user = null }) {
             <p className="mt-1.5 text-xs text-slate-400">
               Changing grade re-syncs auto-enrollment into matching classes.
             </p>
+          </div>
+        )}
+
+        {/* Teacher grade checkboxes (multi) */}
+        {user?.role === "teacher" && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-bold text-navy-950">
+                Select Class / Grade
+              </p>
+              <span className="text-[10px] text-slate-400">
+                {form.grade_ids.length} selected
+              </span>
+            </div>
+            {grades.length === 0 ? (
+              <p className="py-4 text-center text-xs text-slate-400">
+                No grades exist in your institution yet.
+              </p>
+            ) : (
+              <ul className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                {grades.map((g) => {
+                  const checked = form.grade_ids.includes(g.id);
+                  return (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGrade(g.id)}
+                        className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 transition hover:bg-slate-50"
+                      >
+                        <span
+                          className={
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border " +
+                            (checked
+                              ? "border-purple-500 bg-purple-500 text-white"
+                              : "border-slate-300 bg-white")
+                          }
+                        >
+                          {checked && <Check size={11} />}
+                        </span>
+                        <p className="truncate text-xs font-medium text-navy-950">
+                          {g.name}
+                        </p>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
 

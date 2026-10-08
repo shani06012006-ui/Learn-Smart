@@ -162,6 +162,11 @@ class AdminUserUpdateSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False)
     grade_id = serializers.UUIDField(required=False, allow_null=True)
+    grade_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        allow_empty=True,
+    )
 
     def validate_grade_id(self, value):
         if value in (None, ""):
@@ -175,6 +180,20 @@ class AdminUserUpdateSerializer(serializers.Serializer):
             return qs.get()
         except Grade.DoesNotExist:
             raise serializers.ValidationError("Unknown grade for your institution.")
+
+    email = serializers.EmailField(required=False)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        # Instance is passed via context by the view
+        instance = self.context.get("instance")
+        from accounts.models import User as _U
+        qs = _U.objects.filter(email=value)
+        if instance is not None:
+            qs = qs.exclude(id=instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
 
 class AdminUserToggleActiveSerializer(serializers.Serializer):
