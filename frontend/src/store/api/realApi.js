@@ -82,6 +82,22 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Passwordless email OTP ----
+    requestOtp: builder.mutation({
+      query: (body) => ({
+        url: "/auth/request-otp/",
+        method: "POST",
+        body,
+      }),
+    }),
+    verifyOtp: builder.mutation({
+      query: (body) => ({
+        url: "/auth/verify-otp/",
+        method: "POST",
+        body,
+      }),
+    }),
+
     // ---- Teacher chat (multi-room) ----
     getTeacherChatRooms: builder.query({
       query: () => `/teacher/chat/rooms/`,
@@ -1116,6 +1132,8 @@ export const realApi = createApi({
 });
 
 export const {
+  useVerifyOtpMutation,
+  useRequestOtpMutation,
   useSendTeacherChatMessageMutation,
   useGetTeacherChatMessagesQuery,
   useGetTeacherChatRoomsQuery,

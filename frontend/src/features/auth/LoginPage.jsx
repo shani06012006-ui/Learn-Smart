@@ -9,6 +9,7 @@ import { adminCredentialsReceived } from "../../store/slices/adminAuthSlice";
 import AuthLayout from "./components/AuthLayout";
 import FormField from "./components/FormField";
 import SocialButton from "./components/SocialButton";
+import OtpLoginModal from "./components/OtpLoginModal";
 
 // One login form for all three roles, backed by the real Django backend.
 // The response contains { access, refresh, user } — the access token is a
@@ -21,6 +22,8 @@ export default function LoginPage() {
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [formError, setFormError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [otpOpen, setOtpOpen] = useState(false);
 
   const handleChange = (e) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -33,7 +36,7 @@ export default function LoginPage() {
 
     // Real backend login. One path for every role.
     try {
-      const result = await adminLogin(form).unwrap();
+      const result = await adminLogin({ ...form, remember_me: rememberMe }).unwrap();
       dispatch(adminCredentialsReceived(result));
 
       const role = result.user?.role;
@@ -123,7 +126,14 @@ export default function LoginPage() {
             placeholder="••••••••••••"
             icon={Lock}
           />
-          <div className="mt-2 text-right">
+          <div className="mt-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setOtpOpen(true)}
+              className="text-xs font-semibold text-purple-500 transition-colors hover:text-purple-600"
+            >
+              Login with One-Time Code
+            </button>
             <Link
               to="/forgot-password"
               className="text-xs font-semibold text-purple-500 transition-colors hover:text-purple-600"
@@ -132,6 +142,17 @@ export default function LoginPage() {
             </Link>
           </div>
         </div>
+
+        {/* Remember me */}
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-purple-500 accent-purple-500 focus:ring-purple-400"
+          />
+          <span>Remember me for 30 days</span>
+        </label>
 
         {formError && (
           <p role="alert" className="text-sm text-coral-600">
@@ -172,6 +193,7 @@ export default function LoginPage() {
           <span className="transition-transform group-hover:translate-x-0.5">→</span>
         </Link>
       </div>
+      <OtpLoginModal open={otpOpen} onClose={() => setOtpOpen(false)} />
     </AuthLayout>
   );
 }

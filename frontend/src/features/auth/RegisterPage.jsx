@@ -1,4 +1,4 @@
-﻿// frontend/src/features/auth/RegisterPage.jsx
+// frontend/src/features/auth/RegisterPage.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { User, Mail, Lock } from "lucide-react";
@@ -120,8 +120,7 @@ export default function RegisterPage() {
               className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
             >
               <option value="teacher">Teacher</option>
-              <option value="admin">Institution Admin</option>
-            </select>
+                          </select>
             <svg
               viewBox="0 0 20 20"
               className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
