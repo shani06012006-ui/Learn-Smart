@@ -514,6 +514,62 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["post"], url_path="regenerate-pin")
+    def regenerate_pin(self, request, pk=None):
+        """Rotate the student's PIN. Old PIN becomes invalid."""
+        user = self.get_object()
+        if user.role != User.ROLE_STUDENT:
+            return Response(
+                {"error": {"detail": "PINs exist only for students.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from accounts.services import generate_student_pin
+        creds = generate_student_pin(user)
+        return Response({
+            "pin": creds.pin,
+            "is_active": creds.is_active,
+            "last_login_at": creds.last_login_at,
+        })
+
+    @action(detail=True, methods=["post"], url_path="revoke-pin")
+    def revoke_pin(self, request, pk=None):
+        """Disable PIN login for the student without rotating the PIN."""
+        user = self.get_object()
+        if user.role != User.ROLE_STUDENT:
+            return Response(
+                {"error": {"detail": "PINs exist only for students.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from accounts.models import StudentCredentials
+        try:
+            creds = user.credentials
+        except StudentCredentials.DoesNotExist:
+            return Response(
+                {"error": {"detail": "This student has no PIN yet.", "status_code": 404}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        creds.is_active = False
+        creds.save(update_fields=["is_active", "updated_at"])
+        return Response({"pin": creds.pin, "is_active": False})
+
+    @action(detail=True, methods=["get"], url_path="pin")
+    def pin(self, request, pk=None):
+        """Fetch the student's current PIN (or null if none)."""
+        user = self.get_object()
+        if user.role != User.ROLE_STUDENT:
+            return Response({"pin": None, "is_active": False, "exists": False})
+        from accounts.models import StudentCredentials
+        try:
+            creds = user.credentials
+        except StudentCredentials.DoesNotExist:
+            return Response({"pin": None, "is_active": False, "exists": False})
+        return Response({
+            "pin": creds.pin,
+            "is_active": creds.is_active,
+            "exists": True,
+            "last_login_at": creds.last_login_at,
+        })
+
     @action(detail=True, methods=["post"], url_path="toggle-active")
     def toggle_active(self, request, pk=None):
         user = self.get_object()

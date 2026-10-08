@@ -13,6 +13,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
+from accounts.student_login import StudentLoginView
+from attendance.student_views import StudentSelfViewSet
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -20,6 +22,19 @@ urlpatterns = [
 
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/admin/", include("admin_api.urls")),
+
+    # PIN-based student quick-login
+    path("api/v1/auth/student-login/",
+         StudentLoginView.as_view(),
+         name="student-pin-login"),
+    path("api/v1/student/me/",
+         StudentSelfViewSet.as_view({"get": "me"}), name="student-me"),
+    path("api/v1/student/my-classes/",
+         StudentSelfViewSet.as_view({"get": "my_classes"}), name="student-my-classes"),
+    path("api/v1/student/my-attendance/",
+         StudentSelfViewSet.as_view({"get": "my_attendance"}), name="student-my-attendance"),
+    path("api/v1/student/my-grades/",
+         StudentSelfViewSet.as_view({"get": "my_grades"}), name="student-my-grades"),
 path("api/v1/admin/", include("attendance.urls")),
     # teacher-scoped attendance
     path("api/v1/teacher/attendance/",

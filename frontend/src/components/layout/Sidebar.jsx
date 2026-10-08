@@ -36,15 +36,15 @@ const TEACHER_ITEMS = [
 ];
 
 const STUDENT_ITEMS = [
-  { label: "Dashboard",     to: "/student",                    icon: LayoutDashboard, end: true },
-  { label: "My Classes",    to: "/student/classes",            icon: BookOpen },
-  { label: "Timetable",     to: "/student/timetable",          icon: CalendarDays },
-  { label: "Join a class",  to: "/student/join-class",         icon: KeyRound },
-  { label: "Materials",     to: "/student/materials",          icon: FileText },
-  { label: "Announcements", to: "/student/announcements",      icon: Megaphone },
-  { label: "Performance",   to: "/student/performance",        icon: Trophy },
-  { label: "Live Classes",  to: "/student/live-classes",       icon: Video },
-  { label: "Messages",      to: "/student/chat",               icon: MessageSquare },
+  { label: "Dashboard",     to: "/student",                  icon: LayoutDashboard, end: true },
+  { label: "My Classes",    to: "/student/classes",          icon: BookOpen },
+  { label: "Timetable",     to: "/student/timetable",        icon: CalendarDays },
+  { label: "Join a class",  to: "/student/join-class",       icon: KeyRound },
+  { label: "Materials",     to: "/student/materials",        icon: FileText },
+  { label: "Announcements", to: "/student/announcements",    icon: Megaphone },
+  { label: "Performance",   to: "/student/performance",      icon: Trophy },
+  { label: "Live Classes",  to: "/student/live-classes",     icon: Video },
+  { label: "Messages",      to: "/student/chat",             icon: MessageSquare },
 ];
 
 export default function Sidebar({ role }) {
