@@ -219,3 +219,86 @@ class StudentChatViewSet(ViewSet):
             "email": t.email,
         } for t in teachers]
         return Response({"count": len(rows), "results": rows})
+
+
+# ═══════════════════════════════════════════════════════════════
+# Teacher-side chat (class groups + institution teachers group)
+# ═══════════════════════════════════════════════════════════════
+
+class TeacherChatPermission(IsAuthenticated):
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        return getattr(request.user, "role", None) in ("teacher", "admin")
+
+
+class TeacherChatViewSet(ViewSet):
+    """
+    Teacher-facing chat endpoints.
+    - List all threads the teacher is a member of (class groups + institution group)
+    - Read/send messages
+    - Uses the same serializer shape as student chat for consistency
+    """
+    permission_classes = [TeacherChatPermission]
+
+    def list(self, request):
+        threads = (
+            Thread.objects
+            .filter(memberships__user=request.user)
+            .select_related("class_course")
+            .order_by("-updated_at", "-created_at")
+        )
+        rooms = [_serialize_thread(t, request.user) for t in threads]
+        return Response({"count": len(rooms), "results": rooms})
+
+    def retrieve(self, request, pk=None):
+        try:
+            t = Thread.objects.get(pk=pk, memberships__user=request.user)
+        except Thread.DoesNotExist:
+            return Response(
+                {"error": {"detail": "Room not found.", "status_code": 404}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(_serialize_thread(t, request.user))
+
+    @action(detail=True, methods=["get"], url_path="messages")
+    def messages(self, request, pk=None):
+        try:
+            t = Thread.objects.get(pk=pk, memberships__user=request.user)
+        except Thread.DoesNotExist:
+            return Response(
+                {"error": {"detail": "Room not found.", "status_code": 404}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        qs = t.messages.select_related("sender").order_by("created_at")[:200]
+        return Response({"count": qs.count(), "results": [_serialize_message(m) for m in qs]})
+
+    @action(detail=True, methods=["post"], url_path="send")
+    def send(self, request, pk=None):
+        try:
+            t = Thread.objects.get(pk=pk, memberships__user=request.user)
+        except Thread.DoesNotExist:
+            return Response(
+                {"error": {"detail": "Room not found.", "status_code": 404}},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        body = (request.data.get("body") or "").strip()
+        if not body:
+            return Response(
+                {"error": {"detail": "Empty message.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        msg = Message.objects.create(thread=t, sender=request.user, body=body)
+        payload = _serialize_message(msg)
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            async_to_sync(get_channel_layer().group_send)(
+                f"chat_thread_{t.id}",
+                {"type": "chat.message", "message": payload},
+            )
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("teacher chat broadcast failed")
+        return Response(payload, status=status.HTTP_201_CREATED)
+
