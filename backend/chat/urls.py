@@ -5,6 +5,9 @@ from .views import (
     TeacherGroupMembersView,
     TeacherGroupMessagesView,
     TeacherGroupThreadView,
+    ThreadMembersView,
+    ThreadMemberDetailView,
+    ThreadAvailableMembersView,
 )
 
 app_name = "chat"
@@ -29,5 +32,20 @@ urlpatterns = [
         "messages/<uuid:msg_id>/react/",
         MessageReactionView.as_view(),
         name="message-reaction",
+    ),
+    path(
+        "threads/<uuid:thread_id>/members/",
+        ThreadMembersView.as_view(),
+        name="thread-members",
+    ),
+    path(
+        "threads/<uuid:thread_id>/members/<uuid:user_id>/",
+        ThreadMemberDetailView.as_view(),
+        name="thread-member-detail",
+    ),
+    path(
+        "threads/<uuid:thread_id>/available-members/",
+        ThreadAvailableMembersView.as_view(),
+        name="thread-available-members",
     ),
 ]
