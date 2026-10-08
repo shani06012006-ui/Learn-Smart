@@ -79,8 +79,30 @@ export const realApi = createApi({
     "ClassMaterial",
     "MaterialList",
     "ChatMembers",
+    "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Teacher chat (multi-room) ----
+    getTeacherChatRooms: builder.query({
+      query: () => `/teacher/chat/rooms/`,
+      providesTags: ["TeacherChat"],
+    }),
+    getTeacherChatMessages: builder.query({
+      query: (id) => `/teacher/chat/rooms/${id}/messages/`,
+      providesTags: (r, e, id) => [{ type: "TeacherChat", id: `msgs-${id}` }],
+    }),
+    sendTeacherChatMessage: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `/teacher/chat/rooms/${id}/send/`,
+        method: "POST",
+        body: { body },
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "TeacherChat", id: `msgs-${id}` },
+        "TeacherChat",
+      ],
+    }),
+
     // ---- Chat thread membership (shared student + teacher) ----
     getChatThreadMembers: builder.query({
       query: (threadId) => `/chat/threads/${threadId}/members/`,
@@ -1094,6 +1116,9 @@ export const realApi = createApi({
 });
 
 export const {
+  useSendTeacherChatMessageMutation,
+  useGetTeacherChatMessagesQuery,
+  useGetTeacherChatRoomsQuery,
   useGetChatThreadAvailableMembersQuery,
   useRemoveChatThreadMemberMutation,
   useAddChatThreadMemberMutation,
