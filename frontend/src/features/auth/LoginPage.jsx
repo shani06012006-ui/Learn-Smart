@@ -1,4 +1,4 @@
-﻿// frontend/src/features/auth/LoginPage.jsx
+// frontend/src/features/auth/LoginPage.jsx
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch } from "react-redux";
@@ -158,6 +158,20 @@ export default function LoginPage() {
           Sign up
         </Link>
       </p>
+
+      {/* Student quick-login link */}
+      <div className="mt-6 border-t border-slate-100 pt-5">
+        <Link
+          to="/student-login"
+          className="group flex items-center justify-center gap-2 rounded-2xl border border-purple-100 bg-purple-50/60 px-4 py-3 text-sm font-semibold text-purple-700 transition-all hover:border-purple-200 hover:bg-purple-100 hover:shadow-purple-glow"
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-500 text-[10px] font-black text-white">
+            PIN
+          </span>
+          <span>Are you a student? Sign in with your Student Passcode</span>
+          <span className="transition-transform group-hover:translate-x-0.5">→</span>
+        </Link>
+      </div>
     </AuthLayout>
   );
 }
