@@ -1,4 +1,4 @@
-﻿// frontend/src/features/auth/components/AuthLayout.jsx
+// frontend/src/features/auth/components/AuthLayout.jsx
 import { Link } from "react-router-dom";
 
 /**
@@ -32,15 +32,17 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
 
             <div className="relative mt-10">
               {/* HERE IS YOUR IMAGE — auth illustration — paste a URL over the src */}
-              <img
-                src={illustrationSrc}
-                alt=""
-                className="relative mx-auto h-auto w-full max-w-sm object-contain"
-                onError={(e) => {
-                  // If no image URL, show the SVG fallback underneath
-                  e.currentTarget.style.display = "none";
-                }}
-              />
+              {illustrationSrc && (
+                <img
+                  src={illustrationSrc}
+                  alt=""
+                  className="relative mx-auto h-auto w-full max-w-sm object-contain"
+                  onError={(e) => {
+                    // If image fails to load, hide it so the SVG fallback shows
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              )}
 
               {/* SVG fallback — shown when no illustrationSrc is provided */}
               {!illustrationSrc && (
