@@ -8,6 +8,9 @@ import StudentLayout from "./components/layout/StudentLayout";
 import StudentMyClassesPage from "./features/student/pages/StudentMyClassesPage";
 import StudentPerformancePage from "./features/student/pages/StudentPerformancePage";
 import StudentPlaceholderPage from "./features/student/pages/StudentPlaceholderPage";
+import StudentMaterialsPage from "./features/student/pages/StudentMaterialsPage";
+import StudentTimetablePage from "./features/student/pages/StudentTimetablePage";
+import StudentChatPage from "./features/student/pages/StudentChatPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import RootRoute from "./routes/RootRoute";
 
@@ -71,15 +74,7 @@ export default function App() {
             <Route path="progress" element={<StudentProgressPage />} />
             <Route path="classes" element={<StudentMyClassesPage />} />
             <Route path="performance" element={<StudentPerformancePage />} />
-            <Route
-              path="timetable"
-              element={
-                <StudentPlaceholderPage
-                  title="Timetable"
-                  description="Your weekly schedule will appear here."
-                />
-              }
-            />
+            <Route path="timetable" element={<StudentTimetablePage />} />
             <Route
               path="join-class"
               element={
@@ -89,15 +84,7 @@ export default function App() {
                 />
               }
             />
-            <Route
-              path="materials"
-              element={
-                <StudentPlaceholderPage
-                  title="Materials"
-                  description="Study materials shared by your teachers will appear here."
-                />
-              }
-            />
+            <Route path="materials" element={<StudentMaterialsPage />} />
             <Route
               path="announcements"
               element={
@@ -116,15 +103,7 @@ export default function App() {
                 />
               }
             />
-            <Route
-              path="chat"
-              element={
-                <StudentPlaceholderPage
-                  title="Messages"
-                  description="Chat with your teachers and classmates."
-                />
-              }
-            />
+            <Route path="chat" element={<StudentChatPage />} />
           </Route>
         </Route>
       </Route>

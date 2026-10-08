@@ -80,6 +80,52 @@ export const realApi = createApi({
     "MaterialList",
   ],
   endpoints: (builder) => ({
+    // ---- Student chat ----
+    getStudentChatRooms: builder.query({
+      query: () => `/student/chat/rooms/`,
+      providesTags: ["StudentChat"],
+    }),
+    getStudentChatRoom: builder.query({
+      query: (id) => `/student/chat/rooms/${id}/`,
+      providesTags: (r, e, id) => [{ type: "StudentChat", id }],
+    }),
+    getStudentChatMessages: builder.query({
+      query: (id) => `/student/chat/rooms/${id}/messages/`,
+      providesTags: (r, e, id) => [{ type: "StudentChat", id: `msgs-${id}` }],
+    }),
+    sendStudentChatMessage: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `/student/chat/rooms/${id}/send/`,
+        method: "POST",
+        body: { body },
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "StudentChat", id: `msgs-${id}` },
+        { type: "StudentChat", id: "LIST" },
+      ],
+    }),
+    getStudentChatTeachers: builder.query({
+      query: () => `/student/chat/rooms/teachers/`,
+      providesTags: ["StudentChat"],
+    }),
+    createStudentDm: builder.mutation({
+      query: (teacherId) => ({
+        url: `/student/chat/rooms/dm/${teacherId}/`,
+        method: "POST",
+      }),
+      invalidatesTags: [{ type: "StudentChat", id: "LIST" }],
+    }),
+
+    // ---- Student timetable + materials ----
+    getStudentMyTimetable: builder.query({
+      query: () => `/student/my-timetable/`,
+      providesTags: ["StudentSelf"],
+    }),
+    getStudentMyMaterials: builder.query({
+      query: () => `/student/my-materials/`,
+      providesTags: ["StudentSelf"],
+    }),
+
     // ---- Student self-service ----
     getStudentMe: builder.query({
       query: () => `/student/me/`,
@@ -1016,6 +1062,14 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetStudentMyMaterialsQuery,
+  useGetStudentMyTimetableQuery,
+  useCreateStudentDmMutation,
+  useGetStudentChatTeachersQuery,
+  useSendStudentChatMessageMutation,
+  useGetStudentChatMessagesQuery,
+  useGetStudentChatRoomQuery,
+  useGetStudentChatRoomsQuery,
   useGetStudentMyGradesQuery,
   useGetStudentMyAttendanceQuery,
   useGetStudentMyClassesQuery,
