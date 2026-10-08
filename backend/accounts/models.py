@@ -447,3 +447,32 @@ class StudentCredentials(models.Model):
         self.last_login_at = timezone.now()
         self.save(update_fields=["failed_attempts", "locked_until", "last_login_at", "updated_at"])
 
+
+class LoginOTP(models.Model):
+    """
+    One-time passcodes for passwordless login.
+    - Generated when a user requests a code via /auth/request-otp/
+    - Consumed once at /auth/verify-otp/ (is_used=True)
+    - Expires after 10 minutes
+    - Cleaned up opportunistically (older rows can be pruned by a cron)
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(db_index=True)
+    code = models.CharField(max_length=6, db_index=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["email", "code", "is_used"]),
+        ]
+
+    def __str__(self):
+        return f"OTP for {self.email} (used={self.is_used})"
+
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at
+

@@ -191,3 +191,73 @@ def generate_student_pin(student):
     )
     return creds
 
+
+def generate_login_otp(email):
+    """
+    Create a 6-digit OTP for the given email. Invalidates any previous
+    unused codes for the same email. Prints to console (dev mode).
+    """
+    import secrets
+    from datetime import timedelta
+    from django.utils import timezone
+    from .models import LoginOTP, User
+
+    email = (email or "").strip().lower()
+
+    # Invalidate previous unused codes for this email
+    LoginOTP.objects.filter(email=email, is_used=False).update(is_used=True)
+
+    code = "".join(str(secrets.randbelow(10)) for _ in range(6))
+    expires_at = timezone.now() + timedelta(minutes=10)
+
+    otp = LoginOTP.objects.create(
+        email=email,
+        code=code,
+        expires_at=expires_at,
+    )
+
+    # DEV MODE: print to terminal. Replace with SMTP send in production.
+    print("")
+    print("=" * 60)
+    print(f"  LOGIN OTP for {email}: {code}")
+    print(f"  Expires in 10 minutes")
+    print("=" * 60)
+    print("")
+
+    return otp
+
+
+def verify_login_otp(email, code):
+    """
+    Returns the User if the OTP matches, is unused, and not expired.
+    Returns None otherwise.
+    """
+    from django.utils import timezone
+    from .models import LoginOTP, User
+
+    email = (email or "").strip().lower()
+    code = (code or "").strip()
+
+    otp = (
+        LoginOTP.objects
+        .filter(email=email, code=code, is_used=False)
+        .order_by("-created_at")
+        .first()
+    )
+    if not otp:
+        return None
+    if otp.is_expired():
+        otp.is_used = True
+        otp.save(update_fields=["is_used"])
+        return None
+
+    # Mark used
+    otp.is_used = True
+    otp.save(update_fields=["is_used"])
+
+    # Find the user
+    try:
+        return User.objects.get(email=email, is_active=True)
+    except User.DoesNotExist:
+        return None
+
