@@ -1321,8 +1321,9 @@ class TimetableView(APIView):
         )
 
         if user.role == "teacher":
-            # Match by either the entry's `teacher` FK OR the class's teacher,
-            # so a missing `teacher` on the entry does not hide the schedule.
+            # Teachers see only their OWN classes' timetable entries.
+            # Match by either the entry's `teacher` FK OR the class's teacher
+            # (protects against missing `teacher` on legacy rows).
             qs = qs.filter(
                 Q(teacher=user) | Q(class_course__teacher=user),
                 institution=user.institution,
