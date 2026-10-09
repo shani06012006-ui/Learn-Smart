@@ -82,6 +82,50 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Teacher: performance trend scoped to own classes ----
+    getTeacherPerformanceTrend: builder.query({
+      query: ({ period = "month" } = {}) => ({
+        url: `/teacher/dashboard/performance-trend/`,
+        params: { period },
+      }),
+      providesTags: ["TeacherStats"],
+    }),
+
+    // ---- Teacher: student leaves from own classes ----
+    getTeacherStudentLeaves: builder.query({
+      query: (params = {}) => {
+        const search = new URLSearchParams();
+        if (params.page) search.set("page", params.page);
+        if (params.status) search.set("status", params.status);
+        if (params.leave_type) search.set("leave_type", params.leave_type);
+        if (params.from) search.set("from", params.from);
+        if (params.to) search.set("to", params.to);
+        if (params.q) search.set("q", params.q);
+        const qs = search.toString();
+        return qs ? `/teacher/leaves/students/?${qs}` : "/teacher/leaves/students/";
+      },
+      providesTags: (result) => [
+        ...(result?.results || []).map((l) => ({ type: "StudentLeave", id: l.id })),
+        { type: "StudentLeave", id: "TEACHER-LIST" },
+      ],
+    }),
+    approveTeacherStudentLeave: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/teacher/leaves/students/${id}/approve/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "StudentLeave", id: "TEACHER-LIST" }, { type: "StudentLeave", id: "LIST" }],
+    }),
+    rejectTeacherStudentLeave: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/teacher/leaves/students/${id}/reject/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "StudentLeave", id: "TEACHER-LIST" }, { type: "StudentLeave", id: "LIST" }],
+    }),
+
     // ---- Admin: purge stale sessions ----
     purgeStaleSessions: builder.mutation({
       query: () => ({
@@ -1154,6 +1198,9 @@ export const realApi = createApi({
 });
 
 export const {
+  useRejectTeacherStudentLeaveMutation,
+  useApproveTeacherStudentLeaveMutation,
+  useGetTeacherStudentLeavesQuery,
   useGetAdminPerformanceTrendQuery,
 
   useVerifyOtpMutation,
@@ -1265,4 +1312,6 @@ export const {
 
 
   usePurgeStaleSessionsMutation,
+
+  useGetTeacherPerformanceTrendQuery,
 } = realApi;

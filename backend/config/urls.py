@@ -16,7 +16,8 @@ from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
 from accounts.student_login import StudentLoginView
 from attendance.student_views import StudentSelfViewSet
 from chat.student_views import StudentChatViewSet, TeacherChatViewSet
-from admin_api.views import PerformanceTrendView
+from admin_api.views import PerformanceTrendView, TeacherPerformanceTrendView
+from leaves.views import TeacherStudentLeavesViewSet
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -27,6 +28,9 @@ urlpatterns = [
     path("api/v1/admin/dashboard/performance-trend/",
          PerformanceTrendView.as_view(),
          name="admin-performance-trend"),
+    path("api/v1/teacher/dashboard/performance-trend/",
+         TeacherPerformanceTrendView.as_view(),
+         name="teacher-performance-trend"),
 
     # PIN-based student quick-login
     path("api/v1/auth/student-login/",
@@ -57,6 +61,22 @@ urlpatterns = [
          StudentChatViewSet.as_view({"post": "dm"}), name="student-chat-dm"),
     path("api/v1/student/chat/rooms/teachers/",
          StudentChatViewSet.as_view({"get": "teachers"}), name="student-chat-teachers"),
+    # teacher: student leaves for own classes
+    path("api/v1/teacher/leaves/students/",
+         TeacherStudentLeavesViewSet.as_view({"get": "list"}),
+         name="teacher-student-leaves"),
+    path("api/v1/teacher/leaves/students/<uuid:pk>/",
+         TeacherStudentLeavesViewSet.as_view({"get": "retrieve"}),
+         name="teacher-student-leave-detail"),
+    path("api/v1/teacher/leaves/students/<uuid:pk>/approve/",
+         TeacherStudentLeavesViewSet.as_view({"post": "approve"}),
+         name="teacher-student-leave-approve"),
+    path("api/v1/teacher/leaves/students/<uuid:pk>/reject/",
+         TeacherStudentLeavesViewSet.as_view({"post": "reject"}),
+         name="teacher-student-leave-reject"),
+    path("api/v1/teacher/leaves/students/<uuid:pk>/cancel/",
+         TeacherStudentLeavesViewSet.as_view({"post": "cancel"}),
+         name="teacher-student-leave-cancel"),
     # teacher chat
     path("api/v1/teacher/chat/rooms/",
          TeacherChatViewSet.as_view({"get": "list"}), name="teacher-chat-rooms"),

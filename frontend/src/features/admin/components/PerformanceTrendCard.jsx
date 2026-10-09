@@ -6,7 +6,10 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Loader2, Activity } from "lucide-react";
 
-import { useGetAdminPerformanceTrendQuery } from "../../../store/api/realApi";
+import {
+  useGetAdminPerformanceTrendQuery,
+  useGetTeacherPerformanceTrendQuery,
+} from "../../../store/api/realApi";
 
 const PERIODS = [
   { value: "week",  label: "Weekly" },
@@ -62,10 +65,12 @@ function CustomTooltip({ active, payload }) {
   );
 }
 
-export default function PerformanceTrendCard() {
+export default function PerformanceTrendCard({ scope = "admin" }) {
   const [period, setPeriod] = useState("month");
 
-  const { data, isLoading, isError } = useGetAdminPerformanceTrendQuery({ period });
+  const adminQuery = useGetAdminPerformanceTrendQuery({ period }, { skip: scope !== "admin" });
+  const teacherQuery = useGetTeacherPerformanceTrendQuery({ period }, { skip: scope !== "teacher" });
+  const { data, isLoading, isError } = scope === "teacher" ? teacherQuery : adminQuery;
 
   const timeline = data?.timeline || [];
   const direction = data?.direction || "flat";

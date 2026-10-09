@@ -16,6 +16,8 @@ import Badge from "../../../components/ui/Badge";
 import StatCard from "../../admin/components/StatCard";
 import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import LeaveRequestModal from "../components/LeaveRequestModal";
+import TeacherStudentLeavesTab from "../components/leaves/TeacherStudentLeavesTab";
+import LeaveReviewModal from "../../admin/components/leaves/LeaveReviewModal";
 import useLeavesSocket from "../../../hooks/useLeavesSocket";
 import {
   useGetMyLeavesQuery,
@@ -67,7 +69,11 @@ function fmtDateTime(iso) {
 }
 
 export default function TeacherLeavesPage() {
+  const [tab, setTab] = useState("mine");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewMode, setReviewMode] = useState(null);
+  const [reviewLeave, setReviewLeave] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
@@ -128,22 +134,69 @@ export default function TeacherLeavesPage() {
     );
   }
 
+  const handleAction = (action, leave) => {
+    setReviewMode(action);
+    setReviewLeave(leave);
+    setReviewOpen(true);
+  };
+
+  const closeReview = () => {
+    setReviewOpen(false);
+    setReviewMode(null);
+    setReviewLeave(null);
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            Leave requests
+            Leaves
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Submit and track your leave requests.
+            Manage your own leaves and review student requests.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
-          <Plus size={16} />
-          Request leave
-        </Button>
+        {tab === "mine" && (
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            <Plus size={16} />
+            Request leave
+          </Button>
+        )}
       </header>
+
+      {/* Tabs */}
+      <div className="flex items-center gap-1.5 self-start rounded-full bg-slate-50 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("mine")}
+          className={
+            "rounded-full px-4 py-2 text-xs font-bold transition-all " +
+            (tab === "mine"
+              ? "bg-purple-500 text-white shadow-purple-glow"
+              : "text-slate-500 hover:text-navy-950")
+          }
+        >
+          My Personal Leaves
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("students")}
+          className={
+            "rounded-full px-4 py-2 text-xs font-bold transition-all " +
+            (tab === "students"
+              ? "bg-purple-500 text-white shadow-purple-glow"
+              : "text-slate-500 hover:text-navy-950")
+          }
+        >
+          Student Leave Requests
+        </button>
+      </div>
+
+      {tab === "students" ? (
+        <TeacherStudentLeavesTab onAction={handleAction} />
+      ) : (
+        <>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -274,10 +327,22 @@ export default function TeacherLeavesPage() {
         </ul>
       )}
 
+        </>
+      )}
+
       <LeaveRequestModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSuccess={() => refetch()}
+      />
+
+      <LeaveReviewModal
+        open={reviewOpen}
+        mode={reviewMode}
+        kind="student"
+        leave={reviewLeave}
+        onClose={closeReview}
+        onSuccess={closeReview}
       />
 
       <ConfirmDialog

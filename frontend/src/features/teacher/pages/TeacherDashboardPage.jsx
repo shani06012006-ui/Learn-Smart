@@ -12,6 +12,7 @@ import {
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import StatCard from "../../admin/components/StatCard";
+import PerformanceTrendCard from "../../admin/components/PerformanceTrendCard";
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
 import { useAuth } from "../../../hooks/useAuth";
@@ -145,6 +146,9 @@ export default function TeacherDashboardPage() {
           tone="coral"
         />
       </div>
+
+      {/* Student performance trend — scoped to this teacher's classes */}
+      <PerformanceTrendCard scope="teacher" />
 
       {/* Two-column: today's sessions + recent messages */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
