@@ -770,10 +770,13 @@ export const realApi = createApi({
           search.set("day", String(params.day));
         if (params.active !== undefined)
           search.set("active", String(params.active));
+        if (params.teacher) search.set("teacher", params.teacher);
+        if (params.class_id) search.set("class_id", params.class_id);
+        if (params.mine) search.set("mine", "1");
         const qs = search.toString();
         return qs ? `/timetable/?${qs}` : "/timetable/";
       },
-      providesTags: ["AdminTimetable"],
+      providesTags: ["AdminTimetable", "Timetable"],
     }),
 
     createAdminTimetable: builder.mutation({

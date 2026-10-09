@@ -1354,13 +1354,27 @@ class TimetableView(APIView):
         )
 
         if user.role == "teacher":
-            # Teachers see only their OWN classes' timetable entries.
-            # Match by either the entry's `teacher` FK OR the class's teacher
-            # (protects against missing `teacher` on legacy rows).
-            qs = qs.filter(
-                Q(teacher=user) | Q(class_course__teacher=user),
-                institution=user.institution,
-            )
+            # Teachers see the FULL institution timetable so they can view
+            # every class and every teacher's schedule. Optional query params
+            # narrow the view:
+            #   ?teacher=<uuid>  — show only one teacher's slots
+            #   ?class_id=<uuid> — show only one class's slots
+            #   ?mine=1          — show only the requesting teacher's own slots
+            qs = qs.filter(institution=user.institution)
+
+            only_mine = (request.query_params.get("mine") or "").lower() in {"1", "true", "yes"}
+            if only_mine:
+                qs = qs.filter(
+                    Q(teacher=user) | Q(class_course__teacher=user)
+                )
+
+            teacher_param = request.query_params.get("teacher")
+            if teacher_param:
+                qs = qs.filter(teacher_id=teacher_param)
+
+            class_param = request.query_params.get("class_id")
+            if class_param:
+                qs = qs.filter(class_course_id=class_param)
         elif user.role == "student":
             enrolled_class_ids = StudentEnrollment.objects.filter(
                 student=user,
