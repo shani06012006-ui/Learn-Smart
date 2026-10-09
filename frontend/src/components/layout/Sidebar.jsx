@@ -79,12 +79,9 @@ export default function Sidebar({ role }) {
             <img
               src="/learn-smart-logo.png"
               alt="Learn Smart"
-              className="h-9 w-9 rounded-lg object-contain"
+              className="h-20 w-auto object-contain"
             />
             <div>
-              <p className="font-display text-sm font-extrabold text-navy-950">
-                Learn Smart
-              </p>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 {role === "teacher" ? "Teacher" : "Student"}
               </p>

@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/pages/AdminSessionsPage.jsx
+// frontend/src/features/admin/pages/AdminSessionsPage.jsx
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -150,7 +150,7 @@ function StatMini({ label, value, tone = "purple", icon: Icon }) {
 
 /* Page */
 export default function AdminSessionsPage() {
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [confirmRevoke, setConfirmRevoke] = useState(null);

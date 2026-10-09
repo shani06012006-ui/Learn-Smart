@@ -19,12 +19,9 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
             <img
               src="/learn-smart-logo.png"
               alt="Learn Smart"
-              className="h-8 w-8 rounded-lg object-contain"
+              className="h-20 w-auto object-contain"
             />
-            <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
-              Learn Smart
-            </span>
-          </Link>
+            </Link>
 
           {/* Heading + illustration */}
           <div className="my-auto max-w-md">
@@ -100,10 +97,7 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-coral-500 to-coral-600">
               <span className="text-sm font-black leading-none text-white">M</span>
             </span>
-            <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
-              Learn Smart
-            </span>
-          </Link>
+            </Link>
 
           <div className="w-full max-w-md">{children}</div>
         </main>

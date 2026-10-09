@@ -78,12 +78,9 @@ function EduviLogo() {
       <img
         src="/learn-smart-logo.png"
         alt="Learn Smart"
-        className="h-8 w-8 rounded-lg object-contain"
+        className="h-20 w-auto object-contain"
       />
-      <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
-        Learn Smart
-      </span>
-    </Link>
+      </Link>
   );
 }
 
