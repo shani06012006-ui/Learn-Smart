@@ -7,7 +7,6 @@ import {
   GraduationCap,
   FileText,
   Megaphone,
-  BarChart3,
   MessageSquare,
   Video,
   Trophy,
@@ -32,7 +31,6 @@ const TEACHER_ITEMS = [
   { label: "Quizzes",       to: "/teacher/quizzes",           icon: Brain },
   { label: "Materials",     to: "/teacher/materials",          icon: FileText },
   { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },
-  { label: "AI Insights",   to: "/teacher/analytics",          icon: BarChart3, disabled: true, note: "Module E" },
   { label: "Live Classes",  to: "/teacher/live-classes",       icon: Video },
   { label: "Messages",      to: "/teacher/chat",               icon: MessageSquare },
 ];
