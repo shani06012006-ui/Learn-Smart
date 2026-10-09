@@ -15,6 +15,7 @@ import {
   CalendarDays,
   CalendarX,
   ClipboardCheck,
+  Brain,
   LogOut,
 } from "lucide-react";
 
@@ -28,6 +29,7 @@ const TEACHER_ITEMS = [
   { label: "Timetable",     to: "/teacher/timetable",          icon: CalendarDays },
   { label: "Attendance",    to: "/teacher/attendance",         icon: ClipboardCheck },
   { label: "Leaves",        to: "/teacher/leaves",             icon: CalendarX },
+  { label: "Quizzes",       to: "/teacher/quizzes",           icon: Brain },
   { label: "Materials",     to: "/teacher/materials",          icon: FileText },
   { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },
   { label: "AI Insights",   to: "/teacher/analytics",          icon: BarChart3, disabled: true, note: "Module E" },

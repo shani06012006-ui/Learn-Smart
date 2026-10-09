@@ -44,6 +44,7 @@ LOCAL_APPS = [
     "institutions",
     "classes",
     "leaves",
+    "quizzes",
     "admin_api",
     "chat",
     "attendance",
@@ -212,6 +213,7 @@ CELERY_TIMEZONE = TIME_ZONE
 # ---------------------------------------------------------------------------
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Joining code config (classes app)

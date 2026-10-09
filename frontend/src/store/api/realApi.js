@@ -82,6 +82,123 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Class-wise attendance sheet (spec: /api/v1/attendance/) ----
+    getAttendanceSheet: builder.query({
+      query: ({ class_id, klass, grade, date }) => {
+        const s = new URLSearchParams();
+        if (class_id) s.set("class_id", class_id);
+        else if (klass) s.set("klass", klass);
+        else if (grade) s.set("grade", grade);
+        if (date) s.set("date", date);
+        return `/attendance/?${s.toString()}`;
+      },
+      providesTags: ["Attendance", "AttendanceSheet"],
+    }),
+    bulkSaveAttendance: builder.mutation({
+      query: ({ class_id, klass, grade, date, records }) => {
+        const body = { date, records };
+        if (class_id) body.class_id = class_id;
+        else if (klass) body.klass = klass;
+        else if (grade) body.grade = grade;
+        return {
+          url: `/attendance/bulk-save/`,
+          method: "POST",
+          body,
+        };
+      },
+      invalidatesTags: ["Attendance", "AttendanceSheet", "AdminAttendance"],
+    }),
+    getTeacherStudentsDirectory: builder.query({
+      query: ({ class_course, q } = {}) => {
+        const s = new URLSearchParams();
+        if (class_course) s.set("class_course", class_course);
+        if (q) s.set("q", q);
+        const qs = s.toString();
+        return qs ? `/teacher/students/?${qs}` : "/teacher/students/";
+      },
+      providesTags: ["TeacherStudents"],
+    }),
+    getAdminAttendanceAudit: builder.query({
+      query: ({ from, to, class_id, status } = {}) => {
+        const s = new URLSearchParams();
+        if (from) s.set("from", from);
+        if (to) s.set("to", to);
+        if (class_id) s.set("class_id", class_id);
+        if (status) s.set("status", status);
+        const qs = s.toString();
+        return qs ? `/admin/attendance/audit/?${qs}` : "/admin/attendance/audit/";
+      },
+      providesTags: ["AdminAttendance"],
+    }),
+
+    // ---- Quizzes ----
+    getQuizzes: builder.query({
+      query: (params = {}) => {
+        const s = new URLSearchParams();
+        if (params.class_course) s.set("class_course", params.class_course);
+        if (params.status) s.set("status", params.status);
+        if (params.q) s.set("q", params.q);
+        if (params.page) s.set("page", params.page);
+        const qs = s.toString();
+        return qs ? `/quizzes/?${qs}` : "/quizzes/";
+      },
+      providesTags: (result) => [
+        ...((result?.results || result || []) || []).map((q) => ({ type: "Quiz", id: q.id })),
+        { type: "Quiz", id: "LIST" },
+      ],
+    }),
+    getQuiz: builder.query({
+      query: (id) => `/quizzes/${id}/`,
+      providesTags: (_r, _e, id) => [{ type: "Quiz", id }],
+    }),
+    createQuiz: builder.mutation({
+      query: (body) => ({ url: "/quizzes/", method: "POST", body }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+    updateQuiz: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/quizzes/${id}/`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "Quiz", id },
+        { type: "Quiz", id: "LIST" },
+      ],
+    }),
+    deleteQuiz: builder.mutation({
+      query: (id) => ({ url: `/quizzes/${id}/`, method: "DELETE" }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+    generateQuizFromPdf: builder.mutation({
+      query: (formData) => ({
+        url: "/quizzes/generate-from-pdf/",
+        method: "POST",
+        body: formData,
+        formData: true,
+      }),
+    }),
+    publishQuiz: builder.mutation({
+      query: (id) => ({
+        url: `/quizzes/${id}/publish/`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Quiz", id },
+        { type: "Quiz", id: "LIST" },
+      ],
+    }),
+    unpublishQuiz: builder.mutation({
+      query: (id) => ({
+        url: `/quizzes/${id}/unpublish/`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [
+        { type: "Quiz", id },
+        { type: "Quiz", id: "LIST" },
+      ],
+    }),
+
     // ---- Teacher: performance trend scoped to own classes ----
     getTeacherPerformanceTrend: builder.query({
       query: ({ period = "month" } = {}) => ({
@@ -1198,6 +1315,19 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetAttendanceSheetQuery,
+  useBulkSaveAttendanceMutation,
+  useGetTeacherStudentsDirectoryQuery,
+  useGetAdminAttendanceAuditQuery,
+  useUnpublishQuizMutation,
+
+  useGetQuizzesQuery,
+  useGetQuizQuery,
+  useCreateQuizMutation,
+  useUpdateQuizMutation,
+  useDeleteQuizMutation,
+  useGenerateQuizFromPdfMutation,
+  usePublishQuizMutation,
   useRejectTeacherStudentLeaveMutation,
   useApproveTeacherStudentLeaveMutation,
   useGetTeacherStudentLeavesQuery,

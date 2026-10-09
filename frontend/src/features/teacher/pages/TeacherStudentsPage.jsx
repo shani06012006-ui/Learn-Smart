@@ -1,158 +1,68 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  GraduationCap,
-  Users,
-  Search,
-  BookOpen,
-  Plus,
-  X,
-} from "lucide-react";
+import { Search, GraduationCap, Users, TrendingUp } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
-import Avatar from "../../../components/ui/Avatar";
-import StatCard from "../../admin/components/StatCard";
-import Button from "../../../components/ui/Button";
-import CreateTeacherStudentModal from "../components/CreateTeacherStudentModal";
-import { useGetTeacherStudentsQuery } from "../../../store/api/realApi";
+import { classShortLabel, classLabel } from "../components/classLabel";
+import {
+  useGetClassesQuery,
+  useGetTeacherStudentsDirectoryQuery,
+} from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
-function initialsOf(name) {
-  const parts = (name || "").split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
-}
-
-function StudentDrawer({ student, onClose }) {
-  if (!student) return null;
+function MetricCard({ icon: Icon, label, value, tone = "purple" }) {
+  const tones = {
+    purple: "bg-purple-50 text-purple-600",
+    mint: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+  };
   return (
-    <div className="fixed inset-0 z-50 flex" onClick={onClose}>
-      <div className="absolute inset-0 bg-navy-950/40" />
-      <aside
-        className="relative ml-auto flex h-full w-full max-w-md flex-col bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="font-display text-base font-extrabold text-navy-950">
-            Student details
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
-          >
-            <X size={16} />
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          <div className="flex items-center gap-3">
-            <Avatar userId={student.student} initials={initialsOf(student.student_name)} size="lg" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-navy-950">
-                {student.student_name}
-              </p>
-              <p className="truncate text-xs text-slate-400">{student.email}</p>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-col gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Grade
-              </p>
-              <p className="mt-1 text-sm text-navy-950">
-                {student.grade_name || "Not assigned"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Your classes ({student.classes?.length || 0})
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(student.classes || []).map((c) => (
-                  <Link
-                    key={c.id}
-                    to={`/teacher/classes/${c.id}`}
-                    onClick={onClose}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
-                  >
-                    {c.subject || c.name}
-                  </Link>
-                ))}
-                {(!student.classes || student.classes.length === 0) && (
-                  <p className="text-xs text-slate-400">
-                    Not enrolled in any of your classes.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-card">
+      <div className="flex items-start justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          {label}
+        </p>
+        <span className={"flex h-8 w-8 items-center justify-center rounded-lg " + tones[tone]}>
+          <Icon size={15} />
+        </span>
+      </div>
+      <p className="mt-2 font-display text-2xl font-extrabold text-navy-950">
+        {value}
+      </p>
     </div>
   );
 }
 
 export default function TeacherStudentsPage() {
+  const [classId, setClassId] = useState("");
   const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("all");
-  const [openStudent, setOpenStudent] = useState(null);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  const { data, isLoading, isError, error, refetch } = useGetTeacherStudentsQuery({});
+  const { data: classesData } = useGetClassesQuery();
+  const classes = classesData?.results ?? classesData ?? [];
 
-  const rows = data?.rows || [];
-  const grades = data?.grades || [];
+  const queryArgs = useMemo(() => {
+    const a = {};
+    if (classId) a.class_course = classId;
+    if (search.trim()) a.q = search.trim();
+    return a;
+  }, [classId, search]);
 
-  const filtered = useMemo(() => {
-    let list = rows;
-    if (gradeFilter !== "all") {
-      list = list.filter((s) => s.grade_id === gradeFilter);
-    }
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (s) =>
-          (s.student_name || "").toLowerCase().includes(q) ||
-          (s.email || "").toLowerCase().includes(q),
-      );
-    }
-    return list;
-  }, [rows, gradeFilter, search]);
+  const { data, isLoading, isError, error, refetch } =
+    useGetTeacherStudentsDirectoryQuery(queryArgs);
 
-  const grouped = useMemo(() => {
-    const byGrade = new Map();
-    for (const s of filtered) {
-      const gid = s.grade_id || "__none__";
-      const gname = s.grade_name || "No grade assigned";
-      if (!byGrade.has(gid)) {
-        byGrade.set(gid, { id: gid, name: gname, students: [] });
-      }
-      byGrade.get(gid).students.push(s);
-    }
-    return Array.from(byGrade.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { numeric: true })
-    );
-  }, [filtered]);
+  const students = data?.results ?? data ?? [];
 
-  // Distinct classes across all my students (for the stat card)
-  const distinctClasses = useMemo(() => {
-    const s = new Set();
-    rows.forEach((r) => (r.classes || []).forEach((c) => s.add(c.id)));
-    return s.size;
-  }, [rows]);
+  const metrics = useMemo(() => {
+    const total = students.length;
+    const present = students.filter((s) => s.attendance_pct >= 75).length;
+    const avgPct = total
+      ? Math.round(students.reduce((sum, s) => sum + (s.attendance_pct || 0), 0) / total)
+      : 0;
+    return { total, present, avgPct };
+  }, [students]);
 
-  const totalInScope = rows.length;
-  const distinctGrades = grades.length;
-
-  if (isLoading) return <LoadingState label="Loading your students..." />;
-  if (isError) {
-    return <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />;
-  }
+  const selectedClass = classes.find((c) => c.id === classId);
 
   return (
     <div className="flex flex-col gap-6">
@@ -162,156 +72,134 @@ export default function TeacherStudentsPage() {
             Students
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Students actively enrolled in classes you teach.
+            Class-wise student directory with attendance overview.
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreateModalOpen(true)}>
-          <Plus size={16} />
-          New student
-        </Button>
       </header>
 
-      {/* Stat cards — real counts */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard icon={Users} label="Students" value={totalInScope} tone="purple" />
-        <StatCard icon={BookOpen} label="Your classes" value={distinctClasses} tone="mint" />
-        <StatCard icon={GraduationCap} label="Grades" value={distinctGrades} tone="amber" />
+        <MetricCard icon={Users} label="Total Students" value={metrics.total} tone="purple" />
+        <MetricCard icon={GraduationCap} label="Above 75% Attendance" value={metrics.present} tone="mint" />
+        <MetricCard icon={TrendingUp} label="Avg Attendance (%)" value={metrics.avgPct} tone="amber" />
       </div>
 
-      {/* Search + grade chips */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
+        <div className="relative min-w-[200px] flex-1">
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+            placeholder="Search by name or email…"
+            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setGradeFilter("all")}
-            className={
-              "rounded-full px-3 py-1 text-xs font-semibold transition " +
-              (gradeFilter === "all"
-                ? "bg-purple-500 text-white shadow-sm"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200")
-            }
-          >
-            All grades
-          </button>
-          {grades.map((g) => {
-            const active = gradeFilter === g.id;
-            return (
-              <button
-                key={g.id}
-                type="button"
-                onClick={() => setGradeFilter(g.id)}
-                className={
-                  "rounded-full px-3 py-1 text-xs font-semibold transition " +
-                  (active
-                    ? "bg-purple-500 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200")
-                }
-              >
-                {g.name}
-              </button>
-            );
-          })}
-        </div>
+        <select
+          value={classId}
+          onChange={(e) => setClassId(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+        >
+          <option value="">All classes</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {classShortLabel(c)}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Roster */}
-      {grouped.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+      {selectedClass && (
+        <p className="text-xs text-slate-500">
+          🎯 Showing roster for{" "}
+          <span className="font-bold text-navy-950">{classLabel(selectedClass)}</span>
+        </p>
+      )}
+
+      {isLoading && <LoadingState label="Loading students…" />}
+      {isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
+
+      {!isLoading && !isError && students.length === 0 && (
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
             <Users size={26} />
           </span>
-          <p className="mt-4 text-sm font-semibold text-navy-950">
-            No students yet
+          <h2 className="font-display text-xl font-extrabold text-navy-950">
+            No students found
+          </h2>
+          <p className="max-w-md text-sm text-slate-500">
+            Try a different class or clear the search.
           </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Students appear here once they are enrolled in classes you teach.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {grouped.map((g) => (
-            <section key={g.id} className="flex flex-col gap-3">
-              <header className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                    {g.name}
-                  </h2>
-                  <span className="text-[11px] text-slate-400">
-                    {g.students.length} student{g.students.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </header>
-
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-card">
-                <ul className="divide-y divide-slate-100">
-                  {g.students.map((s) => (
-                    <li
-                      key={s.student}
-                      className="flex cursor-pointer items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/50"
-                      onClick={() => setOpenStudent(s)}
-                    >
-                      <Avatar
-                        userId={s.student}
-                        initials={initialsOf(s.student_name)}
-                        size="sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-navy-950">
-                          {s.student_name}
-                        </p>
-                        <p className="truncate text-[11px] text-slate-400">
-                          {s.email}
-                        </p>
-                      </div>
-                      <div className="hidden flex-wrap gap-1 sm:flex">
-                        {(s.classes || []).slice(0, 3).map((c) => (
-                          <span
-                            key={c.id}
-                            className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600"
-                          >
-                            {c.subject || c.name}
-                          </span>
-                        ))}
-                        {(s.classes || []).length > 3 && (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                            +{(s.classes || []).length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          ))}
         </div>
       )}
 
-      <StudentDrawer student={openStudent} onClose={() => setOpenStudent(null)} />
-
-      <CreateTeacherStudentModal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        onSuccess={(res) => {
-          console.info(
-            `Created student: enrolled in ${res?.auto_enrolled_count ?? 0} class(es)`
-          );
-        }}
-      />
+      {!isLoading && !isError && students.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
+          <table className="w-full">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Student
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Roll #
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Class
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Class Teacher
+                </th>
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Attendance
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((s) => {
+                const pct = s.attendance_pct ?? 0;
+                const tone =
+                  pct >= 85
+                    ? "text-emerald-600 bg-emerald-50"
+                    : pct >= 60
+                    ? "text-amber-600 bg-amber-50"
+                    : "text-rose-600 bg-rose-50";
+                return (
+                  <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
+                          {(s.full_name || s.email || "?").slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-navy-950">
+                            {s.full_name || "Unnamed"}
+                          </p>
+                          <p className="truncate text-[11px] text-slate-500">{s.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {s.roll_number || <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {s.class_name || <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      {s.class_teacher_name || <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-bold " + tone}>
+                        {pct}%
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

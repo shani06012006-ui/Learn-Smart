@@ -196,97 +196,114 @@ _ = User
 
 class StudentListView(APIView):
     """
-    GET /api/v1/students/
+    GET /api/v1/teacher/students/
 
-    Cross-class student list for teachers.
+    Cross-class student directory for teachers.
 
     Query parameters:
-      scope   -- "mine" (default, students in teacher's classes) or
-                 "all" (all students in the institution)
-      grade   -- filter by Grade UUID
-      q       -- case-insensitive search on email / first / last name
+      class_course -- filter to a single class (UUID)
+      class_id     -- alias for class_course
+      klass        -- alias for class_course
+      grade        -- filter by Grade UUID
+      scope        -- "mine" (teacher's classes) or "all" (institution-wide, default)
+      q            -- search on email / first / last name
 
-    Teachers only. Admins use /api/v1/admin/users/?role=student.
+    Returns each row with: roll_number, class_name, class_teacher_name, attendance_pct.
+    Teachers see all students in their institution (cross-teacher read).
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        from accounts.models import User, StudentAttendance
+        from classes.models import ClassCourse, StudentEnrollment
+        from django.db.models import Q
 
+        user = request.user
         if user.role != "teacher":
             return Response(
-                {"detail": "Only teachers can access this endpoint."},
+                {"detail": "Teacher access only."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        from .models import User
-        from .serializers import StudentBriefSerializer
-        from classes.models import ClassCourse, StudentEnrollment
-
-        # Base scope: only students of the teacher's institution
-        qs = User.objects.filter(
-            role=User.ROLE_STUDENT,
-            institution=user.institution,
-        ).select_related("grade").order_by("first_name", "last_name", "email")
-
-        scope = request.query_params.get("scope", "mine").lower()
-
-        if scope == "mine":
-            # Restrict to students enrolled in any class this teacher owns
-            my_class_ids = ClassCourse.objects.filter(
-                teacher=user,
-            ).values_list("id", flat=True)
-            student_ids = StudentEnrollment.objects.filter(
-                class_course_id__in=my_class_ids,
-                status=StudentEnrollment.STATUS_ACTIVE,
-            ).values_list("student_id", flat=True).distinct()
-            qs = qs.filter(id__in=student_ids)
-
-        # Filter by grade
-        grade_id = request.query_params.get("grade")
-        if grade_id:
-            qs = qs.filter(grade_id=grade_id)
-
-        # Search
-        q = request.query_params.get("q")
-        if q:
-            from django.db.models import Q
-            qs = qs.filter(
-                Q(email__icontains=q)
-                | Q(first_name__icontains=q)
-                | Q(last_name__icontains=q)
-            )
-
-        # Attach "classes the student is enrolled in" for the serialized output.
-        # Build a map[student_id] = list of {id, name, subject} in one query.
-        student_ids = list(qs.values_list("id", flat=True))
-        enrollments = (
-            StudentEnrollment.objects
-            .filter(
-                student_id__in=student_ids,
-                status=StudentEnrollment.STATUS_ACTIVE,
-            )
-            .select_related("class_course")
+        class_course_id = (
+            request.query_params.get("class_course")
+            or request.query_params.get("class_id")
+            or request.query_params.get("klass")
         )
-        class_map = {}
-        for e in enrollments:
-            class_map.setdefault(e.student_id, []).append({
-                "id": str(e.class_course.id),
-                "name": e.class_course.name,
-                "subject": e.class_course.subject,
+        grade_id = request.query_params.get("grade")
+        scope = (request.query_params.get("scope") or "all").lower()
+        q_str = (request.query_params.get("q") or "").strip()
+
+        enroll_qs = StudentEnrollment.objects.filter(
+            status=StudentEnrollment.STATUS_ACTIVE,
+        ).select_related(
+            "student",
+            "class_course",
+            "class_course__teacher",
+            "class_course__grade",
+        )
+
+        # Institution scope (cross-teacher read is allowed within institution)
+        if user.institution_id:
+            enroll_qs = enroll_qs.filter(class_course__institution_id=user.institution_id)
+
+        # Optional: limit to classes this teacher teaches
+        if scope == "mine":
+            enroll_qs = enroll_qs.filter(class_course__teacher=user)
+
+        if class_course_id:
+            enroll_qs = enroll_qs.filter(class_course_id=class_course_id)
+        if grade_id:
+            enroll_qs = enroll_qs.filter(class_course__grade_id=grade_id)
+        if q_str:
+            enroll_qs = enroll_qs.filter(
+                Q(student__first_name__icontains=q_str)
+                | Q(student__last_name__icontains=q_str)
+                | Q(student__email__icontains=q_str)
+            )
+
+        rows = []
+        seen = set()
+        for e in enroll_qs:
+            s = e.student
+            cls = e.class_course
+            # de-dupe across multiple enrollments
+            dedupe_key = (str(s.id), str(cls.id) if cls else None)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+
+            total = StudentAttendance.objects.filter(
+                student=s, class_course=cls
+            ).count()
+            present = StudentAttendance.objects.filter(
+                student=s, class_course=cls,
+                status=StudentAttendance.STATUS_PRESENT,
+            ).count()
+            pct = round((present / total) * 100, 1) if total else 0.0
+
+            full_name = (f"{s.first_name or ''} {s.last_name or ''}").strip() or s.email
+            ct = cls.teacher if cls else None
+            class_teacher_name = (
+                (f"{ct.first_name or ''} {ct.last_name or ''}").strip() or ct.email
+            ) if ct else ""
+
+            rows.append({
+                "id": str(s.id),
+                "enrollment_id": str(e.id),
+                "full_name": full_name,
+                "email": s.email,
+                "roll_number": e.roll_number or "",
+                "class_id": str(cls.id) if cls else None,
+                "class_name": cls.name if cls else "",
+                "class_teacher_id": str(ct.id) if ct else None,
+                "class_teacher_name": class_teacher_name,
+                "attendance_pct": pct,
             })
 
-        # Attach the list to each user object (used by the serializer)
-        students = list(qs)
-        for s in students:
-            setattr(s, "_my_classes", class_map.get(s.id, []))
-
-        serializer = StudentBriefSerializer(students, many=True)
-        return Response({
-            "count": len(students),
-            "results": serializer.data,
-        })
-
+        # Optional: sort by name
+        rows.sort(key=lambda r: r["full_name"].lower())
+        return Response({"count": len(rows), "results": rows})
 
 class TeacherStudentCreateView(APIView):
     """
