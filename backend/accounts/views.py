@@ -200,26 +200,45 @@ class StudentListView(APIView):
 
     Cross-class student directory for teachers.
 
-    Query parameters:
-      class_course -- filter to a single class (UUID)
-      class_id     -- alias for class_course
-      klass        -- alias for class_course
-      grade        -- filter by Grade UUID
-      scope        -- "mine" (teacher's classes) or "all" (institution-wide, default)
-      q            -- search on email / first / last name
+    Query params:
+      class_course / class_id / klass -- filter to a ClassCourse UUID
+      grade                            -- filter by Grade UUID
+      scope                            -- "mine" | "all" (default "all")
+      q                                -- search email / first / last name
 
-    Returns each row with: roll_number, class_name, class_teacher_name, attendance_pct.
-    Teachers see all students in their institution (cross-teacher read).
+    Response:
+      {
+        "count": N,
+        "grades": [{id, name}, ...],       # for the filter dropdown
+        "results": [
+          {
+            "id": <student_uuid>,
+            "enrollment_id": <enrollment_uuid>,
+            "full_name": "...",
+            "email": "...",
+            "roll_number": "",
+            "class_id": <class_uuid or null>,
+            "class_name": "...",
+            "class_teacher_id": <teacher_uuid or null>,
+            "class_teacher_name": "...",
+            "attendance_pct": <float 0-100>
+          }, ...
+        ]
+      }
+
+    All teachers in the same institution can see each other's students
+    (cross-teacher read). Scope is enforced by institution.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         from accounts.models import User, StudentAttendance
         from classes.models import ClassCourse, StudentEnrollment
-        from django.db.models import Q
+        from institutions.models import Grade
+        from collections import defaultdict
 
         user = request.user
-        if user.role != "teacher":
+        if getattr(user, "role", None) != "teacher":
             return Response(
                 {"detail": "Teacher access only."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -234,66 +253,101 @@ class StudentListView(APIView):
         scope = (request.query_params.get("scope") or "all").lower()
         q_str = (request.query_params.get("q") or "").strip()
 
-        enroll_qs = StudentEnrollment.objects.filter(
-            status=StudentEnrollment.STATUS_ACTIVE,
-        ).select_related(
-            "student",
-            "class_course",
-            "class_course__teacher",
-            "class_course__grade",
+        # Enrollments
+        enroll_qs = (
+            StudentEnrollment.objects
+            .filter(status=StudentEnrollment.STATUS_ACTIVE)
+            .select_related(
+                "student",
+                "class_course",
+                "class_course__teacher",
+                "class_course__grade",
+                "class_course__institution",
+            )
         )
 
-        # Institution scope (cross-teacher read is allowed within institution)
+        # Institution scope
         if user.institution_id:
-            enroll_qs = enroll_qs.filter(class_course__institution_id=user.institution_id)
+            enroll_qs = enroll_qs.filter(
+                class_course__institution_id=user.institution_id
+            )
 
-        # Optional: limit to classes this teacher teaches
+        # Optional scope=mine
         if scope == "mine":
             enroll_qs = enroll_qs.filter(class_course__teacher=user)
 
+        # Filters
         if class_course_id:
             enroll_qs = enroll_qs.filter(class_course_id=class_course_id)
         if grade_id:
             enroll_qs = enroll_qs.filter(class_course__grade_id=grade_id)
         if q_str:
+            from django.db.models import Q
             enroll_qs = enroll_qs.filter(
                 Q(student__first_name__icontains=q_str)
                 | Q(student__last_name__icontains=q_str)
                 | Q(student__email__icontains=q_str)
             )
 
-        rows = []
+        # Attendance lookup: (student_id, class_id) -> {total, present}
+        attendance_map = {}
+        student_ids = list({str(e.student_id) for e in enroll_qs})
+        class_ids = list({
+            str(e.class_course_id) for e in enroll_qs if e.class_course_id
+        })
+
+        if student_ids and class_ids:
+            att_rows = (
+                StudentAttendance.objects
+                .filter(
+                    student_id__in=student_ids,
+                    class_course_id__in=class_ids,
+                )
+                .values("student_id", "class_course_id", "status")
+            )
+            counts = defaultdict(lambda: {"total": 0, "present": 0})
+            for r in att_rows:
+                key = (str(r["student_id"]), str(r["class_course_id"]))
+                counts[key]["total"] += 1
+                if r["status"] == StudentAttendance.STATUS_PRESENT:
+                    counts[key]["present"] += 1
+            attendance_map = dict(counts)
+
+        # Build result rows
+        results = []
         seen = set()
         for e in enroll_qs:
             s = e.student
             cls = e.class_course
-            # de-dupe across multiple enrollments
+
             dedupe_key = (str(s.id), str(cls.id) if cls else None)
             if dedupe_key in seen:
                 continue
             seen.add(dedupe_key)
 
-            total = StudentAttendance.objects.filter(
-                student=s, class_course=cls
-            ).count()
-            present = StudentAttendance.objects.filter(
-                student=s, class_course=cls,
-                status=StudentAttendance.STATUS_PRESENT,
-            ).count()
-            pct = round((present / total) * 100, 1) if total else 0.0
+            # Attendance %
+            pct = 0.0
+            if cls:
+                agg = attendance_map.get((str(s.id), str(cls.id)))
+                if agg and agg["total"] > 0:
+                    pct = round((agg["present"] / agg["total"]) * 100, 1)
 
-            full_name = (f"{s.first_name or ''} {s.last_name or ''}").strip() or s.email
+            # Names
+            full_name = (
+                f"{s.first_name or ''} {s.last_name or ''}".strip()
+            ) or s.email
             ct = cls.teacher if cls else None
             class_teacher_name = (
-                (f"{ct.first_name or ''} {ct.last_name or ''}").strip() or ct.email
-            ) if ct else ""
+                (f"{ct.first_name or ''} {ct.last_name or ''}".strip() or ct.email)
+                if ct else ""
+            )
 
-            rows.append({
+            results.append({
                 "id": str(s.id),
                 "enrollment_id": str(e.id),
                 "full_name": full_name,
                 "email": s.email,
-                "roll_number": e.roll_number or "",
+                "roll_number": getattr(e, "roll_number", "") or "",
                 "class_id": str(cls.id) if cls else None,
                 "class_name": cls.name if cls else "",
                 "class_teacher_id": str(ct.id) if ct else None,
@@ -301,9 +355,19 @@ class StudentListView(APIView):
                 "attendance_pct": pct,
             })
 
-        # Optional: sort by name
-        rows.sort(key=lambda r: r["full_name"].lower())
-        return Response({"count": len(rows), "results": rows})
+        results.sort(key=lambda r: r["full_name"].lower())
+
+        # Grades list for the filter dropdown
+        grades_qs = Grade.objects.all()
+        if user.institution_id:
+            grades_qs = grades_qs.filter(institution_id=user.institution_id)
+        grades = [{"id": str(g.id), "name": g.name} for g in grades_qs.order_by("level", "name")]
+
+        return Response({
+            "count": len(results),
+            "grades": grades,
+            "results": results,
+        })
 
 class TeacherStudentCreateView(APIView):
     """

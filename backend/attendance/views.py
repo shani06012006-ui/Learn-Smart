@@ -504,91 +504,168 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
 class TeacherStudentsViewSet(viewsets.ViewSet):
     """
     GET /api/v1/teacher/students/
-    Returns ONLY students actively enrolled in classes the requesting
-    teacher teaches. Groups by grade, tags each student with the classes
-    they're in (for this teacher).
+
+    Institution-wide student directory for teachers.
+
+    Query params:
+      class_course / class_id / klass -- filter to a ClassCourse UUID
+      grade                            -- filter by Grade UUID
+      scope                            -- "mine" | "all" (default "all")
+      q                                -- search email / first / last name
+
+    Response:
+      {
+        "count": N,
+        "grades": [{id, name}, ...],
+        "results": [
+          {
+            "id": <student_uuid>,
+            "enrollment_id": <enrollment_uuid>,
+            "full_name": "...",
+            "email": "...",
+            "roll_number": "",
+            "class_id": <class_uuid or null>,
+            "class_name": "...",
+            "class_teacher_id": <teacher_uuid or null>,
+            "class_teacher_name": "...",
+            "attendance_pct": <float 0-100>
+          }, ...
+        ]
+      }
+
+    Cross-teacher read is allowed within the same institution.
     """
     permission_classes = [IsTeacherOnly]
 
     def list(self, request):
-        from classes.models import StudentEnrollment
-
-        # Filter param: ?grade=<uuid>
-        grade_id = request.query_params.get("grade")
-
-        from accounts.models import TeacherGradeAssignment
+        from accounts.models import User, StudentAttendance
+        from classes.models import ClassCourse, StudentEnrollment
+        from institutions.models import Grade
         from django.db.models import Q
+        from collections import defaultdict
 
-        # 1. Students in grades this teacher handles
-        handled_grade_ids = list(
-            TeacherGradeAssignment.objects
-            .filter(teacher=request.user)
-            .values_list("grade_id", flat=True)
+        user = request.user
+
+        class_course_id = (
+            request.query_params.get("class_course")
+            or request.query_params.get("class_id")
+            or request.query_params.get("klass")
         )
+        grade_id = request.query_params.get("grade")
+        scope = (request.query_params.get("scope") or "all").lower()
+        q_str = (request.query_params.get("q") or "").strip()
 
-        # 2. Students enrolled in classes this teacher teaches
-        enrolled_student_ids = list(
+        enroll_qs = (
             StudentEnrollment.objects
-            .filter(
-                class_course__teacher=request.user,
-                status=StudentEnrollment.STATUS_ACTIVE,
+            .filter(status=StudentEnrollment.STATUS_ACTIVE)
+            .select_related(
+                "student",
+                "class_course",
+                "class_course__teacher",
+                "class_course__grade",
+                "class_course__institution",
             )
-            .values_list("student_id", flat=True)
         )
 
-        # Union
-        from accounts.models import User as _User
-        student_qs = _User.objects.filter(
-            role=getattr(_User, "ROLE_STUDENT", "student"),
-        ).filter(
-            Q(grade_id__in=handled_grade_ids) | Q(id__in=enrolled_student_ids)
-        ).select_related("grade")
+        # Institution scope
+        if user.institution_id:
+            enroll_qs = enroll_qs.filter(
+                class_course__institution_id=user.institution_id
+            )
 
+        # Optional scope=mine
+        if scope == "mine":
+            enroll_qs = enroll_qs.filter(class_course__teacher=user)
+
+        # Filters
+        if class_course_id:
+            enroll_qs = enroll_qs.filter(class_course_id=class_course_id)
         if grade_id:
-            student_qs = student_qs.filter(grade_id=grade_id)
-
-        # Rebuild class list from enrollments (for the "classes" tag on each row)
-        enrollments_by_student = {}
-        for e in (
-            StudentEnrollment.objects
-            .filter(
-                class_course__teacher=request.user,
-                status=StudentEnrollment.STATUS_ACTIVE,
-                student_id__in=[s.id for s in student_qs],
+            enroll_qs = enroll_qs.filter(class_course__grade_id=grade_id)
+        if q_str:
+            enroll_qs = enroll_qs.filter(
+                Q(student__first_name__icontains=q_str)
+                | Q(student__last_name__icontains=q_str)
+                | Q(student__email__icontains=q_str)
             )
-            .select_related("class_course")
-        ):
-            enrollments_by_student.setdefault(e.student_id, []).append({
-                "id": str(e.class_course_id),
-                "name": e.class_course.name,
-                "subject": e.class_course.subject,
-            })
 
-        # Aggregate
-        by_student = {}
-        for s in student_qs.order_by("first_name", "last_name"):
-            by_student[s.id] = {
-                "student": str(s.id),
-                "student_name": _full_name(s),
-                "email": s.email,
-                "grade_id": str(s.grade_id) if s.grade_id else None,
-                "grade_name": s.grade.name if s.grade_id else None,
-                "classes": enrollments_by_student.get(s.id, []),
-            }
-
-        rows = list(by_student.values())
-        rows.sort(key=lambda r: r["student_name"].lower())
-
-        # Grade buckets for the chip filter
-        grades_seen = {}
-        for r in rows:
-            if r["grade_id"]:
-                grades_seen[r["grade_id"]] = r["grade_name"]
-
-        return Response({
-            "count": len(rows),
-            "grades": [{"id": gid, "name": gname}
-                       for gid, gname in sorted(grades_seen.items(), key=lambda x: x[1])],
-            "rows": rows,
+        # Pre-fetch attendance: (student_id, class_id) -> {total, present}
+        attendance_map = {}
+        student_ids = list({str(e.student_id) for e in enroll_qs})
+        class_ids = list({
+            str(e.class_course_id) for e in enroll_qs if e.class_course_id
         })
 
+        if student_ids and class_ids:
+            att_rows = (
+                StudentAttendance.objects
+                .filter(
+                    student_id__in=student_ids,
+                    class_course_id__in=class_ids,
+                )
+                .values("student_id", "class_course_id", "status")
+            )
+            counts = defaultdict(lambda: {"total": 0, "present": 0})
+            for r in att_rows:
+                key = (str(r["student_id"]), str(r["class_course_id"]))
+                counts[key]["total"] += 1
+                if r["status"] == StudentAttendance.STATUS_PRESENT:
+                    counts[key]["present"] += 1
+            attendance_map = dict(counts)
+
+        # Build rows
+        results = []
+        seen = set()
+        for e in enroll_qs:
+            s = e.student
+            cls = e.class_course
+
+            dedupe_key = (str(s.id), str(cls.id) if cls else None)
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+
+            pct = 0.0
+            if cls:
+                agg = attendance_map.get((str(s.id), str(cls.id)))
+                if agg and agg["total"] > 0:
+                    pct = round((agg["present"] / agg["total"]) * 100, 1)
+
+            full_name = (
+                f"{s.first_name or ''} {s.last_name or ''}".strip()
+            ) or s.email
+            ct = cls.teacher if cls else None
+            class_teacher_name = (
+                (f"{ct.first_name or ''} {ct.last_name or ''}".strip() or ct.email)
+                if ct else ""
+            )
+
+            results.append({
+                "id": str(s.id),
+                "enrollment_id": str(e.id),
+                "full_name": full_name,
+                "email": s.email,
+                "roll_number": getattr(e, "roll_number", "") or "",
+                "class_id": str(cls.id) if cls else None,
+                "class_name": cls.name if cls else "",
+                "class_teacher_id": str(ct.id) if ct else None,
+                "class_teacher_name": class_teacher_name,
+                "attendance_pct": pct,
+            })
+
+        results.sort(key=lambda r: r["full_name"].lower())
+
+        # Grades for filter dropdown
+        grades_qs = Grade.objects.all()
+        if user.institution_id:
+            grades_qs = grades_qs.filter(institution_id=user.institution_id)
+        grades = [
+            {"id": str(g.id), "name": g.name}
+            for g in grades_qs.order_by("level", "name")
+        ]
+
+        return Response({
+            "count": len(results),
+            "grades": grades,
+            "results": results,
+        })
