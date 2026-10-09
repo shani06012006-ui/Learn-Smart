@@ -16,9 +16,11 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
         <aside className="relative hidden flex-col justify-between bg-[#f5f5f7] px-12 py-10 lg:flex xl:px-16 xl:py-12">
           {/* Logo */}
           <Link to="/" className="inline-flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-coral-500 to-coral-600 shadow-coral-glow">
-              <span className="text-sm font-black leading-none text-white">M</span>
-            </span>
+            <img
+              src="/learn-smart-logo.png"
+              alt="Learn Smart"
+              className="h-8 w-8 rounded-lg object-contain"
+            />
             <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
               Learn Smart
             </span>
