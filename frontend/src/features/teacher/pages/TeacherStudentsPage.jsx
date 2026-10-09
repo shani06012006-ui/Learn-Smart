@@ -1,6 +1,6 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
 import { useMemo, useState } from "react";
-import { Search, GraduationCap, Users, TrendingUp } from "lucide-react";
+import { Search, GraduationCap, Users, TrendingUp, RefreshCw } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -34,6 +34,12 @@ function MetricCard({ icon: Icon, label, value, tone = "purple" }) {
   );
 }
 
+function initialsOf(name) {
+  const parts = (name || "").split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
 export default function TeacherStudentsPage() {
   const [classId, setClassId] = useState("");
   const [search, setSearch] = useState("");
@@ -51,13 +57,26 @@ export default function TeacherStudentsPage() {
   const { data, isLoading, isError, error, refetch } =
     useGetTeacherStudentsDirectoryQuery(queryArgs);
 
-  const students = data?.results ?? data ?? [];
+  // HARDENED extraction — data may be:
+  //   - undefined (loading)
+  //   - { results: [...] } (paginated)
+  //   - [...] (unpaginated)
+  //   - an error object (403/500) with no results
+  const students = useMemo(() => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.results)) return data.results;
+    if (Array.isArray(data.data)) return data.data;
+    return [];
+  }, [data]);
 
   const metrics = useMemo(() => {
     const total = students.length;
-    const present = students.filter((s) => s.attendance_pct >= 75).length;
+    const present = students.filter((s) => (s.attendance_pct ?? 0) >= 75).length;
     const avgPct = total
-      ? Math.round(students.reduce((sum, s) => sum + (s.attendance_pct || 0), 0) / total)
+      ? Math.round(
+          students.reduce((sum, s) => sum + (s.attendance_pct || 0), 0) / total,
+        )
       : 0;
     return { total, present, avgPct };
   }, [students]);
@@ -75,6 +94,14 @@ export default function TeacherStudentsPage() {
             Class-wise student directory with attendance overview.
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+        >
+          <RefreshCw size={13} />
+          Refresh
+        </button>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -117,7 +144,13 @@ export default function TeacherStudentsPage() {
       )}
 
       {isLoading && <LoadingState label="Loading students…" />}
-      {isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
+
+      {isError && (
+        <ErrorState
+          message={extractErrorMessage(error)}
+          onRetry={refetch}
+        />
+      )}
 
       {!isLoading && !isError && students.length === 0 && (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
@@ -165,11 +198,11 @@ export default function TeacherStudentsPage() {
                     ? "text-amber-600 bg-amber-50"
                     : "text-rose-600 bg-rose-50";
                 return (
-                  <tr key={s.id} className="border-t border-slate-100 hover:bg-slate-50/50">
+                  <tr key={s.id || s.enrollment_id} className="border-t border-slate-100 hover:bg-slate-50/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
-                          {(s.full_name || s.email || "?").slice(0, 1).toUpperCase()}
+                          {initialsOf(s.full_name || s.email)}
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold text-navy-950">
