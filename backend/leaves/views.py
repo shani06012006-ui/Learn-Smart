@@ -231,3 +231,163 @@ class LeaveSummaryView(APIView):
         }
         counts["total"] = sum(counts.values())
         return Response(counts)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Teacher: student leaves from the classes they teach
+# ═══════════════════════════════════════════════════════════════
+
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
+
+from admin_api.serializers import (
+    StudentLeaveReadSerializer,
+    LeaveReviewSerializer,
+)
+
+
+class IsTeacher(IsAuthenticated):
+    """Caller must be a teacher."""
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        return getattr(request.user, "role", None) == "teacher"
+
+
+class TeacherStudentLeavesViewSet(viewsets.GenericViewSet):
+    """
+    Teacher view of student leaves for their own classes.
+
+    GET    /api/v1/teacher/leaves/students/
+    GET    /api/v1/teacher/leaves/students/<id>/
+    POST   /api/v1/teacher/leaves/students/<id>/approve/
+    POST   /api/v1/teacher/leaves/students/<id>/reject/
+    POST   /api/v1/teacher/leaves/students/<id>/cancel/
+
+    Queryset is scoped to StudentLeave rows whose student is
+    actively enrolled in one of the requesting teacher's classes.
+    """
+    permission_classes = [IsTeacher]
+
+    def _scope_queryset(self, qs):
+        return qs.filter(
+            student__enrollments__class_course__teacher=self.request.user,
+            student__enrollments__status="active",
+        ).distinct()
+
+    def get_queryset(self):
+        qs = (
+            StudentLeave.objects.all()
+            .select_related("student", "institution", "reviewer")
+        )
+        qs = self._scope_queryset(qs)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter in {
+            StudentLeave.STATUS_PENDING,
+            StudentLeave.STATUS_APPROVED,
+            StudentLeave.STATUS_REJECTED,
+            StudentLeave.STATUS_CANCELLED,
+        }:
+            qs = qs.filter(status=status_filter)
+
+        leave_type = self.request.query_params.get("leave_type")
+        if leave_type in {
+            StudentLeave.LEAVE_SICK,
+            StudentLeave.LEAVE_CASUAL,
+            StudentLeave.LEAVE_VACATION,
+            StudentLeave.LEAVE_OTHER,
+        }:
+            qs = qs.filter(leave_type=leave_type)
+
+        q = self.request.query_params.get("q")
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(student__email__icontains=q)
+                | Q(student__first_name__icontains=q)
+                | Q(student__last_name__icontains=q)
+            )
+
+        from_str = self.request.query_params.get("from")
+        if from_str:
+            qs = qs.filter(start_date__gte=from_str)
+        to_str = self.request.query_params.get("to")
+        if to_str:
+            qs = qs.filter(end_date__lte=to_str)
+
+        return qs.order_by("-applied_at")
+
+    def get_object(self):
+        pk = self.kwargs["pk"]
+        try:
+            return self.get_queryset().get(pk=pk)
+        except StudentLeave.DoesNotExist:
+            raise NotFound("Student leave not found.")
+
+    def list(self, request):
+        qs = self.get_queryset()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(
+                StudentLeaveReadSerializer(page, many=True).data
+            )
+        return Response(StudentLeaveReadSerializer(qs, many=True).data)
+
+    def retrieve(self, request, pk=None):
+        obj = self.get_object()
+        return Response(StudentLeaveReadSerializer(obj).data)
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != StudentLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be approved.", "status_code": 400}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave.status = StudentLeave.STATUS_APPROVED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status != StudentLeave.STATUS_PENDING:
+            return Response(
+                {"error": {"detail": "Only pending leaves can be rejected.", "status_code": 400}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave.status = StudentLeave.STATUS_REJECTED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        return Response(StudentLeaveReadSerializer(leave).data)
+
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel(self, request, pk=None):
+        leave = self.get_object()
+        if leave.status == StudentLeave.STATUS_CANCELLED:
+            return Response(
+                {"error": {"detail": "Leave is already cancelled.", "status_code": 400}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave.status = StudentLeave.STATUS_CANCELLED
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        return Response(StudentLeaveReadSerializer(leave).data)
+

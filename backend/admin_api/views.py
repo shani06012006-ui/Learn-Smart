@@ -2149,3 +2149,86 @@ class PerformanceTrendView(APIView):
             "timeline": visible,
         })
 
+
+class TeacherPerformanceTrendView(APIView):
+    """
+    GET /api/v1/teacher/dashboard/performance-trend/?period=week|month|term
+    Same shape as PerformanceTrendView but scoped to the requesting teacher's
+    own classes. Teachers see only their students' attendance trends.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from accounts.models import StudentAttendance
+
+        user = request.user
+        if getattr(user, "role", None) != "teacher":
+            return Response(
+                {"detail": "Teacher access only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        period = (request.query_params.get("period") or "month").lower()
+        if period not in ("week", "month", "term"):
+            period = "month"
+
+        counts = {"week": 8, "month": 6, "term": 4}
+        n = counts[period]
+        windows = _trend_periods(period, n + 1)
+
+        base_qs = StudentAttendance.objects.filter(
+            class_course__teacher=user,
+        )
+
+        timeline = []
+        for (label, start, end) in windows:
+            qs = base_qs.filter(date__gte=start, date__lte=end)
+            agg = qs.values("status").annotate(count=Count("id"))
+            counts_map = {row["status"]: row["count"] for row in agg}
+            total = sum(counts_map.values())
+            present = counts_map.get(StudentAttendance.STATUS_PRESENT, 0)
+            rate = round((present / total) * 100, 1) if total else 0.0
+            timeline.append({
+                "label": label,
+                "start": str(start),
+                "end": str(end),
+                "score": rate,
+                "present": present,
+                "absent": counts_map.get(StudentAttendance.STATUS_ABSENT, 0),
+                "late": counts_map.get(StudentAttendance.STATUS_LATE, 0),
+                "excused": counts_map.get(StudentAttendance.STATUS_EXCUSED, 0),
+                "total": total,
+            })
+
+        current = timeline[-1] if timeline else {"score": 0.0, "label": ""}
+        previous = timeline[-2] if len(timeline) >= 2 else {"score": 0.0, "label": ""}
+
+        current_value = current["score"]
+        previous_value = previous["score"]
+        if previous_value > 0:
+            trend_pct = round(((current_value - previous_value) / previous_value) * 100, 1)
+        else:
+            trend_pct = 0.0
+
+        if trend_pct >= 2:
+            direction = "up"
+        elif trend_pct <= -2:
+            direction = "down"
+        else:
+            direction = "flat"
+
+        visible = timeline[-n:] if len(timeline) > n else timeline
+
+        return Response({
+            "period": period,
+            "metric_label": "Attendance Rate",
+            "unit": "%",
+            "direction": direction,
+            "trend_percentage": trend_pct,
+            "current_value": current_value,
+            "previous_value": previous_value,
+            "current_label": current["label"],
+            "previous_label": previous["label"],
+            "timeline": visible,
+        })
+
