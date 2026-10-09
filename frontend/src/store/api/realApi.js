@@ -82,6 +82,46 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Teacher announcements ----
+    getTeacherAnnouncements: builder.query({
+      query: (params = {}) => {
+        const s = new URLSearchParams();
+        if (params.class_course) s.set("class_course", params.class_course);
+        const qs = s.toString();
+        return qs ? `/teacher/announcements/?${qs}` : "/teacher/announcements/";
+      },
+      providesTags: ["TeacherAnnouncements"],
+    }),
+    createTeacherAnnouncement: builder.mutation({
+      query: (body) => ({
+        url: "/teacher/announcements/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["TeacherAnnouncements"],
+    }),
+    updateTeacherAnnouncement: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/teacher/announcements/${id}/`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["TeacherAnnouncements"],
+    }),
+    deleteTeacherAnnouncement: builder.mutation({
+      query: (id) => ({
+        url: `/teacher/announcements/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["TeacherAnnouncements"],
+    }),
+
+    // ---- Teacher: colleagues list (for filter dropdowns) ----
+    getTeacherColleagues: builder.query({
+      query: () => "/teacher/teachers/",
+      providesTags: ["TeacherColleagues"],
+    }),
+
     // ---- Class-wise attendance sheet (spec: /api/v1/attendance/) ----
     getAttendanceSheet: builder.query({
       query: ({ class_id, klass, grade, date }) => {
@@ -1318,6 +1358,12 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetTeacherAnnouncementsQuery,
+  useCreateTeacherAnnouncementMutation,
+  useUpdateTeacherAnnouncementMutation,
+  useDeleteTeacherAnnouncementMutation,
+  useGetTeacherColleaguesQuery,
+
   useGetAttendanceSheetQuery,
   useBulkSaveAttendanceMutation,
   useGetTeacherStudentsDirectoryQuery,

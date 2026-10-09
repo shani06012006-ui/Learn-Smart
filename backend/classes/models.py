@@ -361,3 +361,48 @@ class Material(SoftDeleteModel, TimeStampedModel):
 
     def __str__(self):
         return f"{self.title} ({self.class_course.name})"
+
+
+class Announcement(TimeStampedModel):
+    """
+    A teacher-authored announcement for one of their classes, or for
+    all their classes (class_course is null).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="announcements",
+    )
+    class_course = models.ForeignKey(
+        ClassCourse,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="announcements",
+        help_text="Null = announcement targets all of this teacher's classes.",
+    )
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="announcements",
+    )
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    is_published = models.BooleanField(default=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["teacher"]),
+            models.Index(fields=["class_course"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return self.title
+

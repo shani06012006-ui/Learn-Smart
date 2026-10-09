@@ -13,6 +13,8 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from attendance.views import AttendanceViewSet, TeacherAttendanceViewSet, TeacherStudentsViewSet
+from classes.views import TeacherAnnouncementsViewSet
+from accounts.views import TeacherColleaguesView
 from accounts.student_login import StudentLoginView
 from attendance.student_views import StudentSelfViewSet
 from chat.student_views import StudentChatViewSet, TeacherChatViewSet
@@ -116,6 +118,20 @@ path("api/v1/admin/", include("attendance.urls")),
     path("api/v1/teacher/students/",
          TeacherStudentsViewSet.as_view({"get": "list"}),
          name="teacher-students-list"),
+    path("api/v1/teacher/teachers/",
+         TeacherColleaguesView.as_view(),
+         name="teacher-colleagues"),
+    path("api/v1/teacher/announcements/",
+         TeacherAnnouncementsViewSet.as_view({"get": "list", "post": "create"}),
+         name="teacher-announcements"),
+    path("api/v1/teacher/announcements/<uuid:pk>/",
+         TeacherAnnouncementsViewSet.as_view({
+             "get": "retrieve",
+             "patch": "partial_update",
+             "delete": "destroy",
+         }),
+         name="teacher-announcement-detail"),
+
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),

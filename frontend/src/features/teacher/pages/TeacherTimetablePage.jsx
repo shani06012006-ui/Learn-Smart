@@ -7,7 +7,7 @@ import ErrorState from "../../../components/feedback/ErrorState";
 import { useAuth } from "../../../hooks/useAuth";
 import {
   useGetTimetableQuery,
-  useGetAdminUsersQuery,
+  useGetTeacherColleaguesQuery,
   useGetClassesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
@@ -63,7 +63,7 @@ export default function TeacherTimetablePage() {
   } = useGetTimetableQuery(queryParams);
 
   // Load teachers for the dropdown
-  const { data: teachersData } = useGetAdminUsersQuery({ role: "teacher" });
+  const { data: teachersData } = useGetTeacherColleaguesQuery();
   const teachers = useMemo(() => {
     const list = teachersData?.results ?? teachersData ?? [];
     return list.filter((t) => t.role === "teacher");
