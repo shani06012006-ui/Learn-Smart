@@ -57,7 +57,7 @@ function PageHero() {
             {/* Left — heading */}
             <div>
               <h1 className="font-display text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl md:text-5xl">
-                Eduvi Online
+                Learn Smart Online
                 <br />
                 Book Shop
               </h1>

@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
  *   LEFT  — light grey panel with logo, heading, illustration, carousel dots
  *   RIGHT — white panel with vertical divider, form content (children)
  *
- * Matches the Eduvi reference design.
+ * Matches the Learn Smart reference design.
  */
 export default function AuthLayout({ heading, illustrationSrc, children }) {
   return (
@@ -20,7 +20,7 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
               <span className="text-sm font-black leading-none text-white">M</span>
             </span>
             <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
-              Eduvi
+              Learn Smart
             </span>
           </Link>
 
@@ -99,7 +99,7 @@ export default function AuthLayout({ heading, illustrationSrc, children }) {
               <span className="text-sm font-black leading-none text-white">M</span>
             </span>
             <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
-              Eduvi
+              Learn Smart
             </span>
           </Link>
 

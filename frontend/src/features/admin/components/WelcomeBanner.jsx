@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/components/WelcomeBanner.jsx
+// frontend/src/features/admin/components/WelcomeBanner.jsx
 import { useSelector } from "react-redux";
 import { Sparkles } from "lucide-react";
 
@@ -41,7 +41,7 @@ export default function WelcomeBanner() {
       {/* Eyebrow */}
       <span className="relative inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white/80">
         <Sparkles size={11} className="text-electric-300" />
-        Eduvi Platform
+        Learn Smart Platform
       </span>
 
       <div className="relative mt-4 flex flex-wrap items-start justify-between gap-4">
@@ -50,7 +50,7 @@ export default function WelcomeBanner() {
             {greeting}, <span className="text-coral-300">{displayName}</span>!
           </h1>
           <p className="mt-2 max-w-xl text-sm text-white/70">
-            Here&rsquo;s what&rsquo;s happening across Eduvi today.
+            Here&rsquo;s what&rsquo;s happening across Learn Smart today.
           </p>
         </div>
         <p className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/70 backdrop-blur">

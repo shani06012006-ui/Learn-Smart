@@ -97,7 +97,7 @@ function PageHero() {
           <div className="relative z-10 grid grid-cols-1 items-center gap-10 md:grid-cols-2">
             <div>
               <h1 className="font-display text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl md:text-5xl">
-                Eduvi Courses
+                Learn Smart Courses
                 <br />
                 For All Standards
               </h1>
