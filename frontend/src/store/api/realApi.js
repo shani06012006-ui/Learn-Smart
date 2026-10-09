@@ -82,6 +82,15 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Admin: purge stale sessions ----
+    purgeStaleSessions: builder.mutation({
+      query: () => ({
+        url: `/admin/sessions/purge-stale/`,
+        method: "POST",
+      }),
+      invalidatesTags: ["AdminSessions"],
+    }),
+
     // ---- Admin: student performance trend (attendance-based) ----
     getAdminPerformanceTrend: builder.query({
       query: ({ period = "month" } = {}) => ({
@@ -1254,4 +1263,6 @@ export const {
   useCancelTeacherLeaveMutation,
   useDeactivateAdminTimetableMutation,
 
+
+  usePurgeStaleSessionsMutation,
 } = realApi;

@@ -775,6 +775,39 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
 
         return Response(AdminRefreshTokenSerializer(session).data)
 
+    @action(detail=False, methods=["post"], url_path="purge-stale")
+    def purge_stale(self, request):
+        """
+        POST /api/v1/admin/sessions/purge-stale/
+        Deletes RefreshToken rows that are:
+          - revoked (revoked_at set) AND
+          - older than 7 days since revocation
+        OR
+          - expired (expires_at < now - 7 days)
+        Preserves all active and recent sessions.
+        Returns { deleted: N }
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        from accounts.models import RefreshToken
+
+        user = request.user
+        cutoff = timezone.now() - timedelta(days=7)
+
+        # Base: everyone's tokens, scoped to institution for non-superusers
+        qs = RefreshToken.objects.all()
+        if not user.is_superuser:
+            qs = qs.filter(user__institution=user.institution)
+
+        # Revoked long ago OR expired long ago
+        qs = qs.filter(
+            Q(revoked_at__lt=cutoff)
+            | Q(revoked_at__isnull=True, expires_at__lt=cutoff)
+        )
+        deleted = qs.count()
+        qs.delete()
+
+        return Response({"deleted": deleted}, status=status.HTTP_200_OK)
 
 class InstitutionCourseViewSet(viewsets.GenericViewSet):
 
