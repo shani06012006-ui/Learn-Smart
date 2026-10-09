@@ -613,6 +613,16 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
                     counts[key]["present"] += 1
             attendance_map = dict(counts)
 
+        # Prefetch student PINs (login codes) for this page of students
+        from accounts.models import StudentCredentials
+        pin_map = {}
+        pin_active_map = {}
+        all_student_ids = list({str(e.student_id) for e in enroll_qs})
+        if all_student_ids:
+            for cred in StudentCredentials.objects.filter(student_id__in=all_student_ids):
+                pin_map[str(cred.student_id)] = cred.pin or ""
+                pin_active_map[str(cred.student_id)] = bool(cred.is_active)
+
         # Build rows
         results = []
         seen = set()
@@ -651,6 +661,8 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
                 "class_teacher_id": str(ct.id) if ct else None,
                 "class_teacher_name": class_teacher_name,
                 "attendance_pct": pct,
+                "student_pin": pin_map.get(str(s.id), ""),
+                "student_pin_active": pin_active_map.get(str(s.id), False),
             })
 
         results.sort(key=lambda r: r["full_name"].lower())

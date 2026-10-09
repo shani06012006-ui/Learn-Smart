@@ -178,6 +178,9 @@ export default function TeacherStudentsPage() {
                   Roll #
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Student PIN
+                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Class
                 </th>
                 <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -214,6 +217,20 @@ export default function TeacherStudentsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">
                       {s.roll_number || <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      {s.student_pin ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-1 font-mono text-xs font-bold text-purple-700 ring-1 ring-purple-100">
+                          {s.student_pin}
+                          {s.student_pin_active === false && (
+                            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
+                              inactive
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300">No PIN</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-600">
                       {s.class_name || <span className="text-slate-300">—</span>}
