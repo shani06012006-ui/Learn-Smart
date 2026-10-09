@@ -1,9 +1,15 @@
 import { Link } from "react-router-dom";
-import { CalendarDays, Clock, MapPin, ArrowRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { CalendarDays, Clock, MapPin, ArrowRight, User, Users } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
-import { useGetTimetableQuery } from "../../../store/api/realApi";
+import { useAuth } from "../../../hooks/useAuth";
+import {
+  useGetTimetableQuery,
+  useGetAdminUsersQuery,
+  useGetClassesQuery,
+} from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
 const DAYS = [
@@ -35,13 +41,40 @@ function durationLabel(start, end) {
 }
 
 export default function TeacherTimetablePage() {
+  const { user } = useAuth();
+  const [scope, setScope] = useState("all");        // "all" | "mine"
+  const [teacherFilter, setTeacherFilter] = useState("");  // teacher UUID
+  const [classFilter, setClassFilter] = useState("");
+
+  const queryParams = useMemo(() => {
+    const p = {};
+    if (scope === "mine") p.mine = true;
+    if (teacherFilter) p.teacher = teacherFilter;
+    if (classFilter) p.class_id = classFilter;
+    return p;
+  }, [scope, teacherFilter, classFilter]);
+
   const {
     data: entriesData,
     isLoading,
     isError,
     error,
     refetch,
-  } = useGetTimetableQuery();
+  } = useGetTimetableQuery(queryParams);
+
+  // Load teachers for the dropdown
+  const { data: teachersData } = useGetAdminUsersQuery({ role: "teacher" });
+  const teachers = useMemo(() => {
+    const list = teachersData?.results ?? teachersData ?? [];
+    return list.filter((t) => t.role === "teacher");
+  }, [teachersData]);
+
+  // Load classes for the dropdown
+  const { data: classesData } = useGetClassesQuery();
+  const classes = useMemo(() => {
+    const list = classesData?.results ?? classesData ?? [];
+    return list;
+  }, [classesData]);
 
   if (isLoading) return <LoadingState label="Loading timetable..." />;
   if (isError) {
@@ -74,7 +107,7 @@ export default function TeacherTimetablePage() {
             Timetable
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Your weekly class schedule.
+            Full institution timetable — every class, every teacher.
           </p>
         </div>
 
@@ -96,6 +129,74 @@ export default function TeacherTimetablePage() {
           </div>
         )}
       </header>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
+        <div className="flex items-center gap-1 rounded-full bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => { setScope("all"); setTeacherFilter(""); }}
+            className={
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition " +
+              (scope === "all"
+                ? "bg-purple-500 text-white shadow-purple-glow"
+                : "text-slate-500 hover:text-navy-950")
+            }
+          >
+            <Users size={12} />
+            All Teachers
+          </button>
+          <button
+            type="button"
+            onClick={() => { setScope("mine"); setTeacherFilter(""); }}
+            className={
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition " +
+              (scope === "mine"
+                ? "bg-purple-500 text-white shadow-purple-glow"
+                : "text-slate-500 hover:text-navy-950")
+            }
+          >
+            <User size={12} />
+            My Slots
+          </button>
+        </div>
+
+        {scope === "all" && (
+          <select
+            value={teacherFilter}
+            onChange={(e) => setTeacherFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+          >
+            <option value="">All teachers</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.full_name || t.email}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <select
+          value={classFilter}
+          onChange={(e) => setClassFilter(e.target.value)}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+        >
+          <option value="">All classes</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+
+        {(teacherFilter || classFilter || scope === "mine") && (
+          <button
+            type="button"
+            onClick={() => { setScope("all"); setTeacherFilter(""); setClassFilter(""); }}
+            className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {entries.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
@@ -181,7 +282,12 @@ export default function TeacherTimetablePage() {
                           {classId ? (
                             <Link
                               to={`/teacher/classes/${classId}`}
-                              className="group block rounded-xl border border-slate-100 bg-slate-50/60 p-3 transition hover:border-purple-200 hover:bg-purple-50/50"
+                              className={
+                                "group block rounded-xl border bg-slate-50/60 p-3 transition hover:border-purple-200 hover:bg-purple-50/50 " +
+                                (e.teacher?.id === user?.id
+                                  ? "border-purple-200 ring-1 ring-purple-100"
+                                  : "border-slate-100")
+                              }
                             >
                               {Inner}
                               <ArrowRight
