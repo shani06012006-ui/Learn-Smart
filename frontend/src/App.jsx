@@ -55,6 +55,7 @@ import TeacherMaterialsPage from "./features/teacher/pages/TeacherMaterialsPage"
 import TeacherStudentsPage from "./features/teacher/pages/TeacherStudentsPage";
 import TeacherLeavesPage from "./features/teacher/pages/TeacherLeavesPage";
 import TeacherQuizzesPage from "./features/teacher/pages/TeacherQuizzesPage";
+import TeacherAnnouncementsPage from "./features/teacher/pages/TeacherAnnouncementsPage";
 import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -155,7 +156,7 @@ export default function App() {
             <Route path="leaves" element={<TeacherLeavesPage />} />
               <Route path="quizzes" element={<TeacherQuizzesPage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
-            <Route path="announcements" element={<TeacherPlaceholder title="Announcements" />} />
+            <Route path="announcements" element={<TeacherAnnouncementsPage />} />
             <Route path="live-classes" element={<TeacherPlaceholder title="Live Classes" />} />
           </Route>
         </Route>

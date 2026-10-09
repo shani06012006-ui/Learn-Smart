@@ -1,15 +1,16 @@
 import mimetypes
 
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions, status
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
 from core.permissions import IsTeacher
 
 from . import services
-from .models import ClassCourse, Material, StudentEnrollment
+from .models import Announcement, ClassCourse, Material, StudentEnrollment
 from .permissions import CanViewClass, IsClassOwner
 from .serializers import (
     AddStudentSerializer,
@@ -404,4 +405,158 @@ class MaterialListView(APIView):
             "count": qs.count(),
             "results": serializer.data,
         })
+
+
+# ============================================================
+# Announcements — teacher CRUD
+# ============================================================
+
+class TeacherAnnouncementsViewSet(viewsets.GenericViewSet):
+    """
+    Teacher-authored announcements.
+
+    GET    /api/v1/teacher/announcements/            — list own
+    POST   /api/v1/teacher/announcements/            — create
+    GET    /api/v1/teacher/announcements/<id>/       — retrieve
+    PATCH  /api/v1/teacher/announcements/<id>/       — update
+    DELETE /api/v1/teacher/announcements/<id>/       — delete
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def get_queryset(self):
+        user = self.request.user
+        if getattr(user, "role", None) != "teacher":
+            return Announcement.objects.none()
+        qs = Announcement.objects.filter(teacher=user).select_related(
+            "class_course", "teacher"
+        )
+        class_id = self.request.query_params.get("class_course")
+        if class_id:
+            qs = qs.filter(class_course_id=class_id)
+        return qs.order_by("-created_at")
+
+    def _serialize(self, obj):
+        return {
+            "id": str(obj.id),
+            "title": obj.title,
+            "body": obj.body,
+            "is_published": obj.is_published,
+            "published_at": obj.published_at.isoformat() if obj.published_at else None,
+            "created_at": obj.created_at.isoformat(),
+            "updated_at": obj.updated_at.isoformat(),
+            "class_course": str(obj.class_course_id) if obj.class_course_id else None,
+            "class_name": obj.class_course.name if obj.class_course else None,
+            "teacher_id": str(obj.teacher_id),
+            "teacher_name": (
+                f"{obj.teacher.first_name or ''} {obj.teacher.last_name or ''}".strip()
+                or obj.teacher.email
+            ),
+        }
+
+    def list(self, request):
+        if getattr(request.user, "role", None) != "teacher":
+            return Response(
+                {"detail": "Teacher access only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        qs = self.get_queryset()
+        return Response({"count": qs.count(), "results": [self._serialize(a) for a in qs]})
+
+    def retrieve(self, request, pk=None):
+        try:
+            obj = self.get_queryset().get(pk=pk)
+        except Announcement.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(self._serialize(obj))
+
+    def create(self, request):
+        if getattr(request.user, "role", None) != "teacher":
+            return Response(
+                {"detail": "Teacher access only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        title = (request.data.get("title") or "").strip()
+        body = (request.data.get("body") or "").strip()
+        class_course_id = request.data.get("class_course") or None
+        is_published = bool(request.data.get("is_published", True))
+
+        if not title or not body:
+            return Response(
+                {"detail": "Both title and body are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate class belongs to this teacher
+        cls = None
+        if class_course_id:
+            try:
+                cls = ClassCourse.objects.get(id=class_course_id, teacher=request.user)
+            except ClassCourse.DoesNotExist:
+                return Response(
+                    {"detail": "Class not found or not yours."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        from django.utils import timezone as _tz
+        obj = Announcement.objects.create(
+            teacher=request.user,
+            institution=getattr(request.user, "institution", None),
+            class_course=cls,
+            title=title,
+            body=body,
+            is_published=is_published,
+            published_at=_tz.now() if is_published else None,
+        )
+        return Response(self._serialize(obj), status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        try:
+            obj = self.get_queryset().get(pk=pk)
+        except Announcement.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if "title" in request.data:
+            title = (request.data.get("title") or "").strip()
+            if not title:
+                return Response(
+                    {"detail": "Title cannot be empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            obj.title = title
+        if "body" in request.data:
+            body = (request.data.get("body") or "").strip()
+            if not body:
+                return Response(
+                    {"detail": "Body cannot be empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            obj.body = body
+        if "class_course" in request.data:
+            cid = request.data.get("class_course") or None
+            if cid:
+                try:
+                    obj.class_course = ClassCourse.objects.get(id=cid, teacher=request.user)
+                except ClassCourse.DoesNotExist:
+                    return Response(
+                        {"detail": "Class not found or not yours."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                obj.class_course = None
+        if "is_published" in request.data:
+            obj.is_published = bool(request.data.get("is_published"))
+            from django.utils import timezone as _tz
+            obj.published_at = _tz.now() if obj.is_published else None
+
+        obj.save()
+        return Response(self._serialize(obj))
+
+    def destroy(self, request, pk=None):
+        try:
+            obj = self.get_queryset().get(pk=pk)
+        except Announcement.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 

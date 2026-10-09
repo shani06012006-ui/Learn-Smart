@@ -541,3 +541,46 @@ class VerifyOTPView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+class TeacherColleaguesView(APIView):
+    """
+    GET /api/v1/teacher/teachers/
+
+    Returns teachers in the requesting teacher's institution for
+    building filter dropdowns (e.g. timetable, student directory).
+    Read-only, no PII beyond name/email/id.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from accounts.models import User
+
+        user = request.user
+        if getattr(user, "role", None) != "teacher":
+            return Response(
+                {"detail": "Teacher access only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        qs = User.objects.filter(
+            role=getattr(User, "ROLE_TEACHER", "teacher"),
+            is_active=True,
+        ).order_by("first_name", "last_name", "email")
+
+        if user.institution_id:
+            qs = qs.filter(institution_id=user.institution_id)
+
+        results = []
+        for u in qs:
+            full_name = (f"{u.first_name or ''} {u.last_name or ''}").strip() or u.email
+            results.append({
+                "id": str(u.id),
+                "email": u.email,
+                "first_name": u.first_name or "",
+                "last_name": u.last_name or "",
+                "full_name": full_name,
+                "role": "teacher",
+            })
+
+        return Response({"count": len(results), "results": results})
+
