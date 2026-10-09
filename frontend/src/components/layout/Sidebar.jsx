@@ -81,7 +81,7 @@ export default function Sidebar({ role }) {
             </span>
             <div>
               <p className="font-display text-sm font-extrabold text-navy-950">
-                Eduvi
+                Learn Smart
               </p>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                 {role === "teacher" ? "Teacher" : "Student"}

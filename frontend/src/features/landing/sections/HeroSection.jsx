@@ -1,4 +1,4 @@
-﻿// frontend/src/features/landing/sections/HeroSection.jsx
+// frontend/src/features/landing/sections/HeroSection.jsx
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
@@ -111,7 +111,7 @@ export default function HeroSection() {
                 <span aria-hidden className="absolute inset-x-0 bottom-0.5 -z-0 h-3 bg-coral-200/60" />
               </span>{" "}
               by online courses with{" "}
-              <span className="text-coral-500">Eduvi</span>
+              <span className="text-coral-500">Learn Smart</span>
             </motion.h1>
 
             {/* Body */}
@@ -121,7 +121,7 @@ export default function HeroSection() {
               transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
               className="mt-6 max-w-xl text-base leading-relaxed text-slate-500"
             >
-              Eduvi is a Global training provider based across the UK that specialises in
+              Learn Smart is a Global training provider based across the UK that specialises in
               accredited and bespoke training courses. We crush the barriers to gaining a
               degree.
             </motion.p>

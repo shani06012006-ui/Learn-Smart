@@ -1,4 +1,4 @@
-﻿// frontend/src/features/blogs/BlogsPage.jsx
+// frontend/src/features/blogs/BlogsPage.jsx
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useInView } from "framer-motion";
@@ -57,7 +57,7 @@ function PageHero() {
                 Insights & guides
               </span>
               <h1 className="mt-4 font-display text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl md:text-5xl">
-                The Eduvi
+                The Learn Smart
                 <br />
                 Learning Blog
               </h1>

@@ -50,7 +50,7 @@ export default function RegisterPage() {
       heading={
         <>
           Welcome to{" "}
-          <span className="text-coral-500">Eduvi</span> Online Learning Platform
+          <span className="text-coral-500">Learn Smart</span> Online Learning Platform
         </>
       }
       illustrationSrc=""

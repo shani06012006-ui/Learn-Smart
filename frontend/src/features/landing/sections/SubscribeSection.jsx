@@ -138,7 +138,7 @@ export default function SubscribeSection() {
               transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
               className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/60 sm:text-base"
             >
-              20k+ students daily learn with Eduvi. Subscribe for new courses.
+              20k+ students daily learn with Learn Smart. Subscribe for new courses.
             </motion.p>
 
             {/* Form */}
