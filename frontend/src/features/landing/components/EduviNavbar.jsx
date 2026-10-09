@@ -20,9 +20,11 @@ function EduviLogo() {
   return (
     <Link to="/" className="flex items-center gap-2" aria-label="Learn Smart home">
       {/* HERE IS YOUR IMAGE — logo mark — paste a URL over the gradient below */}
-      <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-coral-500 to-coral-600 shadow-coral-glow">
-        <span className="text-sm font-black leading-none text-white">M</span>
-      </span>
+      <img
+        src="/learn-smart-logo.png"
+        alt="Learn Smart"
+        className="h-8 w-8 rounded-lg object-contain"
+      />
       <span className="font-display text-lg font-extrabold tracking-tight text-navy-950">
         Learn Smart
       </span>

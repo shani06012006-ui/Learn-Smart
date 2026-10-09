@@ -76,9 +76,11 @@ export default function Sidebar({ role }) {
         {/* Brand */}
         <div className="border-b border-slate-100 px-5 py-5">
           <Link to={role === "teacher" ? "/teacher" : "/student"} className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 shadow-purple-glow">
-              <span className="text-sm font-black leading-none text-white">E</span>
-            </span>
+            <img
+              src="/learn-smart-logo.png"
+              alt="Learn Smart"
+              className="h-9 w-9 rounded-lg object-contain"
+            />
             <div>
               <p className="font-display text-sm font-extrabold text-navy-950">
                 Learn Smart
