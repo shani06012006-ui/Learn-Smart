@@ -89,6 +89,12 @@ class StudentEnrollment(TimeStampedModel):
     joining_code = models.CharField(max_length=6, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
     joined_at = models.DateTimeField(null=True, blank=True)
+    roll_number = models.CharField(
+        max_length=32,
+        blank=True,
+        db_index=True,
+        help_text="Optional human-readable roll number (e.g. STU-2026-001, or just 01).",
+    )
 
     # StudentEnrollment is never soft-deleted, so `objects` and `all_objects`
     # are identical here — `all_objects` exists purely so

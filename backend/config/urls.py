@@ -12,12 +12,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
-from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
+from attendance.views import AttendanceViewSet, TeacherAttendanceViewSet, TeacherStudentsViewSet
 from accounts.student_login import StudentLoginView
 from attendance.student_views import StudentSelfViewSet
 from chat.student_views import StudentChatViewSet, TeacherChatViewSet
 from admin_api.views import PerformanceTrendView, TeacherPerformanceTrendView
 from leaves.views import TeacherStudentLeavesViewSet
+from quizzes.views import StudentQuizListView
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -61,6 +62,16 @@ urlpatterns = [
          StudentChatViewSet.as_view({"post": "dm"}), name="student-chat-dm"),
     path("api/v1/student/chat/rooms/teachers/",
          StudentChatViewSet.as_view({"get": "teachers"}), name="student-chat-teachers"),
+    path("api/v1/student/quizzes/",
+         StudentQuizListView.as_view(),
+         name="student-quizzes"),
+    # Top-level attendance endpoints (spec-friendly aliases)
+    path("api/v1/attendance/",
+         AttendanceViewSet.as_view({"get": "list"}),
+         name="attendance-list"),
+    path("api/v1/attendance/bulk-save/",
+         AttendanceViewSet.as_view({"post": "bulk_save"}),
+         name="attendance-bulk-save"),
     # teacher: student leaves for own classes
     path("api/v1/teacher/leaves/students/",
          TeacherStudentLeavesViewSet.as_view({"get": "list"}),
@@ -109,6 +120,7 @@ path("api/v1/admin/", include("attendance.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),
     path("api/v1/leaves/", include("leaves.urls")),
+    path("api/v1/quizzes/", include("quizzes.urls")),
 ]
 
 if settings.DEBUG:

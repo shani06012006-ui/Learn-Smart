@@ -14,6 +14,8 @@ import {
   ShieldOff,
   ShieldCheck,
   X,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
@@ -26,6 +28,7 @@ import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import GradeFormModal from "../components/GradeFormModal";
 import AddStudentToGradeModal from "../components/AddStudentToGradeModal";
 import AttachClassToGradeModal from "../components/AttachClassToGradeModal";
+import AssignClassTeacherModal from "../components/AssignClassTeacherModal";
 import {
   useGetGradeQuery,
   useGetAdminUsersQuery,
@@ -108,6 +111,7 @@ export default function AdminGradeDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [addStudentsOpen, setAddStudentsOpen] = useState(false);
   const [attachClassOpen, setAttachClassOpen] = useState(false);
+  const [assignTeacherFor, setAssignTeacherFor] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
   const {
@@ -465,11 +469,41 @@ export default function AdminGradeDetailPage() {
                   <span className="hidden text-xs font-semibold text-slate-500 sm:inline">
                     {c.student_count ?? 0} student{(c.student_count ?? 0) === 1 ? "" : "s"}
                   </span>
+                  {c.teacher?.full_name ? (
+                    <div className="hidden items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-1.5 sm:flex">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">
+                        {(c.teacher.full_name || "?")
+                          .split(/\s+/)
+                          .slice(0, 2)
+                          .map((w) => w[0])
+                          .join("")
+                          .toUpperCase()}
+                      </span>
+                      <div className="text-left leading-tight">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                          Class Teacher
+                        </p>
+                        <p className="text-xs font-semibold text-emerald-900">
+                          {c.teacher.full_name}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="hidden items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 sm:inline-flex">
+                      <AlertTriangle size={12} />
+                      No Class Teacher Assigned
+                    </span>
+                  )}
                   <Badge variant={c.is_archived ? "neutral" : "success"}>
                     {c.is_archived ? "Archived" : "Active"}
                   </Badge>
                   <RowMenu
                     items={[
+                      {
+                        label: c.teacher?.full_name ? "Change Class Teacher" : "Assign Class Teacher",
+                        icon: UserCheck,
+                        onClick: () => setAssignTeacherFor(c),
+                      },
                       {
                         label: "Detach from grade",
                         icon: X,
@@ -490,6 +524,16 @@ export default function AdminGradeDetailPage() {
         onClose={() => setEditOpen(false)}
         grade={grade}
         onSuccess={() => refetchGrade()}
+      />
+
+      <AssignClassTeacherModal
+        open={Boolean(assignTeacherFor)}
+        onClose={() => setAssignTeacherFor(null)}
+        klass={assignTeacherFor}
+        onSuccess={() => {
+          setAssignTeacherFor(null);
+          refetchGrade();
+        }}
       />
 
       <AddStudentToGradeModal

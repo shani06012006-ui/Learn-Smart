@@ -49,7 +49,11 @@ def _resolve_target(request):
     Raises Response on error.
     """
     grade_id = request.query_params.get("grade")
-    klass_id = request.query_params.get("klass")
+    klass_id = (
+        request.query_params.get("klass")
+        or request.query_params.get("class_course")
+        or request.query_params.get("class_id")
+    )
 
     if not grade_id and not klass_id:
         return None, None, Response(
@@ -125,6 +129,17 @@ def _roster_rows(grade, klass, date_str):
     return rows
 
 
+def _roll_number_for(student, klass):
+    """Return the student's roll_number for a given class enrollment, or ''."""
+    if not klass:
+        return ""
+    try:
+        enroll = student.enrollments.filter(class_course=klass).first()
+        return enroll.roll_number if enroll else ""
+    except Exception:
+        return ""
+
+
 def _record_rows(grade, klass, date_str):
     """Return ONLY saved records. Used by admin view."""
     if grade:
@@ -132,7 +147,7 @@ def _record_rows(grade, klass, date_str):
     else:
         qs = StudentAttendance.objects.filter(class_course=klass, date=date_str)
 
-    qs = qs.select_related("student", "marked_by").order_by(
+    qs = qs.select_related("student", "marked_by", "class_course").order_by(
         "student__first_name", "student__last_name"
     )
 
@@ -141,16 +156,39 @@ def _record_rows(grade, klass, date_str):
         rows.append({
             "student": str(a.student_id),
             "student_name": _full_name(a.student),
+            "roll_number": _roll_number_for(a.student, a.class_course) if a.class_course else "",
             "status": a.status,
             "note": a.note or "",
             "record_id": str(a.id),
             "marked_by": (
                 _full_name(a.marked_by) if a.marked_by else None
             ),
+            "marked_by_id": str(a.marked_by_id) if a.marked_by_id else None,
             "marked_at": a.updated_at.isoformat() if a.updated_at else None,
             "source": a.source,
         })
     return rows
+
+
+def _submitted_meta(grade, klass, date_str):
+    """
+    Return {teacher_name, teacher_id, submitted_at} for the given target+date,
+    based on the most recent marked_by on any record. None if no records.
+    """
+    if grade:
+        qs = StudentAttendance.objects.filter(grade=grade, date=date_str)
+    elif klass:
+        qs = StudentAttendance.objects.filter(class_course=klass, date=date_str)
+    else:
+        return None
+    rec = qs.select_related("marked_by").order_by("-updated_at").first()
+    if not rec or not rec.marked_by:
+        return None
+    return {
+        "teacher_id": str(rec.marked_by_id),
+        "teacher_name": _full_name(rec.marked_by),
+        "submitted_at": rec.updated_at.isoformat() if rec.updated_at else None,
+    }
 
 
 def _bulk_mark(grade, klass, date_obj, records, marked_by):
@@ -243,15 +281,25 @@ class AttendanceViewSet(viewsets.ViewSet):
             return err
 
         rows = _record_rows(grade, klass, date_str)
+        class_teacher_name = None
+        if klass and klass.teacher_id:
+            class_teacher_name = _full_name(klass.teacher)
         return Response({
             "grade": str(grade.id) if grade else None,
             "grade_name": grade.name if grade else None,
             "klass": str(klass.id) if klass else None,
             "klass_name": klass.name if klass else None,
+            "class_teacher_name": class_teacher_name,
             "date": date_str,
             "count": len(rows),
             "rows": rows,
+            "submitted": _submitted_meta(grade, klass, date_str),
         })
+
+    @action(detail=False, methods=["post"], url_path="bulk-save")
+    def bulk_save(self, request):
+        """Alias for `mark` — spec-friendly URL."""
+        return self.mark(request)
 
     @action(detail=False, methods=["post"], url_path="mark")
     def mark(self, request):

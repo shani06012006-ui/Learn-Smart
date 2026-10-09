@@ -164,16 +164,7 @@ export default function TeacherClassesPage() {
   const [updateClass, { isLoading: updating }] = useUpdateClassMutation();
   const [deleteClass, { isLoading: deleting }] = useDeleteClassMutation();
 
-  if (isLoading) return <LoadingState label="Loading your classes..." />;
-  if (isError) {
-    return (
-      <ErrorState
-        message={extractErrorMessage(error)}
-        onRetry={refetch}
-      />
-    );
-  }
-
+  // ── ALL HOOKS FIRST — no early returns above these ──
   const classes = classesData?.results ?? classesData ?? [];
   const activeClasses = classes.filter((c) => !c.is_archived);
   const archivedClasses = classes.filter((c) => c.is_archived);
@@ -192,6 +183,17 @@ export default function TeacherClassesPage() {
     }
     return Array.from(byGrade.values()).sort((a, b) => a.level - b.level);
   }, [activeClasses]);
+
+  // ── NOW the early returns — safe, no hooks below this line ──
+  if (isLoading) return <LoadingState label="Loading your classes..." />;
+  if (isError) {
+    return (
+      <ErrorState
+        message={extractErrorMessage(error)}
+        onRetry={refetch}
+      />
+    );
+  }
 
   function handleCreate() {
     setEditing(null);
