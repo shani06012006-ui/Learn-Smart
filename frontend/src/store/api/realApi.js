@@ -82,6 +82,15 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+    // ---- Admin: student performance trend (attendance-based) ----
+    getAdminPerformanceTrend: builder.query({
+      query: ({ period = "month" } = {}) => ({
+        url: `/admin/dashboard/performance-trend/`,
+        params: { period },
+      }),
+      providesTags: ["AdminStats"],
+    }),
+
     // ---- Passwordless email OTP ----
     requestOtp: builder.mutation({
       query: (body) => ({
@@ -1136,6 +1145,8 @@ export const realApi = createApi({
 });
 
 export const {
+  useGetAdminPerformanceTrendQuery,
+
   useVerifyOtpMutation,
   useRequestOtpMutation,
   useSendTeacherChatMessageMutation,

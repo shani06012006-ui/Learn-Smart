@@ -1974,3 +1974,145 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
 
         return Response(TeacherLeaveReadSerializer(leave).data)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Admin: performance trend (attendance-based)
+# ═══════════════════════════════════════════════════════════════
+
+def _trend_periods(period, count):
+    """
+    Return list of (label, start_date, end_date) tuples for the last N
+    periods ending today. Period is 'week' | 'month' | 'term'.
+    """
+    from datetime import date, timedelta
+    import calendar
+
+    today = date.today()
+    out = []
+
+    if period == "week":
+        # Start of current week (Monday)
+        monday = today - timedelta(days=today.weekday())
+        for i in range(count - 1, -1, -1):
+            start = monday - timedelta(weeks=i)
+            end = start + timedelta(days=6)
+            out.append((f"Wk {start.isocalendar()[1]}", start, end))
+
+    elif period == "term":
+        # Group by calendar quarter
+        q = (today.month - 1) // 3 + 1
+        year = today.year
+        for i in range(count - 1, -1, -1):
+            qq = q - i
+            yy = year
+            while qq <= 0:
+                qq += 4
+                yy -= 1
+            start_month = (qq - 1) * 3 + 1
+            end_month = start_month + 2
+            start = date(yy, start_month, 1)
+            last_day = calendar.monthrange(yy, end_month)[1]
+            end = date(yy, end_month, last_day)
+            out.append((f"Q{qq} {yy}", start, end))
+
+    else:  # "month"
+        for i in range(count - 1, -1, -1):
+            m = today.month - i
+            y = today.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            start = date(y, m, 1)
+            last_day = calendar.monthrange(y, m)[1]
+            end = date(y, m, last_day)
+            out.append((start.strftime("%b %Y"), start, end))
+
+    return out
+
+
+class PerformanceTrendView(APIView):
+    """
+    GET /api/v1/admin/dashboard/performance-trend/?period=week|month|term
+
+    Returns the attendance-rate trend (% present) over the last N periods
+    plus a growth % vs the previous period and a direction indicator.
+
+    Data is derived from StudentAttendance, scoped to the caller's institution.
+    """
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
+    def get(self, request):
+        from datetime import date, timedelta
+        from accounts.models import StudentAttendance
+
+        period = (request.query_params.get("period") or "month").lower()
+        if period not in ("week", "month", "term"):
+            period = "month"
+
+        # How many buckets to show
+        counts = {"week": 8, "month": 6, "term": 4}
+        n = counts[period]
+        # Need N + 1 buckets so we can compare the last one vs the previous
+        windows = _trend_periods(period, n + 1)
+
+        user = request.user
+        base_qs = StudentAttendance.objects.all()
+        if not user.is_superuser:
+            base_qs = base_qs.filter(class_course__institution=user.institution)
+
+        timeline = []
+        for (label, start, end) in windows:
+            qs = base_qs.filter(date__gte=start, date__lte=end)
+            agg = qs.values("status").annotate(count=Count("id"))
+            counts_map = {row["status"]: row["count"] for row in agg}
+            total = sum(counts_map.values())
+            present = counts_map.get(StudentAttendance.STATUS_PRESENT, 0)
+            rate = round((present / total) * 100, 1) if total else 0.0
+            timeline.append({
+                "label": label,
+                "start": str(start),
+                "end": str(end),
+                "score": rate,
+                "present": present,
+                "absent": counts_map.get(StudentAttendance.STATUS_ABSENT, 0),
+                "late": counts_map.get(StudentAttendance.STATUS_LATE, 0),
+                "excused": counts_map.get(StudentAttendance.STATUS_EXCUSED, 0),
+                "total": total,
+            })
+
+        # Compare last vs second-to-last
+        current = timeline[-1] if timeline else {"score": 0.0, "label": ""}
+        previous = timeline[-2] if len(timeline) >= 2 else {"score": 0.0, "label": ""}
+
+        current_value = current["score"]
+        previous_value = previous["score"]
+        if previous_value > 0:
+            trend_pct = round(((current_value - previous_value) / previous_value) * 100, 1)
+        else:
+            trend_pct = 0.0
+
+        if trend_pct >= 2:
+            direction = "up"
+        elif trend_pct <= -2:
+            direction = "down"
+        else:
+            direction = "flat"
+
+        # Keep the LAST `n` buckets for the chart (the previous comparison
+        # bucket is dropped from the FRONT, not the end).
+        visible = timeline[-n:] if len(timeline) > n else timeline
+
+        return Response({
+            "period": period,
+            "metric_label": "Attendance Rate",
+            "unit": "%",
+            "direction": direction,
+            "trend_percentage": trend_pct,
+            "current_value": current_value,
+            "previous_value": previous_value,
+            "current_label": current["label"],
+            "previous_label": previous["label"],
+            "timeline": visible,
+        })
+

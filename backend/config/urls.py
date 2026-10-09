@@ -16,6 +16,7 @@ from attendance.views import TeacherAttendanceViewSet, TeacherStudentsViewSet
 from accounts.student_login import StudentLoginView
 from attendance.student_views import StudentSelfViewSet
 from chat.student_views import StudentChatViewSet, TeacherChatViewSet
+from admin_api.views import PerformanceTrendView
 
 urlpatterns = [
     # Developer-only fallback. Not the product's admin UI.
@@ -23,6 +24,9 @@ urlpatterns = [
 
     path("api/v1/auth/", include("accounts.urls")),
     path("api/v1/admin/", include("admin_api.urls")),
+    path("api/v1/admin/dashboard/performance-trend/",
+         PerformanceTrendView.as_view(),
+         name="admin-performance-trend"),
 
     # PIN-based student quick-login
     path("api/v1/auth/student-login/",

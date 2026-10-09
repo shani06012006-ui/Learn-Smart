@@ -1,4 +1,4 @@
-﻿// frontend/src/features/admin/pages/AdminDashboardPage.jsx
+// frontend/src/features/admin/pages/AdminDashboardPage.jsx
 import {
   Users,
   GraduationCap,
@@ -14,6 +14,7 @@ import WelcomeBanner from "../components/WelcomeBanner";
 import QuickActions from "../components/QuickActions";
 import UserRolesChart from "../components/UserRolesChart";
 import ClassStatusChart from "../components/ClassStatusChart";
+import PerformanceTrendCard from "../components/PerformanceTrendCard";
 import RecentUsersTable from "../components/RecentUsersTable";
 import RecentCoursesTable from "../components/RecentCoursesTable";
 import {
@@ -103,7 +104,7 @@ export default function AdminDashboardPage() {
       {/* Charts row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <UserRolesChart stats={stats} />
-        <ClassStatusChart stats={stats} />
+        <PerformanceTrendCard />
       </div>
 
       {/* Recent lists row */}
