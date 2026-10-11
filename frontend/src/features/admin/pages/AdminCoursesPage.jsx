@@ -412,7 +412,7 @@ export default function AdminCoursesPage() {
         </div>
         <Button onClick={handleCreate}>
           <Plus size={15} />
-          Create class
+          Create course
         </Button>
       </header>
 
