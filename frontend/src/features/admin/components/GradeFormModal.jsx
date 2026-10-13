@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Layers } from "lucide-react";
+import { Layers, Plus, Trash2, X } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
@@ -9,12 +9,15 @@ import {
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
+const EMPTY_SECTION = () => ({ name: "", capacity: 40, room: "" });
+
 export default function GradeFormModal({ open, onClose, grade = null, onSuccess }) {
   const isEdit = !!grade;
 
   const [level, setLevel] = useState("");
   const [name, setName] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [sections, setSections] = useState([]);
   const [error, setError] = useState("");
 
   const [createGrade, { isLoading: creating }] = useCreateGradeMutation();
@@ -26,8 +29,35 @@ export default function GradeFormModal({ open, onClose, grade = null, onSuccess 
     setLevel(grade?.level ?? "");
     setName(grade?.name ?? "");
     setIsActive(grade?.is_active ?? true);
+
+    // Preload existing sections if editing
+    const existing = Array.isArray(grade?.sections) ? grade.sections : [];
+    setSections(
+      existing.length > 0
+        ? existing.map((s) => ({
+            id: s.id,
+            name: s.name || "",
+            capacity: s.capacity ?? 40,
+            room: s.room || "",
+          }))
+        : []
+    );
     setError("");
   }, [open, grade]);
+
+  function addSection() {
+    setSections((prev) => [...prev, EMPTY_SECTION()]);
+  }
+
+  function removeSection(idx) {
+    setSections((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateSection(idx, patch) {
+    setSections((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, ...patch } : s))
+    );
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -43,18 +73,41 @@ export default function GradeFormModal({ open, onClose, grade = null, onSuccess 
       return;
     }
 
+    // Validate sections
+    const cleanSections = sections
+      .map((s) => ({
+        ...(s.id ? { id: s.id } : {}),
+        name: (s.name || "").trim(),
+        capacity: Number(s.capacity) || 40,
+        room: (s.room || "").trim(),
+      }))
+      .filter((s) => s.name.length > 0);
+
+    // Check for duplicates
+    const seen = new Set();
+    for (const s of cleanSections) {
+      const key = s.name.toLowerCase();
+      if (seen.has(key)) {
+        setError(`Duplicate section name: "${s.name}"`);
+        return;
+      }
+      seen.add(key);
+    }
+
     try {
       if (isEdit) {
         await updateGrade({
           id: grade.id,
           name: name.trim(),
           is_active: isActive,
+          sections: cleanSections,
         }).unwrap();
       } else {
         await createGrade({
           level: lvl,
           name: name.trim(),
           is_active: isActive,
+          sections: cleanSections,
         }).unwrap();
       }
       onSuccess?.();
@@ -86,8 +139,7 @@ export default function GradeFormModal({ open, onClose, grade = null, onSuccess 
             <Layers size={16} />
           </span>
           <p className="text-xs text-purple-700">
-            Grades define year levels. Students assigned to a grade are
-            auto-enrolled into every class of that grade.
+            Grades define year levels. Add sections (A, B, C) below to divide students into groups.
           </p>
         </div>
 
@@ -138,6 +190,74 @@ export default function GradeFormModal({ open, onClose, grade = null, onSuccess 
             Active (students can be assigned to this grade)
           </span>
         </label>
+
+        {/* ─── Sections ──────────────────────────────────────── */}
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Sections
+              </p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                e.g. A, B, C — students can later be assigned to a section.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={addSection}
+              className="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2.5 py-1.5 text-[11px] font-bold text-purple-600 hover:bg-purple-100"
+            >
+              <Plus size={12} />
+              Add section
+            </button>
+          </div>
+
+          {sections.length === 0 ? (
+            <p className="py-3 text-center text-[11px] text-slate-400">
+              No sections yet — click "Add section" to create one.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {sections.map((s, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-2"
+                >
+                  <input
+                    type="text"
+                    value={s.name}
+                    onChange={(e) => updateSection(idx, { name: e.target.value })}
+                    placeholder="Section name (A)"
+                    className="min-w-0 flex-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold outline-none focus:border-purple-400"
+                  />
+                  <input
+                    type="number"
+                    value={s.capacity}
+                    onChange={(e) => updateSection(idx, { capacity: e.target.value })}
+                    placeholder="Capacity"
+                    title="Capacity"
+                    className="w-20 rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-purple-400"
+                  />
+                  <input
+                    type="text"
+                    value={s.room}
+                    onChange={(e) => updateSection(idx, { room: e.target.value })}
+                    placeholder="Room"
+                    className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-xs outline-none focus:border-purple-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSection(idx)}
+                    className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    title="Remove section"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {error && (
           <p className="rounded-xl border border-coral-200 bg-coral-50 px-3 py-2 text-xs font-medium text-coral-700">

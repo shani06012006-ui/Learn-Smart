@@ -7,7 +7,10 @@ import {
   Trash2,
   Users,
   BookOpen,
+  ChevronDown,
+  ChevronRight,
   Loader2,
+  X,
 } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
@@ -22,24 +25,110 @@ import {
   useCreateGradeMutation,
   useUpdateGradeMutation,
   useDeleteGradeMutation,
+  useGetAdminSectionsQuery,
+  useCreateAdminSectionMutation,
+  useDeleteAdminSectionMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
+import EditSectionModal from "../components/sections/EditSectionModal";
+import SectionStudentsModal from "../components/sections/SectionStudentsModal";
 
 
-/* ── Create / Edit modal ───────────────────────────────── */
+/* ── Add-section mini modal ────────────────────────────── */
+function AddSectionModal({ open, onClose, grade, onCreated }) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  const [createSection, { isLoading }] = useCreateAdminSectionMutation();
+
+  useMemo(() => {
+    if (open) {
+      setName("");
+      setError("");
+    }
+  }, [open]);
+
+  async function submit(e) {
+    e?.preventDefault?.();
+    setError("");
+    if (!name.trim()) {
+      setError("Section name is required.");
+      return;
+    }
+    try {
+      await createSection({
+        grade_id: grade.id,
+        name: name.trim(),
+        capacity: 40,
+        room: "",
+      }).unwrap();
+      onCreated?.();
+      onClose();
+    } catch (err) {
+      setError(extractErrorMessage(err));
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Add New Section to ${grade?.name || "Grade"}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="add-section-form"
+            variant="primary"
+            loading={isLoading}
+          >
+            Create Section
+          </Button>
+        </>
+      }
+    >
+      <form id="add-section-form" onSubmit={submit} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Section Name
+          </span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="E.g. A, B, C, Delta"
+            autoFocus
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+          />
+        </label>
+        {error && (
+          <p className="rounded-xl border border-coral-200 bg-coral-50 px-3 py-2 text-xs font-medium text-coral-700">
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
+  );
+}
+
+
+/* ── Create / Edit grade modal ────────────────────────── */
 function GradeFormModal({ open, onClose, grade }) {
   const isEdit = !!grade;
 
-  const [level, setLevel] = useState(grade?.level ?? "");
-  const [name, setName] = useState(grade?.name ?? "");
-  const [isActive, setIsActive] = useState(grade?.is_active ?? true);
+  const [level, setLevel] = useState("");
+  const [name, setName] = useState("");
+  const [isActive, setIsActive] = useState(true);
   const [error, setError] = useState("");
 
   const [createGrade, { isLoading: creating }] = useCreateGradeMutation();
   const [updateGrade, { isLoading: updating }] = useUpdateGradeMutation();
   const busy = creating || updating;
 
-  // Reset when opening
   useMemo(() => {
     if (!open) return;
     setLevel(grade?.level ?? "");
@@ -92,11 +181,7 @@ function GradeFormModal({ open, onClose, grade }) {
           <Button variant="ghost" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            form="grade-form"
-            loading={busy}
-          >
+          <Button type="submit" form="grade-form" loading={busy}>
             {isEdit ? "Save changes" : "Create grade"}
           </Button>
         </>
@@ -108,9 +193,7 @@ function GradeFormModal({ open, onClose, grade }) {
             <Layers size={16} />
           </span>
           <p className="text-xs text-purple-700">
-            Grades define the year levels for your institution.
-            Students assigned to a grade are auto-enrolled into every
-            class of that grade.
+            Grades define year levels. Add sections later from the Grades list.
           </p>
         </div>
 
@@ -172,17 +255,33 @@ function GradeFormModal({ open, onClose, grade }) {
 }
 
 
-/* ── Page ──────────────────────────────────────────────── */
+/* ── Page ─────────────────────────────────────────────── */
 export default function AdminGradesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [addSectionFor, setAddSectionFor] = useState(null);
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
+  const [editSection, setEditSection] = useState(null);
+  const [manageSection, setManageSection] = useState(null);
 
   const { data, isLoading, isError, error, refetch } = useGetGradesQuery();
+  const { data: sectionsData, refetch: refetchSections } = useGetAdminSectionsQuery({});
   const [deleteGrade, { isLoading: deleting }] = useDeleteGradeMutation();
-  const navigate = useNavigate();
+  const [deleteSection] = useDeleteAdminSectionMutation();
 
   const grades = data?.results ?? data ?? [];
+  const sections = sectionsData?.results ?? sectionsData ?? [];
+
+  // Group sections by grade
+  const sectionsByGrade = useMemo(() => {
+    const map = new Map();
+    for (const s of sections) {
+      if (!map.has(s.grade_id)) map.set(s.grade_id, []);
+      map.get(s.grade_id).push(s);
+    }
+    return map;
+  }, [sections]);
 
   const totals = useMemo(() => {
     let students = 0;
@@ -193,6 +292,15 @@ export default function AdminGradesPage() {
     }
     return { students, classes };
   }, [grades]);
+
+  const toggleExpand = (id) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (isLoading) return <LoadingState label="Loading grades..." />;
   if (isError) {
@@ -219,12 +327,22 @@ export default function AdminGradesPage() {
     });
   }
 
+  async function promptDeleteSection(section, grade) {
+    if (!window.confirm(`Delete section "${section.name}" from ${grade.name}?`)) return;
+    try {
+      await deleteSection(section.id).unwrap();
+      refetchSections();
+    } catch (err) {
+      alert(extractErrorMessage(err));
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            Grades
+            Grades and Sections Overview
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Manage year levels for your institution. Students assigned to a grade are auto-enrolled into every class of that grade.
@@ -259,8 +377,8 @@ export default function AdminGradesPage() {
         />
       </div>
 
-      {/* Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-card">
+      {/* Grades accordion */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
         {grades.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
@@ -281,73 +399,188 @@ export default function AdminGradesPage() {
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {grades.map((g) => (
-              <li
-                key={g.id}
-                onClick={() => navigate(`/admin/grades/${g.id}`)}
-                className="flex cursor-pointer items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50/50"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-50 font-bold text-purple-600 ring-1 ring-purple-100">
-                  {g.level}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-bold text-navy-950">
-                      {g.name}
-                    </p>
-                    {!g.is_active && <Badge variant="neutral">Inactive</Badge>}
+            {grades.map((g) => {
+              const gradeSections = sectionsByGrade.get(g.id) || [];
+              const isExpanded = expandedIds.has(g.id);
+
+              return (
+                <li key={g.id} className="transition-colors">
+                  {/* Header row */}
+                  <div
+                    onClick={() => toggleExpand(g.id)}
+                    className="flex cursor-pointer items-center gap-3 px-5 py-4 hover:bg-slate-50/50"
+                  >
+                    {/* Chevron */}
+                    <span className="text-slate-400">
+                      {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                    </span>
+
+                    {/* Level badge */}
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-50 font-bold text-purple-600 ring-1 ring-purple-100">
+                      {g.level}
+                    </span>
+
+                    {/* Name + level */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-bold text-navy-950">
+                          {g.name}
+                        </p>
+                        {!g.is_active && <Badge variant="neutral">Inactive</Badge>}
+                        {gradeSections.length > 0 && (
+                          <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-600">
+                            {gradeSections.length} section{gradeSections.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                        Level {g.level} · Students (Total: {g.student_count || 0})
+                      </p>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="hidden items-center gap-4 text-xs text-slate-600 sm:flex">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users size={13} />
+                        <span className="font-bold text-navy-950">
+                          {g.student_count || 0}
+                        </span>{" "}
+                        students
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <BookOpen size={13} />
+                        <span className="font-bold text-navy-950">
+                          {g.class_count || 0}
+                        </span>{" "}
+                        classes
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => { setEditing(g); setFormOpen(true); }}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
+                        title="Edit grade"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => promptDelete(g)}
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-coral-50 hover:text-coral-600"
+                        title="Delete grade"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                    Level {g.level}
-                  </p>
-                </div>
 
-                <div className="hidden items-center gap-6 text-xs text-slate-600 sm:flex">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Users size={13} />
-                    <span className="font-bold text-navy-950">
-                      {g.student_count || 0}
-                    </span>{" "}
-                    students
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <BookOpen size={13} />
-                    <span className="font-bold text-navy-950">
-                      {g.class_count || 0}
-                    </span>{" "}
-                    classes
-                  </span>
-                </div>
+                  {/* Expanded sections panel */}
+                  {isExpanded && (
+                    <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-3 pl-[68px]">
+                      {gradeSections.length === 0 ? (
+                        <p className="py-2 text-xs text-slate-400">
+                          No sections yet — click "Add New Section" below.
+                        </p>
+                      ) : (
+                        <ul className="flex flex-col gap-1.5">
+                          {gradeSections.map((s) => (
+                                                        <li
+                              key={s.id}
+                              className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 ring-1 ring-slate-100"
+                            >
+                            <div className="flex min-w-0 items-center gap-3">
+                                <span className="w-24 truncate text-sm font-bold text-navy-950">
+                                  Section {s.name}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  {s.student_count ?? 0} student{(s.student_count ?? 0) === 1 ? "" : "s"}
+                                </span>
+                                {s.capacity && (
+                                  <span className="text-[11px] text-slate-400">
+                                    cap {s.capacity}
+                                  </span>
+                                )}
+                                {s.room && (
+                                  <span className="text-[11px] text-slate-400">
+                                    · {s.room}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditSection(s)}
+                                  className="rounded-md px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100"
+                                  title="Edit section"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate(`/admin/grades/${g.id}/sections/${s.id}`)}
+                                  className="rounded-md px-2 py-1 text-[11px] font-bold text-purple-600 hover:bg-purple-50"
+                                >
+                                  Manage
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => promptDeleteSection(s, g)}
+                                  className="rounded-md p-1.5 text-slate-400 hover:bg-coral-50 hover:text-coral-600"
+                                  title="Delete section"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setEditing(g); setFormOpen(true); }}
-                    className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
-                    title="Edit grade"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); promptDelete(g); }}
-                    className="rounded-lg p-2 text-slate-400 transition hover:bg-coral-50 hover:text-coral-600"
-                    title="Delete grade"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </li>
-            ))}
+                                <EditSectionModal 
+                                open={!!editSection}
+                                onClose={() => setEditSection(null)}
+                                section={editSection}
+                                onSaved={() => refetchSections()} />
+
+                               <SectionStudentsModal
+                                open={!!manageSection}
+                                onClose={() => setManageSection(null)}
+                                section={manageSection}
+                                onSaved={() => refetchSections()} />
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setAddSectionFor(g)}
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-white px-3 py-1.5 text-[11px] font-bold text-purple-600 transition hover:bg-purple-50"
+                      >
+                        <Plus size={12} />
+                        Add New Section to {g.name}
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
 
-      {/* Create / Edit modal */}
+      {/* Grade create/edit modal */}
       <GradeFormModal
         open={formOpen}
         onClose={() => { setFormOpen(false); setEditing(null); }}
         grade={editing}
+      />
+
+      {/* Add section mini-modal */}
+      <AddSectionModal
+        open={!!addSectionFor}
+        onClose={() => setAddSectionFor(null)}
+        grade={addSectionFor}
+        onCreated={() => refetchSections()}
       />
 
       <ConfirmDialog

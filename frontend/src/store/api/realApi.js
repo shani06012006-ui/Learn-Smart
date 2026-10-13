@@ -82,6 +82,66 @@ export const realApi = createApi({
     "TeacherChat",
   ],
   endpoints: (builder) => ({
+        // ---- Sections ----
+    getAdminSections: builder.query({
+      query: (params = {}) => {
+        const s = new URLSearchParams();
+        if (params.grade) s.set("grade", params.grade);
+        const qs = s.toString();
+        return qs ? `/admin/sections/?${qs}` : "/admin/sections/";
+      },
+      providesTags: ["AdminSections"],
+    }),
+    createAdminSection: builder.mutation({
+      query: (body) => ({ url: "/admin/sections/", method: "POST", body }),
+      invalidatesTags: ["AdminSections"],
+    }),
+    updateAdminSection: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/admin/sections/${id}/`, method: "PATCH", body }),
+      invalidatesTags: ["AdminSections"],
+    }),
+    deleteAdminSection: builder.mutation({
+      query: (id) => ({ url: `/admin/sections/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["AdminSections"],
+    }),
+    getSectionStudents: builder.query({
+      query: (id) => `/admin/sections/${id}/students/`,
+      providesTags: (r, e, id) => [{ type: "AdminSections", id: `students-${id}` }],
+    }),
+    assignSectionStudents: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/admin/sections/${id}/students/`,
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "AdminSections", id: `students-${id}` },
+        "AdminSections",
+      ],
+    }),
+
+    // ---- AI Timetable Generator ----
+    generateTimetable: builder.mutation({
+      query: (body) => ({ url: "/admin/timetable/generate/", method: "POST", body }),
+      invalidatesTags: ["AdminTimetable", "Timetable"],
+    }),
+
+    // ---- Teacher absences + substitutions ----
+    getAdminAbsences: builder.query({
+      query: () => "/admin/absences/",
+      providesTags: ["AdminAbsences"],
+    }),
+    createAdminAbsence: builder.mutation({
+      query: (body) => ({ url: "/admin/absences/", method: "POST", body }),
+      invalidatesTags: ["AdminAbsences"],
+    }),
+    suggestSubstitutes: builder.mutation({
+      query: (body) => ({ url: "/admin/substitutions/suggest/", method: "POST", body }),
+    }),
+    assignSubstitute: builder.mutation({
+      query: (body) => ({ url: "/admin/substitutions/assign/", method: "POST", body }),
+      invalidatesTags: ["AdminTimetable"],
+    }),
     // ---- Teacher announcements ----
     getTeacherAnnouncements: builder.query({
       query: (params = {}) => {
@@ -782,25 +842,14 @@ export const realApi = createApi({
         const search = new URLSearchParams();
         if (params.teacher) search.set("teacher", params.teacher);
         if (params.class_id) search.set("class_id", params.class_id);
+        if (params.section) search.set("section", params.section);
+        if (params.grade) search.set("grade", params.grade);
         if (params.day !== undefined && params.day !== "")
           search.set("day", String(params.day));
-        if (params.institution) search.set("institution", params.institution);
-        if (params.active !== undefined)
-          search.set("active", String(params.active));
-        if (params.page) search.set("page", String(params.page));
         const qs = search.toString();
         return qs ? `/admin/timetable/?${qs}` : "/admin/timetable/";
       },
-      providesTags: (result) =>
-        result
-          ? [
-              ...(result.results || []).map((t) => ({
-                type: "AdminTimetable",
-                id: t.id,
-              })),
-              { type: "AdminTimetable", id: "LIST" },
-            ]
-          : [{ type: "AdminTimetable", id: "LIST" }],
+      providesTags: ["AdminTimetable"],
     }),
 
     getTimetable: builder.query({
@@ -1488,6 +1537,18 @@ export const {
   useRejectTeacherLeaveMutation,
   useCancelTeacherLeaveMutation,
   useDeactivateAdminTimetableMutation,
+  
+  useGetAdminSectionsQuery,
+  useCreateAdminSectionMutation,
+  useGetSectionStudentsQuery,
+  useAssignSectionStudentsMutation,
+  useUpdateAdminSectionMutation,
+  useDeleteAdminSectionMutation,
+  useGenerateTimetableMutation,
+  useGetAdminAbsencesQuery,
+  useCreateAdminAbsenceMutation,
+  useSuggestSubstitutesMutation,
+  useAssignSubstituteMutation,
 
 
   usePurgeStaleSessionsMutation,

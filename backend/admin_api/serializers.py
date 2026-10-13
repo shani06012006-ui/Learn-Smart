@@ -518,10 +518,9 @@ class StudentAttendanceSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------- timetable
 
 class TimetableEntryReadSerializer(serializers.ModelSerializer):
-    """Read-only timetable row for admin + role-aware views."""
-
     teacher = AdminCourseTeacherBriefSerializer(read_only=True)
     class_course = AdminEnrollmentClassBriefSerializer(read_only=True)
+    section_name = serializers.SerializerMethodField()
     day_label = serializers.SerializerMethodField()
 
     class Meta:
@@ -529,9 +528,12 @@ class TimetableEntryReadSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "class_course",
+            "section",
+            "section_name",
             "teacher",
             "day_of_week",
             "day_label",
+            "period_number",
             "start_time",
             "end_time",
             "room",
@@ -543,6 +545,11 @@ class TimetableEntryReadSerializer(serializers.ModelSerializer):
 
     def get_day_label(self, obj):
         return obj.get_day_of_week_display()
+
+    def get_section_name(self, obj):
+        if not obj.section_id:
+            return None
+        return f"{obj.section.grade.name} · {obj.section.name}"
 
 
 class TimetableEntryWriteSerializer(serializers.Serializer):

@@ -38,10 +38,12 @@ import AdminGradeDetailPage from "./features/admin/pages/AdminGradeDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminMessagesPage from "./features/admin/pages/AdminMessagesPage";
-import AttendancePage from "./features/admin/pages/AttendancePage";  // marking UI
+import AttendancePage from "./features/admin/pages/AttendancePage"; 
 import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
 import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
-import AdminPlaceholder from "./features/admin/components/AdminPlaceholder";
+import AdminSectionDetailPage from "./features/admin/pages/AdminSectionDetailPage";
+
+
 
 // Teacher
 import TeacherLayout from "./components/layout/TeacherLayout";
@@ -59,6 +61,9 @@ import TeacherAnnouncementsPage from "./features/teacher/pages/TeacherAnnounceme
 import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import AdminSectionsPage from "./features/admin/pages/AdminSectionsPage";
+import AdminTimetableGeneratorPage from "./features/admin/pages/AdminTimetableGeneratorPage";
+import AdminSubstitutionsPage from "./features/admin/pages/AdminSubstitutionsPage";
 
 export default function App() {
   return (
@@ -77,34 +82,10 @@ export default function App() {
             <Route path="classes" element={<StudentMyClassesPage />} />
             <Route path="performance" element={<StudentPerformancePage />} />
             <Route path="timetable" element={<StudentTimetablePage />} />
-            <Route
-              path="join-class"
-              element={
-                <StudentPlaceholderPage
-                  title="Join a class"
-                  description="Enter a joining code from your teacher to enroll."
-                />
-              }
-            />
+            <Route path="join-class" element={ <StudentPlaceholderPage  title="Join a class"  description="Enter a joining code from your teacher to enroll."  />  }/>
             <Route path="materials" element={<StudentMaterialsPage />} />
-            <Route
-              path="announcements"
-              element={
-                <StudentPlaceholderPage
-                  title="Announcements"
-                  description="Notices and updates from your teachers and admin."
-                />
-              }
-            />
-            <Route
-              path="live-classes"
-              element={
-                <StudentPlaceholderPage
-                  title="Live Classes"
-                  description="Your scheduled live class sessions will appear here."
-                />
-              }
-            />
+            <Route path="announcements" element={ <StudentPlaceholderPage title="Announcements"  description="Notices and updates from your teachers and admin." /> } />
+            <Route path="live-classes" element={ <StudentPlaceholderPage title="Live Classes" description="Your scheduled live class sessions will appear here." /> } />
             <Route path="chat" element={<StudentChatPage />} />
           </Route>
         </Route>
@@ -131,10 +112,15 @@ export default function App() {
           <Route path="students/:id"   element={<AdminStudentDetailPage />} />
           <Route path="courses"       element={<AdminCoursesPage />} />
           <Route path="grades"        element={<AdminGradesPage />} />
+          <Route path="grades/:gradeId/sections/:sectionId" element={<AdminSectionDetailPage />} />
           <Route path="grades/:id"    element={<AdminGradeDetailPage />} />
           <Route path="courses/:id"   element={<AdminCourseDetailPage />} />
           <Route path="attendance"     element={<AttendancePage />} />
           <Route path="timetable"      element={<AdminTimetablePage />} />
+          <Route path="sections"       element={<AdminSectionsPage />} />
+          <Route path="timetable/generate" element={<AdminTimetableGeneratorPage />} />
+          <Route path="substitutions"  element={<AdminSubstitutionsPage />} />
+          <Route path="leaves"         element={<AdminLeavesPage />} />
           <Route path="leaves"         element={<AdminLeavesPage />} />
           <Route path="sessions"       element={<AdminSessionsPage />} />
           <Route path="messages"       element={<AdminMessagesPage />} />
@@ -154,7 +140,7 @@ export default function App() {
             <Route path="timetable" element={<TeacherTimetablePage />} />
             <Route path="attendance" element={<TeacherAttendancePage />} />
             <Route path="leaves" element={<TeacherLeavesPage />} />
-              <Route path="quizzes" element={<TeacherQuizzesPage />} />
+            <Route path="quizzes" element={<TeacherQuizzesPage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
             <Route path="announcements" element={<TeacherAnnouncementsPage />} />
             <Route path="live-classes" element={<TeacherPlaceholder title="Live Classes" />} />

@@ -1,19 +1,6 @@
 // frontend/src/features/admin/components/AdminSidebar.jsx
 import { NavLink, Link } from "react-router-dom";
-import {
-  LayoutDashboard,
-  UserCog,
-  BookOpen,
-  GraduationCap,
-  LogOut,
-  Monitor,
-  ClipboardCheck,
-  CalendarDays,
-  CalendarX,
-  MessageSquare,
-  Layers,
-} from "lucide-react";
-
+import { LayoutDashboard, BookOpen, Layers, UserCog, GraduationCap, ClipboardCheck, CalendarDays, CalendarX, Monitor, MessageSquare, Grid3X3, Sparkles, UserCheck, LogOut } from "lucide-react";
 import { useAdminAuth } from "../../../hooks/useAdminAuth";
 import {
   useGetStudentLeavesQuery,
@@ -28,6 +15,7 @@ const NAV_ITEMS = [
   { to: "/admin/students",                label: "Students",   icon: GraduationCap },
   { to: "/admin/attendance",              label: "Attendance", icon: ClipboardCheck },
   { to: "/admin/timetable",               label: "Timetable",  icon: CalendarDays },
+  { to: "/admin/substitutions",           label: "Substitutions",  icon: UserCheck },
   { to: "/admin/leaves",                  label: "Leaves",     icon: CalendarX, badgeKey: "leaves" },
   { to: "/admin/sessions",                label: "Sessions",   icon: Monitor },
   { to: "/admin/messages",                label: "Messages",   icon: MessageSquare },

@@ -106,7 +106,7 @@ export default function TeacherDashboardPage() {
 
         <div className="relative mt-1 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl text-white">
               {getGreeting()}, <span className="text-coral-300">{displayName}</span>!
             </h1>
             <p className="mt-2 max-w-xl text-sm text-white/70">

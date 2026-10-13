@@ -58,7 +58,100 @@ class ClassCourse(SoftDeleteModel, TimeStampedModel):
     def __str__(self):
         return f"{self.name} ({self.teacher.get_full_name()})"
 
+class ClassSection(TimeStampedModel):
+    """
+    A section within a Grade — e.g. "5-A", "5-B", "5-C".
+    Students can be tagged with a section for filtering.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    grade = models.ForeignKey(
+        "institutions.Grade",
+        on_delete=models.CASCADE,
+        related_name="sections",
+    )
+    name = models.CharField(max_length=50, help_text="Short label — e.g. 'A', 'B', '5-A'.")
+    capacity = models.PositiveIntegerField(default=40)
+    room = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)
 
+    class Meta:
+        ordering = ["grade__level", "name"]
+        unique_together = [("grade", "name")]
+        indexes = [
+            models.Index(fields=["grade"]),
+            models.Index(fields=["is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.grade.name} - Section {self.name}"
+
+
+class TeacherAbsence(TimeStampedModel):
+    """Records a teacher's absence on a specific date."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        limit_choices_to={"role": "teacher"},
+        related_name="absences",
+    )
+    date = models.DateField()
+    reason = models.TextField(blank=True)
+    is_approved = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-date"]
+        unique_together = [("teacher", "date")]
+        indexes = [
+            models.Index(fields=["teacher", "date"]),
+            models.Index(fields=["date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.teacher.email} absent on {self.date}"
+
+
+class TeacherSubstitution(TimeStampedModel):
+    """A substitute teacher assigned for one specific TimetableEntry on a date."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    timetable_entry = models.ForeignKey(
+        "TimetableEntry",
+        on_delete=models.CASCADE,
+        related_name="substitutions",
+    )
+    date = models.DateField()
+    original_teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="substituted_out",
+    )
+    substitute_teacher = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="substituted_in",
+        limit_choices_to={"role": "teacher"},
+    )
+    created_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="substitutions_created",
+    )
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-date"]
+        unique_together = [("timetable_entry", "date")]
+        indexes = [
+            models.Index(fields=["date"]),
+            models.Index(fields=["timetable_entry"]),
+        ]
+
+    def __str__(self):
+        return f"{self.substitute_teacher.email} subs {self.original_teacher.email} on {self.date}"
+    
+    
 class StudentEnrollment(TimeStampedModel):
     """Links a student to a class via a unique 6-character joining code.
     Not soft-deleted itself — status transitions (pending/active/blocked/
@@ -89,19 +182,25 @@ class StudentEnrollment(TimeStampedModel):
     joining_code = models.CharField(max_length=6, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
     joined_at = models.DateTimeField(null=True, blank=True)
+    section = models.ForeignKey(
+        "ClassSection",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="section_enrollments",
+        help_text="Which section of the grade this period belongs to.",
+    )
+    period_number = models.PositiveIntegerField(
+        default=1,
+        help_text="1-indexed period within the day (1 = first period).",
+    )
+
     roll_number = models.CharField(
         max_length=32,
         blank=True,
         db_index=True,
         help_text="Optional human-readable roll number (e.g. STU-2026-001, or just 01).",
     )
-
-    # StudentEnrollment is never soft-deleted, so `objects` and `all_objects`
-    # are identical here — `all_objects` exists purely so
-    # core.utils.generate_unique_code()'s convention (prefer all_objects
-    # when present) works uniformly across models. NOTE: once you declare
-    # any manager explicitly on a model, Django stops auto-adding the
-    # implicit `objects` manager, so it must be declared explicitly too.
     objects = models.Manager()
     all_objects = models.Manager()
 
@@ -119,18 +218,6 @@ class StudentEnrollment(TimeStampedModel):
 
 
 class TimetableEntry(TimeStampedModel):
-    """
-    A weekly timetable slot for a class. One row = (class, day, time range).
-
-    Soft-deleted via `is_active=False` so historical rows remain for
-    audits. Overlapping conflicts (same teacher / same class / same room
-    on the same day) are prevented at the serializer level — Django
-    UniqueConstraint cannot express interval overlap cleanly.
-
-    `room` is a free-text CharField. A dedicated Room model would be
-    added in a future phase if room inventory becomes a first-class
-    concept.
-    """
 
     DAY_MONDAY = 0
     DAY_TUESDAY = 1
@@ -176,6 +263,19 @@ class TimetableEntry(TimeStampedModel):
         help_text="Soft-delete flag. Inactive rows are hidden from the UI.",
     )
 
+    section = models.ForeignKey(
+        "ClassSection",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="timetable_entries",
+        help_text="Which section of the grade this period belongs to.",
+    )
+    period_number = models.PositiveIntegerField(
+        default=1,
+        help_text="1-indexed period within the day (1 = first period).",
+    )
+
     class Meta:
         ordering = ["day_of_week", "start_time"]
         indexes = [
@@ -184,12 +284,11 @@ class TimetableEntry(TimeStampedModel):
             models.Index(fields=["class_course", "day_of_week"]),
         ]
         constraints = [
-
             models.UniqueConstraint(
-                fields=["class_course", "day_of_week", "start_time"],
-                name="unique_timetable_class_slot",
+                fields=["class_course", "section", "day_of_week", "period_number"],
+                name="unique_class_section_day_period",
             ),
-        ]
+        ]   
 
     def __str__(self):
         return (

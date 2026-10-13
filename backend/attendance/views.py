@@ -554,6 +554,8 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
         grade_id = request.query_params.get("grade")
         scope = (request.query_params.get("scope") or "all").lower()
         q_str = (request.query_params.get("q") or "").strip()
+        
+        
 
         enroll_qs = (
             StudentEnrollment.objects
@@ -622,6 +624,14 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
             for cred in StudentCredentials.objects.filter(student_id__in=all_student_ids):
                 pin_map[str(cred.student_id)] = cred.pin or ""
                 pin_active_map[str(cred.student_id)] = bool(cred.is_active)
+        
+        section_id = (
+            request.query_params.get("section_id")
+            or request.query_params.get("section")
+        )
+        if section_id:
+            enroll_qs = enroll_qs.filter(section_id=section_id)
+        
 
         # Build rows
         results = []
