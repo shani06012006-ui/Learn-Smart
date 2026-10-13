@@ -64,3 +64,5 @@ backend/audit_backup.json
 node_modules/
 dist/
 .vite/
+
+_node_modules_old/
