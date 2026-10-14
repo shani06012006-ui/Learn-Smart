@@ -193,7 +193,18 @@ class SectionStudentsView(APIView):
             })
 
         # Candidates: active enrollments in this grade that are NOT yet in this section
-        candidates = (
+        already_assigned_student_ids = set(
+            StudentEnrollment.objects
+            .filter(
+                class_course__grade=section.grade,
+                status=StudentEnrollment.STATUS_ACTIVE,
+                section__isnull=False,
+            )
+            .exclude(section=section)
+            .values_list("student_id", flat=True)
+        )
+
+        candidates_qs = (
             StudentEnrollment.objects
             .filter(
                 class_course__grade=section.grade,
@@ -202,12 +213,15 @@ class SectionStudentsView(APIView):
             .exclude(section=section)
             .select_related("student", "class_course")
         )
-        # dedupe by student
+
         seen = set()
         candidate_rows = []
-        for e in candidates:
+        for e in candidates_qs:
             sid = str(e.student_id)
             if sid in seen:
+                continue
+            # Skip students already in another section of this grade
+            if str(e.student_id) in {str(x) for x in already_assigned_student_ids}:
                 continue
             seen.add(sid)
             s = e.student

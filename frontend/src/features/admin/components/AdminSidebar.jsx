@@ -31,7 +31,8 @@ export default function AdminSidebar() {
   const badgeCounts = { leaves: pendingLeaves };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white/80 backdrop-blur-md">
+
       {/* Brand */}
       <div className="border-b border-slate-100 px-5 py-5">
         <Link to="/admin" className="flex items-center gap-2.5">

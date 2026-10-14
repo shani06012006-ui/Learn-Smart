@@ -9,7 +9,7 @@ export default function AdminTopbar() {
   const user = useSelector(selectAdminUser);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/70 bg-white/70 px-6 backdrop-blur-md">
       <div>
         <p className="font-display text-sm font-extrabold text-navy-950">
           Admin Console

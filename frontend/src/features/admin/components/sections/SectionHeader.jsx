@@ -1,12 +1,26 @@
 import { ArrowLeft, Users, GraduationCap, Calendar, Pencil, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+function cleanSectionName(rawName, gradeName) {
+  if (!rawName) return "";
+  let n = String(rawName).trim();
+  n = n.replace(/^section\s+/i, "");
+  if (gradeName) {
+    const g = String(gradeName).trim();
+    if (n.toLowerCase().startsWith(g.toLowerCase())) {
+      n = n.slice(g.length).trim();
+    }
+  }
+  return n || rawName;
+}
+
 export default function SectionHeader({ section, gradeName, stats, onEdit, onDelete }) {
   const capacity = section?.capacity ?? 0;
   const enrolled = stats?.enrolled ?? 0;
   const pct = capacity > 0 ? Math.min(100, Math.round((enrolled / capacity) * 100)) : 0;
 
   const nextClasses = stats?.next_classes ?? [];
+  const displaySectionName = cleanSectionName(section?.name, gradeName);
 
   return (
     <div className="flex flex-col gap-4">
@@ -23,7 +37,7 @@ export default function SectionHeader({ section, gradeName, stats, onEdit, onDel
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            {gradeName} / Section {section?.name}
+            {gradeName} / Section {displaySectionName}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Manage this section's students, schedule, and details.
@@ -67,16 +81,20 @@ export default function SectionHeader({ section, gradeName, stats, onEdit, onDel
           </p>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-purple-500 transition-all"
+              className={
+                "h-full rounded-full transition-all " +
+                (pct >= 100 ? "bg-coral-500" : "bg-purple-500")
+              }
               style={{ width: `${pct}%` }}
             />
           </div>
           <p className="mt-1 text-[11px] text-slate-400">
             {enrolled} / {capacity} capacity
+            {pct >= 100 && <span className="ml-2 font-bold text-coral-600">· FULL</span>}
           </p>
         </div>
 
-        {/* Assigned teacher (Phase 2) */}
+        {/* Assigned teacher */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
           <div className="flex items-start justify-between">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">

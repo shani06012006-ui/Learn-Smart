@@ -130,7 +130,7 @@ export default function AdminUsersPage() {
         </>
       )}
 
-      <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} allowRoleSwitch />
 
       <EditUserModal
         open={!!editUser}

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { BookOpen, Users, Calendar } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
@@ -24,10 +24,27 @@ const TABS = [
   { id: "timetable", label: "Timetable", icon: Calendar },
 ];
 
+const VALID_TABS = new Set(TABS.map((t) => t.id));
+
 export default function AdminSectionDetailPage() {
   const { gradeId, sectionId } = useParams();
   const navigate = useNavigate();
-  const [tab, setTab] = useState("overview");
+
+  // Tab state lives in URL: ?tab=overview (default)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get("tab");
+  const tab = VALID_TABS.has(urlTab) ? urlTab : "overview";
+
+  const setTab = (nextTab) => {
+    const params = new URLSearchParams(searchParams);
+    if (nextTab === "overview") {
+      params.delete("tab"); // clean URL for default tab
+    } else {
+      params.set("tab", nextTab);
+    }
+    setSearchParams(params, { replace: true });
+  };
+
   const [editOpen, setEditOpen] = useState(false);
 
   const { data: gradesData } = useGetGradesQuery();
@@ -38,9 +55,10 @@ export default function AdminSectionDetailPage() {
   const sections = sectionsData?.results ?? sectionsData ?? [];
   const section = sections.find((s) => s.id === sectionId);
 
-  const { data: studentData } = useGetSectionStudentsQuery(sectionId, {
-    skip: !sectionId,
-  });
+  const { data: studentData, refetch: refetchStudents } = useGetSectionStudentsQuery(
+    sectionId,
+    { skip: !sectionId }
+  );
 
   const { data: timetableData } = useGetAdminTimetableQuery(
     { section: sectionId },
@@ -49,7 +67,6 @@ export default function AdminSectionDetailPage() {
 
   const [deleteSection, { isLoading: deleting }] = useDeleteAdminSectionMutation();
 
-  // Compute stats from any of the 3 data sources
   const stats = useMemo(() => {
     const enrolled = studentData?.assigned?.length ?? 0;
 
@@ -66,7 +83,6 @@ export default function AdminSectionDetailPage() {
         subject: e.class_course?.subject || e.class_course?.name || "",
       }));
 
-    // If no classes today, use the next N from the whole week
     let nextClasses = todays;
     if (nextClasses.length === 0) {
       nextClasses = entries
@@ -127,6 +143,7 @@ export default function AdminSectionDetailPage() {
       <div className="flex items-center gap-1 border-b border-slate-200">
         {TABS.map((t) => {
           const Icon = t.icon;
+          const active = tab === t.id;
           return (
             <button
               key={t.id}
@@ -134,7 +151,7 @@ export default function AdminSectionDetailPage() {
               onClick={() => setTab(t.id)}
               className={
                 "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition " +
-                (tab === t.id
+                (active
                   ? "border-purple-500 text-purple-600"
                   : "border-transparent text-slate-500 hover:text-navy-950")
               }
@@ -154,7 +171,9 @@ export default function AdminSectionDetailPage() {
           onManageStudents={() => setTab("students")}
         />
       )}
-      {tab === "students" && <SectionStudentsTab section={section} />}
+      {tab === "students" && (
+        <SectionStudentsTab section={section} onUpdated={refetchStudents} />
+      )}
       {tab === "timetable" && (
         <SectionTimetableTab section={section} gradeName={grade.name} />
       )}
