@@ -1,10 +1,16 @@
 // frontend/src/features/admin/components/CreateUserModal.jsx
 import { useMemo, useState } from "react";
-import { Check, Search } from "lucide-react";
+import {
+  Check,
+  Search,
+  User,
+  Mail,
+  Lock,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
-import ParchmentScrollModal from "../../../components/ui/ParchmentScrollModal";
-import Button from "../../../components/ui/Button";
-import Input from "../../../components/ui/Input";
+import SplitModal from "../../../components/ui/SplitModal";
 import {
   useCreateAdminUserMutation,
   useGetGradesQuery,
@@ -18,23 +24,119 @@ const INITIAL = {
   first_name: "",
   last_name: "",
   role: "student",
-  grade_id: "",            
-  grade_ids: [],          
-  teacher_ids: [],         
+  grade_id: "",
+  grade_ids: [],
+  teacher_ids: [],
 };
 
+/* ------------------------------------------------------------------ */
+/*  Icon-prefixed input                                                */
+/* ------------------------------------------------------------------ */
+function Field({
+  icon: Icon,
+  label,
+  error,
+  hint,
+  ...props
+}) {
+  return (
+    <div>
+      {label && (
+        <label className="block text-xs font-bold text-slate-700">{label}</label>
+      )}
+      <div className="relative mt-1.5">
+        {Icon && (
+          <Icon
+            size={15}
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        )}
+        <input
+          {...props}
+          className={
+            "h-11 w-full rounded-xl border bg-white pr-3 text-sm text-navy-950 outline-none transition " +
+            (Icon ? "pl-10 " : "pl-3.5 ") +
+            (error
+              ? "border-coral-300 focus:border-coral-400 focus:ring-2 focus:ring-coral-100"
+              : "border-slate-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100")
+          }
+        />
+      </div>
+      {error && <p className="mt-1 text-xs text-coral-600">{error}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Password strength meter                                            */
+/* ------------------------------------------------------------------ */
+function strengthOf(pw) {
+  if (!pw) return { score: 0, label: "", tone: "" };
+  let s = 0;
+  if (pw.length >= 8) s++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
+  if (/\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  const map = [
+    { label: "Too weak", tone: "bg-rose-500" },
+    { label: "Weak", tone: "bg-rose-500" },
+    { label: "Fair", tone: "bg-amber-500" },
+    { label: "Good", tone: "bg-lime-500" },
+    { label: "Strong", tone: "bg-emerald-500" },
+  ];
+  return { score: s, ...map[s] };
+}
+
+function PasswordStrength({ password }) {
+  const { score, label, tone } = strengthOf(password);
+  if (!password) return null;
+  return (
+    <div className="mt-2">
+      <div className="flex items-center gap-1.5">
+        {[1, 2, 3, 4].map((i) => (
+          <span
+            key={i}
+            className={
+              "h-1.5 flex-1 rounded-full transition-all " +
+              (score >= i ? tone : "bg-slate-200")
+            }
+          />
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] font-semibold text-slate-500">
+        Password strength:{" "}
+        <span
+          className={
+            score <= 1
+              ? "text-rose-600"
+              : score === 2
+              ? "text-amber-600"
+              : score === 3
+              ? "text-lime-600"
+              : "text-emerald-600"
+          }
+        >
+          {label}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 export default function CreateUserModal({
   open,
   onClose,
   defaultRole = "student",
   allowRoleSwitch = false,
 }) {
-
   const [createUser, { isLoading }] = useCreateAdminUserMutation();
   const { data: gradesData } = useGetGradesQuery();
   const grades = gradesData?.results ?? gradesData ?? [];
 
-  // All teachers (institution-scoped by backend)
   const { data: teachersData } = useGetAdminUsersQuery({
     role: "teacher",
     page: 1,
@@ -57,29 +159,21 @@ export default function CreateUserModal({
     }
   };
 
-  const toggleTeacher = (teacherId) => {
-    setForm((f) => {
-      const has = f.teacher_ids.includes(teacherId);
-      return {
-        ...f,
-        teacher_ids: has
-          ? f.teacher_ids.filter((x) => x !== teacherId)
-          : [...f.teacher_ids, teacherId],
-      };
-    });
-  };
+  const toggleTeacher = (id) =>
+    setForm((f) => ({
+      ...f,
+      teacher_ids: f.teacher_ids.includes(id)
+        ? f.teacher_ids.filter((x) => x !== id)
+        : [...f.teacher_ids, id],
+    }));
 
-  const toggleGrade = (gradeId) => {
-    setForm((f) => {
-      const has = f.grade_ids.includes(gradeId);
-      return {
-        ...f,
-        grade_ids: has
-          ? f.grade_ids.filter((x) => x !== gradeId)
-          : [...f.grade_ids, gradeId],
-      };
-    });
-  };
+  const toggleGrade = (id) =>
+    setForm((f) => ({
+      ...f,
+      grade_ids: f.grade_ids.includes(id)
+        ? f.grade_ids.filter((x) => x !== id)
+        : [...f.grade_ids, id],
+    }));
 
   const handleClose = () => {
     if (isLoading) return;
@@ -90,13 +184,11 @@ export default function CreateUserModal({
     onClose();
   };
 
-  // Teachers who handle the picked grade (for student form)
   const teachersForGrade = useMemo(() => {
     if (form.role !== "student" || !form.grade_id) return [];
-    return allTeachers.filter((t) => {
-      const gids = t.grade_ids || [];
-      return gids.includes(form.grade_id);
-    });
+    return allTeachers.filter((t) =>
+      (t.grade_ids || []).includes(form.grade_id),
+    );
   }, [form.role, form.grade_id, allTeachers]);
 
   const filteredTeachers = useMemo(() => {
@@ -118,18 +210,15 @@ export default function CreateUserModal({
     if (!form.first_name.trim()) errs.first_name = ["Required"];
     if (!form.last_name.trim()) errs.last_name = ["Required"];
     if (!form.email.trim()) errs.email = ["Required"];
-    if (!form.password || form.password.length < 8) {
+    if (!form.password || form.password.length < 8)
       errs.password = ["At least 8 characters"];
-    }
-    if (form.password !== form.confirm_password) {
+    if (form.password !== form.confirm_password)
       errs.confirm_password = ["Passwords do not match"];
-    }
-    if (form.role === "student" && !form.grade_id) {
+    if (form.role === "student" && !form.grade_id)
       errs.grade_id = ["Please pick a grade"];
-    }
-    if (form.role === "teacher" && form.grade_ids.length === 0) {
+    if (form.role === "teacher" && form.grade_ids.length === 0)
       errs.grade_ids = ["Pick at least one grade"];
-    }
+
     if (Object.keys(errs).length) {
       setErrors(errs);
       return;
@@ -142,11 +231,10 @@ export default function CreateUserModal({
       last_name: form.last_name.trim(),
       role: form.role,
     };
-
     if (form.role === "student") {
       payload.grade_id = form.grade_id;
-      payload.teacher_ids = form.teacher_ids; // informational; backend records grade
-      payload.class_ids = [];                 // nothing auto-enrolled (per Q4)
+      payload.teacher_ids = form.teacher_ids;
+      payload.class_ids = [];
     } else {
       payload.grade_ids = form.grade_ids;
       payload.class_ids = [];
@@ -171,18 +259,37 @@ export default function CreateUserModal({
   const submitLabel = isStudent ? "Create Student" : "Create Teacher";
 
   return (
-    <ParchmentScrollModal
+    <SplitModal
       open={open}
       onClose={handleClose}
-      title={isStudent ? "Create a student" : "Create a teacher"}
-      subtitle="Fill in the details below to add a new member to your learning scroll."
+      title={isStudent ? "Create a Student" : "Create a Teacher"}
+      subtitle="Fill in the details below — you can edit everything later."
+      leftPanel={{
+        heading: isStudent
+          ? "Welcome a new student."
+          : "Invite a new teacher.",
+        subheading: isStudent
+          ? "Assign a grade and pick their teachers to get started."
+          : "Assign grades and set credentials — they can sign in right away.",
+        bullets: isStudent
+          ? [
+              "Fill in name & email",
+              "Choose a grade",
+              "Optionally pick teachers",
+            ]
+          : [
+              "Fill in name & email",
+              "Assign one or more grades",
+              "Set a strong password",
+            ],
+      }}
       footer={
         <>
           <button
             type="button"
             onClick={handleClose}
             disabled={isLoading}
-            className="rounded-full border-2 border-amber-400 bg-transparent px-5 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100 disabled:opacity-50"
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -190,9 +297,16 @@ export default function CreateUserModal({
             type="submit"
             form="admin-create-user-form"
             disabled={isLoading}
-            className="rounded-full bg-[#552928] px-6 py-2 text-sm font-bold text-white shadow-md transition hover:bg-[#6b6212] disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 hover:shadow-md disabled:opacity-60"
           >
-            {isLoading ? "Creating…" : submitLabel}
+            {isLoading ? (
+              "Creating…"
+            ) : (
+              <>
+                <Sparkles size={14} />
+                {submitLabel}
+              </>
+            )}
           </button>
         </>
       }
@@ -200,25 +314,20 @@ export default function CreateUserModal({
       <form
         id="admin-create-user-form"
         onSubmit={handleSubmit}
-        className="no-scrollbar flex max-h-[62vh] flex-col gap-3 overflow-y-auto pr-1"
-
+        className="flex flex-col gap-5"
       >
-        {/* Role — only shown on the generic All Users page */}
         {allowRoleSwitch && (
           <div>
-            <label htmlFor="role" className="block text-xs font-bold text-amber-900">
-              Role
-            </label>
+            <label className="block text-xs font-bold text-slate-700">Role</label>
             <select
-              id="role"
               value={form.role}
               onChange={handleChange("role")}
-              className="mt-2 h-11 w-full rounded-xl border-2 border-amber-300 bg-[#FFFDF7] px-4 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-300/50"
+              className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
             >
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
             </select>
-            <p className="mt-1.5 text-xs text-amber-800/60">
+            <p className="mt-1 text-xs text-slate-400">
               Admins are created only by platform operators.
             </p>
           </div>
@@ -227,74 +336,80 @@ export default function CreateUserModal({
         {/* ============ STUDENT LAYOUT ============ */}
         {isStudent && (
           <>
-            {/* Names — side by side */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
+              <Field
+                icon={User}
                 label="First Name"
                 value={form.first_name}
                 onChange={handleChange("first_name")}
                 error={errors.first_name?.[0]}
+                placeholder="Aarav"
                 required
                 autoFocus
-                theme="parchment"
               />
-              <Input
+              <Field
+                icon={User}
                 label="Last Name"
                 value={form.last_name}
                 onChange={handleChange("last_name")}
                 error={errors.last_name?.[0]}
+                placeholder="Sharma"
                 required
-                theme="parchment"
               />
             </div>
 
-            {/* Email */}
-            <Input
+            <Field
+              icon={Mail}
               label="Email"
               type="email"
               value={form.email}
               onChange={handleChange("email")}
               error={errors.email?.[0]}
+              placeholder="aarav@example.com"
               required
-              theme="parchment"
             />
 
-            {/* Passwords — side by side */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Password"
-                type="password"
-                value={form.password}
-                onChange={handleChange("password")}
-                error={errors.password?.[0]}
-                required
-                placeholder="At least 8 characters"
-                theme="parchment"
-              />
-              <Input
-                label="Confirm Password"
-                type="password"
-                value={form.confirm_password}
-                onChange={handleChange("confirm_password")}
-                error={errors.confirm_password?.[0]}
-                required
-                theme="parchment"
-              />
+            <div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  icon={Lock}
+                  label="Password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange("password")}
+                  error={errors.password?.[0]}
+                  placeholder="At least 8 characters"
+                  required
+                />
+                <Field
+                  icon={ShieldCheck}
+                  label="Confirm Password"
+                  type="password"
+                  value={form.confirm_password}
+                  onChange={handleChange("confirm_password")}
+                  error={errors.confirm_password?.[0]}
+                  placeholder="Repeat password"
+                  required
+                />
+              </div>
+              <PasswordStrength password={form.password} />
             </div>
 
-            {/* Grade (single select for students) */}
             <div>
-              <label htmlFor="grade" className="block text-xs font-bold text-amber-900">
+              <label className="block text-xs font-bold text-slate-700">
                 Grade
               </label>
               <select
-                id="grade"
                 value={form.grade_id}
                 onChange={(e) => {
-                  setForm((f) => ({ ...f, grade_id: e.target.value, teacher_ids: [] }));
+                  setForm((f) => ({
+                    ...f,
+                    grade_id: e.target.value,
+                    teacher_ids: [],
+                  }));
                   setTeacherSearch("");
                 }}
-                className="mt-2 h-11 w-full rounded-xl border-2 border-amber-300 bg-[#FFFDF7] px-4 text-sm text-slate-800 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-300/50"
+                className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
               >
                 <option value="">— Select grade —</option>
                 {grades.map((g) => (
@@ -304,23 +419,25 @@ export default function CreateUserModal({
                 ))}
               </select>
               {errors.grade_id?.[0] && (
-                <p className="mt-1.5 text-xs text-coral-600">{errors.grade_id[0]}</p>
+                <p className="mt-1 text-xs text-coral-600">
+                  {errors.grade_id[0]}
+                </p>
               )}
             </div>
 
-            {/* Teacher(s) for grade */}
             {form.grade_id && (
-              <div className="rounded-2xl border-2 border-amber-200 bg-[#FFFDF7]/70 p-3">
-
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold text-amber-900">Select Teacher(s)</p>
-                  <span className="text-[10px] text-amber-800/60">
+                  <p className="text-xs font-bold text-slate-700">
+                    Select Teacher(s)
+                  </p>
+                  <span className="text-[10px] font-semibold text-slate-400">
                     {form.teacher_ids.length} selected
                   </span>
                 </div>
 
                 {teachersForGrade.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-amber-800/60">
+                  <p className="py-3 text-center text-xs text-slate-400">
                     No teachers are assigned to this grade yet.
                   </p>
                 ) : (
@@ -328,17 +445,16 @@ export default function CreateUserModal({
                     <div className="relative mb-2">
                       <Search
                         size={13}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                       />
                       <input
-                        type="text"
                         value={teacherSearch}
                         onChange={(e) => setTeacherSearch(e.target.value)}
-                        placeholder="Search teachers..."
-                        className="w-full rounded-lg border-2 border-amber-200 bg-white py-2 pl-9 pr-3 text-xs text-slate-800 outline-none focus:border-amber-400"
+                        placeholder="Search teachers…"
+                        className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-purple-400"
                       />
                     </div>
-                    <ul className="no-scrollbar max-h-40 overflow-y-auto rounded-xl border-2 border-amber-200 bg-white">
+                    <ul className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white">
                       {filteredTeachers.map((t) => {
                         const checked = form.teacher_ids.includes(t.id);
                         return (
@@ -346,23 +462,23 @@ export default function CreateUserModal({
                             <button
                               type="button"
                               onClick={() => toggleTeacher(t.id)}
-                              className="flex w-full items-center gap-2 border-b border-amber-100 px-3 py-2 text-left last:border-b-0 transition hover:bg-amber-50"
+                              className="flex w-full items-center gap-2 border-b border-slate-100 px-3 py-2 text-left last:border-b-0 transition hover:bg-slate-50"
                             >
                               <span
                                 className={
-                                  "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 " +
+                                  "flex h-4 w-4 shrink-0 items-center justify-center rounded border " +
                                   (checked
-                                    ? "border-amber-500 bg-amber-500 text-white"
-                                    : "border-amber-300 bg-white")
+                                    ? "border-purple-500 bg-purple-500 text-white"
+                                    : "border-slate-300 bg-white")
                                 }
                               >
                                 {checked && <Check size={11} />}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-xs font-medium text-slate-800">
+                                <p className="truncate text-xs font-medium text-navy-950">
                                   {t.full_name || t.email}
                                 </p>
-                                <p className="truncate text-[10px] text-amber-800/60">
+                                <p className="truncate text-[10px] text-slate-400">
                                   {t.email}
                                 </p>
                               </div>
@@ -371,7 +487,7 @@ export default function CreateUserModal({
                         );
                       })}
                       {filteredTeachers.length === 0 && (
-                        <li className="py-3 text-center text-[11px] text-amber-800/60">
+                        <li className="py-3 text-center text-[11px] text-slate-400">
                           No teachers match your search.
                         </li>
                       )}
@@ -386,109 +502,105 @@ export default function CreateUserModal({
         {/* ============ TEACHER LAYOUT ============ */}
         {!isStudent && (
           <>
-            {/* Names — side by side */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
+              <Field
+                icon={User}
                 label="First Name"
                 value={form.first_name}
                 onChange={handleChange("first_name")}
                 error={errors.first_name?.[0]}
+                placeholder="Aarav"
                 required
                 autoFocus
-                theme="parchment"
               />
-              <Input
+              <Field
+                icon={User}
                 label="Last Name"
                 value={form.last_name}
                 onChange={handleChange("last_name")}
                 error={errors.last_name?.[0]}
+                placeholder="Sharma"
                 required
-                theme="parchment"
               />
             </div>
 
-            {/* Email */}
-            <Input
+            <Field
+              icon={Mail}
               label="Email"
               type="email"
               value={form.email}
               onChange={handleChange("email")}
               error={errors.email?.[0]}
+              placeholder="aarav@example.com"
               required
-              theme="parchment"
             />
 
-            {/* Passwords — side by side */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input
-                label="Password"
-                type="password"
-                value={form.password}
-                onChange={handleChange("password")}
-                error={errors.password?.[0]}
-                required
-                placeholder="At least 8 characters"
-                theme="parchment"
-              />
-              <Input
-                label="Confirm Password"
-                type="password"
-                value={form.confirm_password}
-                onChange={handleChange("confirm_password")}
-                error={errors.confirm_password?.[0]}
-                required
-                theme="parchment"
-              />
+            <div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field
+                  icon={Lock}
+                  label="Password"
+                  type="password"
+                  value={form.password}
+                  onChange={handleChange("password")}
+                  error={errors.password?.[0]}
+                  placeholder="At least 8 characters"
+                  required
+                />
+                <Field
+                  icon={ShieldCheck}
+                  label="Confirm Password"
+                  type="password"
+                  value={form.confirm_password}
+                  onChange={handleChange("confirm_password")}
+                  error={errors.confirm_password?.[0]}
+                  placeholder="Repeat password"
+                  required
+                />
+              </div>
+              <PasswordStrength password={form.password} />
             </div>
 
-            {/* Grade multi-select as grid */}
-            <div className="rounded-2xl border-2 border-amber-200 bg-[#FFFDF7]/70 p-4">
+            {/* Class chips */}
+            <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-bold text-amber-900">Select Grades</p>
-                <span className="text-[10px] text-amber-800/60">
+                <label className="text-xs font-bold text-slate-700">
+                  Assign grades
+                </label>
+                <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-purple-100">
                   {form.grade_ids.length} selected
                 </span>
               </div>
               {errors.grade_ids?.[0] && (
-                <p className="mb-2 text-xs text-coral-600">{errors.grade_ids[0]}</p>
+                <p className="mb-2 text-xs text-coral-600">
+                  {errors.grade_ids[0]}
+                </p>
               )}
               {grades.length === 0 ? (
-                <p className="py-4 text-center text-xs text-amber-800/60">
+                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 py-4 text-center text-xs text-slate-400">
                   No grades exist in your institution yet.
                 </p>
               ) : (
-                <div className="no-scrollbar h-28 max-h-28 overflow-y-auto rounded-xl border-2 border-amber-200 bg-white p-2">
-                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {grades.map((g) => {
-                      const checked = form.grade_ids.includes(g.id);
-                      return (
-                        <li key={g.id}>
-                          <button
-                            type="button"
-                            onClick={() => toggleGrade(g.id)}
-                            className={
-                              "flex w-full items-center gap-2 rounded-lg border-2 px-2.5 py-1.5 text-left text-xs font-semibold transition " +
-                              (checked
-                                ? "border-amber-400 bg-amber-100 text-amber-900"
-                                : "border-amber-100 bg-white text-slate-700 hover:border-amber-300 hover:bg-amber-50")
-                            }
-                          >
-                            <span
-                              className={
-                                "flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 " +
-                                (checked
-                                  ? "border-amber-500 bg-amber-500 text-white"
-                                  : "border-amber-300 bg-white")
-                              }
-                            >
-                              {checked && <Check size={10} />}
-                            </span>
-                            <span className="truncate">{g.name}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                  {grades.map((g) => {
+                    const checked = form.grade_ids.includes(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => toggleGrade(g.id)}
+                        className={
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition " +
+                          (checked
+                            ? "border-purple-500 bg-purple-600 text-white shadow-sm shadow-purple-200 hover:bg-purple-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700")
+                        }
+                      >
+                        {checked && <Check size={12} />}
+                        <span>{g.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -498,12 +610,12 @@ export default function CreateUserModal({
         {formError && (
           <p
             role="alert"
-            className="rounded-xl border-2 border-coral-200 bg-coral-50 px-3.5 py-2.5 text-sm font-semibold text-coral-600"
+            className="rounded-xl border border-coral-200 bg-coral-50 px-3.5 py-2.5 text-sm font-semibold text-coral-600"
           >
             {formError}
           </p>
         )}
       </form>
-    </ParchmentScrollModal>
+    </SplitModal>
   );
 }

@@ -8,7 +8,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 import Avatar from "../../../components/ui/Avatar";
-import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import Pager from "../../../components/ui/Pager";
 import LoadingState from "../../../components/feedback/LoadingState";
@@ -29,36 +28,9 @@ const STATUS_CHIPS = [
   { value: "archived", label: "Archived" },
 ];
 
-const SUBJECT_GRADIENTS = {
-  "Mathematics":      "from-purple-500 to-purple-700",
-  "Science":          "from-emerald-500 to-teal-600",
-  "English":          "from-coral-500 to-coral-700",
-  "History":          "from-amber-500 to-coral-600",
-  "Physics":          "from-purple-500 to-coral-500",
-  "Chemistry":        "from-teal-500 to-emerald-700",
-  "Biology":          "from-emerald-500 to-purple-500",
-  "Computer Science": "from-purple-500 to-purple-700",
-  "Geography":        "from-amber-500 to-coral-500",
-};
-
-const FALLBACK_GRADIENTS = [
-  "from-purple-500 to-purple-700",
-  "from-coral-500 to-coral-700",
-  "from-emerald-500 to-teal-600",
-  "from-amber-500 to-coral-500",
-  "from-teal-500 to-emerald-700",
-  "from-purple-500 to-coral-500",
-];
-
-function gradientForSubject(subject) {
-  if (!subject) return FALLBACK_GRADIENTS[0];
-  if (SUBJECT_GRADIENTS[subject]) return SUBJECT_GRADIENTS[subject];
-  let h = 0;
-  for (let i = 0; i < subject.length; i++) h = (h * 31 + subject.charCodeAt(i)) >>> 0;
-  return FALLBACK_GRADIENTS[h % FALLBACK_GRADIENTS.length];
-}
-
-/* ── Card menu with Delete ──────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────── */
+/*  Card actions menu (⋯)                                          */
+/* ─────────────────────────────────────────────────────────────── */
 function CardMenu({ course, onEdit, onArchiveToggle, onDelete, busy }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -81,9 +53,9 @@ function CardMenu({ course, onEdit, onArchiveToggle, onDelete, busy }) {
           setOpen((v) => !v);
         }}
         aria-label="Course actions"
-        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-slate-400 backdrop-blur transition-colors hover:bg-white hover:text-navy-950"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-navy-950"
       >
-        <MoreVertical size={14} />
+        <MoreVertical size={16} />
       </button>
 
       <AnimatePresence>
@@ -93,7 +65,7 @@ function CardMenu({ course, onEdit, onArchiveToggle, onDelete, busy }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg"
+            className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg ring-1 ring-black/5"
           >
             <button
               type="button"
@@ -126,7 +98,7 @@ function CardMenu({ course, onEdit, onArchiveToggle, onDelete, busy }) {
               {course.is_archived ? "Restore" : "Archive"}
             </button>
 
-            <div className="my-1 h-px bg-slate-100" />
+            <div className="my-1 h-px bg-gray-100" />
 
             <button
               type="button"
@@ -148,99 +120,123 @@ function CardMenu({ course, onEdit, onArchiveToggle, onDelete, busy }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────── */
+/*  Course card — clean white surface, purple accents              */
+/* ─────────────────────────────────────────────────────────────── */
 function CourseCard({ course, onEdit, onArchiveToggle, onDelete, busy }) {
   const navigate = useNavigate();
-  const gradient = gradientForSubject(course.subject);
-  const teacherName = course.teacher?.full_name || course.teacher?.email || "Unassigned";
-  const teacherInitials = (teacherName || "?")
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase() || "?";
+  const teacherName =
+    course.teacher?.full_name || course.teacher?.email || "Unassigned";
+  const teacherInitials =
+    (teacherName || "?")
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((p) => p[0])
+      .join("")
+      .toUpperCase() || "?";
+  const isArchived = course.is_archived;
 
   return (
     <motion.article
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.35 }}
       onClick={() => navigate(`/admin/courses/${course.id}`)}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated-lg"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
     >
-      <div className={`relative h-24 bg-gradient-to-br ${gradient} px-5 py-4`}>
-        <div className="flex items-start justify-between">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white backdrop-blur ring-1 ring-white/30">
-            <BookOpen size={18} strokeWidth={2.2} />
-          </span>
-          <CardMenu
-            course={course}
-            onEdit={() => onEdit(course)}
-            onArchiveToggle={() => onArchiveToggle(course)}
-            onDelete={() => onDelete(course)}
-            busy={busy}
-          />
-        </div>
+      {/* Top row: icon + actions */}
+      <div className="flex items-start justify-between p-5 pb-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
+          <BookOpen size={18} strokeWidth={2.2} />
+        </span>
+        <CardMenu
+          course={course}
+          onEdit={() => onEdit(course)}
+          onArchiveToggle={() => onArchiveToggle(course)}
+          onDelete={() => onDelete(course)}
+          busy={busy}
+        />
+      </div>
 
+      {/* Title + subject pill */}
+      <div className="px-5">
         {course.subject && (
-          <span className="mt-3 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur">
+          <span className="inline-block rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-purple-100">
             {course.subject}
           </span>
         )}
-      </div>
-
-      <div className="flex flex-1 flex-col p-5">
-        <h3 className="line-clamp-2 font-display text-base font-extrabold leading-snug text-navy-950 transition-colors group-hover:text-purple-500">
+        <h3 className="mt-2 line-clamp-2 font-display text-base font-extrabold leading-snug text-navy-950 transition-colors group-hover:text-purple-600">
           {course.name}
         </h3>
-
         {course.description && (
-          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
+          <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-slate-500">
             {course.description}
           </p>
         )}
+      </div>
 
-        <div className="mt-4 flex items-center gap-2.5">
-          <Avatar userId={course.teacher?.id || course.id} initials={teacherInitials} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Teacher
-            </p>
-            <p className="truncate text-xs font-semibold text-navy-950">
-              {teacherName}
-            </p>
-          </div>
+      {/* Teacher row */}
+      <div className="mt-4 flex items-center gap-2.5 px-5">
+        <Avatar
+          userId={course.teacher?.id || course.id}
+          initials={teacherInitials}
+          size="sm"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Teacher
+          </p>
+          <p className="truncate text-xs font-semibold text-navy-950">
+            {teacherName}
+          </p>
         </div>
+      </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-            <Users size={12} className="text-slate-400" />
-            {course.student_count ?? 0} student{course.student_count === 1 ? "" : "s"}
-          </span>
-          <Badge variant={course.is_archived ? "neutral" : "success"} dot>
-            {course.is_archived ? "Archived" : "Active"}
-          </Badge>
-        </div>
+      {/* Footer: students + status */}
+      <div className="mt-4 flex items-center justify-between border-t border-gray-100 px-5 py-4">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+          <Users size={12} className="text-slate-400" />
+          {course.student_count ?? 0}{" "}
+          {course.student_count === 1 ? "student" : "students"}
+        </span>
+
+        <span
+          className={
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider ring-1 " +
+            (isArchived
+              ? "bg-slate-50 text-slate-600 ring-slate-200"
+              : "bg-emerald-50 text-emerald-700 ring-emerald-100")
+          }
+        >
+          <span
+            className={
+              "h-1.5 w-1.5 rounded-full " +
+              (isArchived ? "bg-slate-400" : "bg-emerald-500")
+            }
+          />
+          {isArchived ? "Archived" : "Active"}
+        </span>
       </div>
     </motion.article>
   );
 }
 
-function StatMini({ label, value, tone = "purple", icon: Icon }) {
-  const TONE = {
-    purple:  { chip: "bg-purple-50 text-purple-600",  bar: "bg-purple-500" },
-    emerald: { chip: "bg-emerald-50 text-emerald-600", bar: "bg-emerald-500" },
-    coral:   { chip: "bg-coral-50 text-coral-600",     bar: "bg-coral-500" },
-  };
-  const t = TONE[tone];
+/* ─────────────────────────────────────────────────────────────── */
+/*  Stat card — unified purple tone                                */
+/* ─────────────────────────────────────────────────────────────── */
+function StatMini({ label, value, icon: Icon }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated">
-      <span className={`absolute inset-x-0 top-0 h-1 ${t.bar} opacity-70 group-hover:opacity-100`} />
+    <div className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-          <p className="mt-1.5 font-display text-2xl font-extrabold tabular-nums text-navy-950">{value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1.5 font-display text-3xl font-extrabold tabular-nums text-navy-950">
+            {value}
+          </p>
         </div>
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${t.chip}`}>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-purple-100">
           <Icon size={18} strokeWidth={2.2} />
         </span>
       </div>
@@ -248,7 +244,9 @@ function StatMini({ label, value, tone = "purple", icon: Icon }) {
   );
 }
 
-/* ── Delete confirmation modal ────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────── */
+/*  Delete confirmation                                            */
+/* ─────────────────────────────────────────────────────────────── */
 function DeleteConfirmModal({ course, onCancel, onConfirm, saving }) {
   return (
     <AnimatePresence>
@@ -265,7 +263,7 @@ function DeleteConfirmModal({ course, onCancel, onConfirm, saving }) {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 10 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-elevated-lg"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-gray-100"
           >
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-coral-50 text-coral-500">
               <AlertTriangle size={22} />
@@ -274,11 +272,12 @@ function DeleteConfirmModal({ course, onCancel, onConfirm, saving }) {
               Delete this course?
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-500">
-              This will <strong className="text-coral-600">permanently delete</strong> the course,
-              its enrolments, and any timetable entries linked to it. This action cannot be undone.
+              This will <strong className="text-coral-600">permanently delete</strong>{" "}
+              the course, its enrolments, and any timetable entries linked to it.
+              This action cannot be undone.
             </p>
 
-            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-xs">
+            <div className="mt-4 rounded-xl border border-gray-100 bg-slate-50/60 p-4 text-xs">
               <p className="flex items-center gap-2">
                 <BookOpen size={12} className="text-slate-400" />
                 <span className="font-bold text-navy-950">Course:</span>
@@ -292,7 +291,9 @@ function DeleteConfirmModal({ course, onCancel, onConfirm, saving }) {
               )}
               <p className="mt-1 flex items-center gap-2">
                 <span className="font-bold text-navy-950">Students:</span>
-                <span className="truncate text-slate-600">{course.student_count ?? 0}</span>
+                <span className="truncate text-slate-600">
+                  {course.student_count ?? 0}
+                </span>
               </p>
             </div>
 
@@ -317,7 +318,9 @@ function DeleteConfirmModal({ course, onCancel, onConfirm, saving }) {
   );
 }
 
-/* ── Page ─────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────── */
+/*  Page                                                           */
+/* ─────────────────────────────────────────────────────────────── */
 export default function AdminCoursesPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
@@ -339,7 +342,8 @@ export default function AdminCoursesPage() {
   if (subjectFilter) queryParams.subject = subjectFilter;
   if (search.trim()) queryParams.q = search.trim();
 
-  const { data, isLoading, isError, error, refetch } = useGetAdminCoursesQuery(queryParams);
+  const { data, isLoading, isError, error, refetch } =
+    useGetAdminCoursesQuery(queryParams);
   const [updateCourse] = useUpdateAdminCourseMutation();
   const [deleteCourseMutation] = useDeleteAdminCourseMutation();
 
@@ -380,7 +384,7 @@ export default function AdminCoursesPage() {
         is_archived: !course.is_archived,
       }).unwrap();
     } catch {
-      // Silent
+      // silent — tag invalidation refetches
     } finally {
       setBusyId(null);
     }
@@ -393,14 +397,17 @@ export default function AdminCoursesPage() {
       await deleteCourseMutation(deleteCourse.id).unwrap();
       setDeleteCourse(null);
     } catch {
-      // Silent — refetch on tag invalidation
+      // silent
     } finally {
       setDeleting(false);
     }
   };
 
+  const hasAnyFilter = statusFilter || subjectFilter || search;
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
@@ -416,15 +423,17 @@ export default function AdminCoursesPage() {
         </Button>
       </header>
 
+      {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatMini label="Total courses" value={count} tone="purple" icon={BookOpen} />
-        <StatMini label="Active (this page)" value={activeCount} tone="emerald" icon={UserCheck} />
-        <StatMini label="Archived (this page)" value={archivedCount} tone="coral" icon={Archive} />
+        <StatMini label="Total Courses" value={count} icon={BookOpen} />
+        <StatMini label="Active" value={activeCount} icon={UserCheck} />
+        <StatMini label="Archived" value={archivedCount} icon={Archive} />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
+      {/* Filter bar */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-1.5 rounded-full bg-slate-50 p-1">
+          <div className="flex items-center gap-1.5">
             {STATUS_CHIPS.map((chip) => {
               const isActive = statusFilter === chip.value;
               return (
@@ -432,11 +441,12 @@ export default function AdminCoursesPage() {
                   key={chip.value}
                   type="button"
                   onClick={() => setStatusFilter(chip.value)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
-                    isActive
-                      ? "bg-purple-500 text-white shadow-purple-glow"
-                      : "text-slate-500 hover:text-navy-950"
-                  }`}
+                  className={
+                    "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all " +
+                    (isActive
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-slate-500 hover:bg-purple-50 hover:text-purple-700")
+                  }
                 >
                   {chip.label}
                 </button>
@@ -448,11 +458,13 @@ export default function AdminCoursesPage() {
             <select
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
-              className="h-10 appearance-none rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+              className="h-10 appearance-none rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
             >
               <option value="">All subjects</option>
               {subjectOptions.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           )}
@@ -466,7 +478,7 @@ export default function AdminCoursesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by course name or subject"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-10 text-sm text-navy-950 placeholder:text-slate-400 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+              className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-10 text-sm text-navy-950 placeholder:text-slate-400 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
             />
             {search && (
               <button
@@ -486,32 +498,35 @@ export default function AdminCoursesPage() {
         </div>
       </div>
 
+      {/* States */}
       {isLoading && <LoadingState label="Loading courses..." />}
-
-      {isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
+      {isError && (
+        <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />
+      )}
 
       {!isLoading && !isError && courses.length === 0 && (
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-gray-200 bg-white p-14 text-center">
+          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500 ring-1 ring-purple-100">
             <BookOpen size={26} strokeWidth={2} />
           </span>
           <h2 className="font-display text-xl font-extrabold text-navy-950">
-            {statusFilter || subjectFilter || search ? "No courses match your filter" : "No courses yet"}
+            {hasAnyFilter ? "No courses match your filter" : "No courses yet"}
           </h2>
           <p className="max-w-md text-sm text-slate-500">
-            {statusFilter || subjectFilter || search
+            {hasAnyFilter
               ? "Try clearing filters or searching for something else."
               : "Create the first course and assign it to a teacher."}
           </p>
-          {!statusFilter && !subjectFilter && !search && (
+          {!hasAnyFilter && (
             <Button onClick={handleCreate} className="mt-2">
               <Plus size={15} />
-              Create class
+              Create course
             </Button>
           )}
         </div>
       )}
 
+      {/* Grid */}
       {!isLoading && !isError && courses.length > 0 && (
         <>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -527,7 +542,12 @@ export default function AdminCoursesPage() {
             ))}
           </div>
 
-          <Pager page={page} count={count} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pager
+            page={page}
+            count={count}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
 

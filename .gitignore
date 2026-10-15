@@ -66,3 +66,8 @@ dist/
 .vite/
 
 _node_modules_old/
+
+# Backup files from editor / save extensions
+*.bak
+*.bak-*
+*.bak.*
