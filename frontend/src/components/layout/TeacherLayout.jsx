@@ -17,7 +17,7 @@ export default function TeacherLayout() {
       {/* Shared full-screen background image — identical to admin */}
       <PageBackground role="teacher" />
 
-      <Navbar />
+      <Navbar role="teacher" />
 
       <div className="relative flex">
         <Sidebar role="teacher" />

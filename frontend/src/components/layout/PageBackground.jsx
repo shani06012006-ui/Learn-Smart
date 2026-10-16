@@ -8,7 +8,7 @@ const TEACHER_BG_IMAGE_URL =
   "https://i.pinimg.com/1200x/ad/82/b8/ad82b8b19fb4b7dd4fedecbf64616f6b.jpg";  
 
 const STUDENT_BG_IMAGE_URL =
-  "https://i.pinimg.com/1200x/cf/cc/ac/cfccac262211bd8fc1675500a5b5d3e5.jpg";  
+  "https://i.pinimg.com/1200x/b0/1f/28/b01f28fc9bb6fce234dc2609165d7ff4.jpg";  
 
 const DEFAULT_BG_IMAGE_URL = ADMIN_BG_IMAGE_URL;
 
@@ -16,7 +16,7 @@ const DEFAULT_BG_IMAGE_URL = ADMIN_BG_IMAGE_URL;
 export const PAGE_BG_OPACITY = 0.95;
 
 // Soft white gradient over the image so text stays legible
-export const PAGE_BG_VEIL = "from-white/55 via-white/35 to-white/65";
+export const PAGE_BG_VEIL = "";
 
 /* ================================================================= */
 

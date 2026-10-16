@@ -1,62 +1,26 @@
+// frontend/src/components/layout/Sidebar.jsx
 import { NavLink, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import clsx from "clsx";
-import {
-  LayoutDashboard,
-  BookOpen,
-  GraduationCap,
-  FileText,
-  Megaphone,
-  MessageSquare,
-  Video,
-  Trophy,
-  KeyRound,
-  CalendarDays,
-  CalendarX,
-  ClipboardCheck,
-  Brain,
-  LogOut,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { sidebarClosed } from "../../store/slices/uiSlice";
 import { useAuth } from "../../hooks/useAuth";
-
-const TEACHER_ITEMS = [
-  { label: "Dashboard",     to: "/teacher",                    icon: LayoutDashboard, end: true },
-  { label: "Classes",       to: "/teacher/classes",            icon: BookOpen },
-  { label: "Students",      to: "/teacher/students",           icon: GraduationCap },
-  { label: "Timetable",     to: "/teacher/timetable",          icon: CalendarDays },
-  { label: "Attendance",    to: "/teacher/attendance",         icon: ClipboardCheck },
-  { label: "Leaves",        to: "/teacher/leaves",             icon: CalendarX },
-  { label: "Quizzes",       to: "/teacher/quizzes",            icon: Brain },
-  { label: "Materials",     to: "/teacher/materials",          icon: FileText },
-  { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },
-  { label: "Live Classes",  to: "/teacher/live-classes",       icon: Video },
-  { label: "Messages",      to: "/teacher/chat",               icon: MessageSquare },
-];
-
-const STUDENT_ITEMS = [
-  { label: "Dashboard",     to: "/student",                  icon: LayoutDashboard, end: true },
-  { label: "My Classes",    to: "/student/classes",          icon: BookOpen },
-  { label: "Timetable",     to: "/student/timetable",        icon: CalendarDays },
-  { label: "Join a class",  to: "/student/join-class",       icon: KeyRound },
-  { label: "Materials",     to: "/student/materials",        icon: FileText },
-  { label: "Announcements", to: "/student/announcements",    icon: Megaphone },
-  { label: "Performance",   to: "/student/performance",      icon: Trophy },
-  { label: "Live Classes",  to: "/student/live-classes",     icon: Video },
-  { label: "Messages",      to: "/student/chat",             icon: MessageSquare },
-];
+import { getSidebarConfig } from "./chromeConfig";
 
 export default function Sidebar({ role }) {
-  const items = role === "teacher" ? TEACHER_ITEMS : STUDENT_ITEMS;
+  const config = getSidebarConfig(role);
   const sidebarOpen = useSelector((s) => s.ui.sidebarOpen);
   const dispatch = useDispatch();
   const { user, logout } = useAuth();
 
-  const displayName = user?.full_name
-    || (user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : null)
-    || user?.email
-    || "User";
+  const displayName =
+    user?.full_name ||
+    (user?.first_name
+      ? `${user.first_name} ${user.last_name || ""}`.trim()
+      : null) ||
+    user?.email ||
+    "User";
 
   return (
     <>
@@ -67,22 +31,31 @@ export default function Sidebar({ role }) {
         />
       )}
 
-      <aside 
-        className={clsx( 
-             "fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200/60 bg-white/80 backdrop-blur-md transition-transform md:static md:translate-x-0",
-          sidebarOpen && "translate-x-0"
+      <aside
+        className={clsx(
+          "fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r transition-transform md:static md:translate-x-0",
+          config.sidebarClass,
+          sidebarOpen && "translate-x-0",
         )}
       >
         {/* Brand */}
-        <div className="border-b border-slate-100 px-5 py-5">
-          <Link to={role === "teacher" ? "/teacher" : "/student"} className="flex items-center gap-2.5">
+        <div className={clsx("border-b px-5 py-5", config.footerDivider)}>
+          <Link
+            to={role === "teacher" ? "/teacher" : "/student"}
+            className="flex items-center gap-2.5"
+          >
             <img
               src="/learn-smart-logo.png"
               alt="Learn Smart"
               className="h-20 w-auto object-contain"
             />
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p
+                className={
+                  "text-[10px] font-semibold uppercase tracking-wider " +
+                  config.brandLabelClass
+                }
+              >
                 {role === "teacher" ? "Teacher" : "Student"}
               </p>
             </div>
@@ -92,22 +65,8 @@ export default function Sidebar({ role }) {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-0.5">
-            {items.map((item) => {
+            {config.items.map((item) => {
               const Icon = item.icon;
-              if (item.disabled) {
-                return (
-                  <li key={item.label}>
-                    <div
-                      className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-300"
-                      title={`Coming in ${item.note}`}
-                    >
-                      <Icon size={16} />
-                      <span className="flex-1 truncate">{item.label}</span>
-                      <span className="text-[10px]">{item.note}</span>
-                    </div>
-                  </li>
-                );
-              }
               return (
                 <li key={item.label}>
                   <NavLink
@@ -116,9 +75,7 @@ export default function Sidebar({ role }) {
                     onClick={() => dispatch(sidebarClosed())}
                     className={({ isActive }) =>
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
-                      (isActive
-                        ? "bg-red-800 text-white shadow-purple-glow"
-                        : "text-slate-500 hover:bg-purple-50 hover:text-red-900")
+                      (isActive ? config.navItemActive : config.navItemIdle)
                     }
                   >
                     <Icon size={16} />
@@ -131,12 +88,17 @@ export default function Sidebar({ role }) {
         </nav>
 
         {/* User + logout */}
-        <div className="border-t border-slate-100 px-3 py-3">
+        <div className={clsx("border-t px-3 py-3", config.footerDivider)}>
           <div className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-black to-red-500 text-[10px] font-bold text-white">
-              {user?.first_name?.[0]?.toUpperCase()
-                || user?.email?.[0]?.toUpperCase()
-                || "U"}
+            <div
+              className={
+                "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold " +
+                config.avatarClass
+              }
+            >
+              {user?.first_name?.[0]?.toUpperCase() ||
+                user?.email?.[0]?.toUpperCase() ||
+                "U"}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-bold text-navy-950">
@@ -150,7 +112,10 @@ export default function Sidebar({ role }) {
           <button
             type="button"
             onClick={logout}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-coral-50 hover:text-coral-600"
+            className={
+              "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
+              config.signOutClass
+            }
           >
             <LogOut size={16} />
             Sign out

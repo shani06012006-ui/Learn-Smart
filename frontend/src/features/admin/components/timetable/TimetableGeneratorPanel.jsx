@@ -118,7 +118,7 @@ export default function TimetableGeneratorPanel({ open, onClose, onGenerated }) 
         <header className="flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-4 text-white">
           <div>
             <h2 className="font-display text-lg font-extrabold">
-              ⚡ AI Timetable Generator
+             AI Timetable Generator
             </h2>
             <p className="text-xs text-white/80">
               Generate a clash-free schedule for selected sections.
