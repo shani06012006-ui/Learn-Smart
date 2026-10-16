@@ -14,7 +14,7 @@ export default function AdminLayout() {
       />
 
       {/* Shared full-screen background image */}
-      <PageBackground />
+      <PageBackground role="admin" />
 
       <AdminSidebar />
 

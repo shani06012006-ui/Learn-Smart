@@ -1,5 +1,5 @@
 // frontend/src/features/student/pages/StudentProgressPage.jsx
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import {
   BookOpen, Award, TrendingUp, CalendarDays, LogOut, User, Loader2,
@@ -11,6 +11,7 @@ import {
   useGetStudentMyAttendanceQuery,
 } from "../../../store/api/realApi";
 import { adminLoggedOut } from "../../../store/slices/adminAuthSlice";
+import { getRoleConfig } from "../../../config/roleConfig";
 
 function StatBlock({ label, value, tone }) {
   const toneMap = {
@@ -28,6 +29,8 @@ function StatBlock({ label, value, tone }) {
 }
 
 export default function StudentProgressPage() {
+  const R = getRoleConfig("student");
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -44,16 +47,26 @@ export default function StudentProgressPage() {
 
   const loading = meLoading || classesLoading || attLoading;
 
+  // Safe fallbacks in case the config ever lacks a heading
+  const heading = R.headings?.dashboard || {
+    title: "My Progress",
+    subtitle: "Welcome back!",
+  };
+  const attendanceHeading = R.headings?.attendanceSection || "MY ATTENDANCE";
+  const classesHeading = R.headings?.classesSection || "MY CLASSES";
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            My Progress
+            {heading.title}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {me?.full_name ? `Welcome, ${me.full_name}!` : "Welcome back!"}
+            {me?.full_name
+              ? `${heading.subtitle}, ${me.full_name}!`
+              : heading.subtitle}
             {me?.grade?.name ? ` · ${me.grade.name}` : ""}
           </p>
         </div>
@@ -70,7 +83,7 @@ export default function StudentProgressPage() {
           {/* Attendance summary */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
             <h2 className="mb-4 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              My Attendance
+              {attendanceHeading}
             </h2>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               <StatBlock label="Present"  value={attendance?.present  ?? 0} tone="emerald" />
@@ -115,7 +128,7 @@ export default function StudentProgressPage() {
           {/* Classes */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
             <h2 className="mb-4 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              My Classes ({classes.length})
+              {classesHeading} ({classes.length})
             </h2>
             {classes.length === 0 ? (
               <p className="py-6 text-center text-sm text-slate-400">

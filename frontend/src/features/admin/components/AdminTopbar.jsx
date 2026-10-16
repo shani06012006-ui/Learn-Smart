@@ -9,14 +9,14 @@ export default function AdminTopbar() {
   const user = useSelector(selectAdminUser);
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/70 bg-white/70 px-6 backdrop-blur-md">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-900/70 px-6 backdrop-blur-md">
       <div>
-        <p className="font-display text-sm font-extrabold text-navy-950">
+        <p className="font-display text-sm font-extrabold text-slate-100">
           Admin Console
         </p>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-slate-500">
           Signed in as{" "}
-          <span className="font-semibold text-navy-950">
+          <span className="font-semibold text-slate-200">
             {user?.email || "—"}
           </span>
         </p>
@@ -26,7 +26,7 @@ export default function AdminTopbar() {
         to="/"
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition-all hover:border-slate-300 hover:text-navy-950"
+        className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/60 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition-all hover:border-slate-600 hover:bg-slate-700/70 hover:text-white"
       >
         <ExternalLink size={12} />
         View public site

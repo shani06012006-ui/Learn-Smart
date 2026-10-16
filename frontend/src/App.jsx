@@ -22,6 +22,10 @@ import PricingPage from "./features/pricing/PricingPage";
 import BlogsPage from "./features/blogs/BlogsPage";
 import ContactPage from "./features/contact/ContactPage";
 
+import StudentQuizzesPage from "./features/student/pages/StudentQuizzesPage";
+import StudentTakeQuizPage from "./features/student/pages/StudentTakeQuizPage";
+import StudentQuizResultPage from "./features/student/pages/StudentQuizResultPage";
+
 // Admin
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
 import AdminLayout from "./features/admin/AdminLayout";
@@ -77,6 +81,9 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["student"]} />}>
           <Route path="/student" element={<StudentLayout />}>
+            <Route path="quizzes" element={<StudentQuizzesPage />} />
+            <Route path="quizzes/:quizId" element={<StudentTakeQuizPage />} />
+            <Route path="quiz-attempts/:attemptId" element={<StudentQuizResultPage />} />
             <Route index element={<StudentProgressPage />} />
             <Route path="progress" element={<StudentProgressPage />} />
             <Route path="classes" element={<StudentMyClassesPage />} />

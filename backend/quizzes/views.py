@@ -12,9 +12,13 @@ from .models import Quiz
 from .serializers import (
     GenerateFromPdfSerializer,
     QuizReadSerializer,
-    QuizWriteSerializer,
+    QuizWriteSerializer,StudentQuizTakeSerializer, QuizAttemptSerializer
 )
+from datetime import timedelta
 
+from django.db import transaction
+
+from .models import AttemptAnswer, Choice, Question, Quiz, QuizAttempt
 
 class QuizViewSet(viewsets.ModelViewSet):
     """
@@ -217,3 +221,246 @@ class StudentQuizListView(APIView):
         return Response(
             QuizReadSerializer(qs, many=True, context={"request": request}).data
         )
+
+# ===============================================================
+# Student quiz-taking endpoints
+# ===============================================================
+
+def _is_student(user):
+    return getattr(user, "role", None) == "student"
+
+
+def _student_can_access_quiz(student, quiz):
+    """Student must have an active enrollment in the quiz's class."""
+    return quiz.class_course.enrollments.filter(
+        student=student, status="active"
+    ).exists()
+
+
+class StudentStartQuizAttemptView(APIView):
+    """
+    POST /api/v1/student/quizzes/<quiz_id>/start/
+    Creates (or returns existing) attempt + serves quiz WITHOUT is_correct.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, quiz_id):
+        if not _is_student(request.user):
+            return Response({"detail": "Student access only."}, status=403)
+
+        try:
+            quiz = Quiz.objects.select_related("class_course").get(id=quiz_id)
+        except Quiz.DoesNotExist:
+            return Response({"detail": "Quiz not found."}, status=404)
+
+        if not quiz.is_published:
+            return Response({"detail": "Quiz is not available yet."}, status=400)
+
+        if not _student_can_access_quiz(request.user, quiz):
+            return Response(
+                {"detail": "You are not enrolled in this quiz's class."},
+                status=403,
+            )
+
+        attempt, created = QuizAttempt.objects.get_or_create(
+            quiz=quiz, student=request.user
+        )
+
+        # If they already submitted → block re-entry
+        if attempt.status == QuizAttempt.STATUS_SUBMITTED:
+            return Response(
+                {"detail": "You have already submitted this quiz.",
+                 "attempt_id": str(attempt.id)},
+                status=400,
+            )
+
+        # Enforce time limit server-side
+        elapsed = timezone.now() - attempt.started_at
+        if elapsed > timedelta(minutes=quiz.duration_minutes):
+            # Auto-submit: mark as submitted with whatever they had (empty)
+            attempt.status = QuizAttempt.STATUS_SUBMITTED
+            attempt.submitted_at = timezone.now()
+            attempt.save(update_fields=["status", "submitted_at", "updated_at"])
+            return Response(
+                {"detail": "Time is up. Your attempt has been auto-submitted.",
+                 "attempt_id": str(attempt.id)},
+                status=400,
+            )
+
+        seconds_left = max(
+            0,
+            int(
+                (timedelta(minutes=quiz.duration_minutes) - elapsed)
+                .total_seconds()
+            ),
+        )
+
+        return Response({
+            "attempt_id": str(attempt.id),
+            "started_at": attempt.started_at,
+            "seconds_left": seconds_left,
+            "quiz": StudentQuizTakeSerializer(quiz, context={"request": request}).data,
+        })
+
+
+class StudentSubmitQuizAttemptView(APIView):
+    """
+    POST /api/v1/student/quizzes/<quiz_id>/submit/
+    Body: {"answers": [{"question_id": "...", "choice_id": "..."}, ...]}
+    Scores answers, marks submitted, returns the attempt with full review.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, quiz_id):
+        if not _is_student(request.user):
+            return Response({"detail": "Student access only."}, status=403)
+
+        try:
+            quiz = Quiz.objects.select_related("class_course").get(id=quiz_id)
+        except Quiz.DoesNotExist:
+            return Response({"detail": "Quiz not found."}, status=404)
+
+        try:
+            attempt = QuizAttempt.objects.get(quiz=quiz, student=request.user)
+        except QuizAttempt.DoesNotExist:
+            return Response({"detail": "Attempt not started."}, status=400)
+
+        if attempt.status == QuizAttempt.STATUS_SUBMITTED:
+            return Response(
+                {"detail": "Already submitted.",
+                 "attempt_id": str(attempt.id)},
+                status=400,
+            )
+
+        # Enforce time limit
+        elapsed = timezone.now() - attempt.started_at
+        if elapsed > timedelta(minutes=quiz.duration_minutes + 1):
+            # +1 min grace for network jitter; anything beyond is auto-submitted as-is
+            pass  # still accept, but score what they sent
+
+        answers = request.data.get("answers") or []
+        if not isinstance(answers, list):
+            return Response({"detail": "answers must be a list."}, status=400)
+
+        # Build lookup for fast scoring
+        questions = list(quiz.questions.prefetch_related("choices"))
+        question_by_id = {str(q.id): q for q in questions}
+        choice_by_id = {}
+        for q in questions:
+            for c in q.choices.all():
+                choice_by_id[str(c.id)] = c
+
+        total_possible = sum(q.points for q in questions)
+
+        with transaction.atomic():
+            # Wipe any previous (partial) answers for idempotency
+            attempt.answers.all().delete()
+
+            running_score = 0
+            for row in answers:
+                qid = str(row.get("question_id", ""))
+                cid = row.get("choice_id")
+                cid = str(cid) if cid else None
+                q = question_by_id.get(qid)
+                if not q:
+                    continue
+
+                c = choice_by_id.get(cid) if cid else None
+                is_correct = bool(c and c.question_id == q.id and c.is_correct)
+                points = q.points if is_correct else 0
+                running_score += points
+
+                AttemptAnswer.objects.create(
+                    attempt=attempt,
+                    question=q,
+                    choice=c,
+                    is_correct=is_correct,
+                    points_awarded=points,
+                )
+
+            # Unanswered questions still count against total_possible
+            attempt.score = running_score
+            attempt.max_score = total_possible
+            attempt.status = QuizAttempt.STATUS_SUBMITTED
+            attempt.submitted_at = timezone.now()
+            attempt.save(
+                update_fields=["score", "max_score", "status",
+                               "submitted_at", "updated_at"]
+            )
+
+        return Response(
+            QuizAttemptSerializer(attempt, context={"request": request}).data
+        )
+
+
+class StudentQuizAttemptResultView(APIView):
+    """
+    GET /api/v1/student/quiz-attempts/<attempt_id>/
+    Full review: score, correct answers, explanations.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, attempt_id):
+        if not _is_student(request.user):
+            return Response({"detail": "Student access only."}, status=403)
+        try:
+            attempt = QuizAttempt.objects.select_related(
+                "quiz", "quiz__class_course"
+            ).prefetch_related(
+                "answers__question__choices", "answers__choice"
+            ).get(id=attempt_id, student=request.user)
+        except QuizAttempt.DoesNotExist:
+            return Response({"detail": "Attempt not found."}, status=404)
+        return Response(
+            QuizAttemptSerializer(attempt, context={"request": request}).data
+        )
+
+
+class TeacherQuizSubmissionsView(APIView):
+    """
+    GET /api/v1/quizzes/<quiz_id>/submissions/
+    Teacher views all attempts on their own quiz.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, quiz_id):
+        user = request.user
+        try:
+            quiz = Quiz.objects.select_related("teacher").get(id=quiz_id)
+        except Quiz.DoesNotExist:
+            return Response({"detail": "Quiz not found."}, status=404)
+
+        if not (user.is_superuser
+                or getattr(user, "role", None) == "admin"
+                or (getattr(user, "role", None) == "teacher"
+                    and quiz.teacher_id == user.id)):
+            return Response({"detail": "Not your quiz."}, status=403)
+
+        attempts = (
+            QuizAttempt.objects.filter(quiz=quiz)
+            .select_related("student")
+            .order_by("-submitted_at", "-started_at")
+        )
+
+        data = []
+        for a in attempts:
+            data.append({
+                "id": str(a.id),
+                "student_id": str(a.student_id),
+                "student_name": a.student.get_full_name() or a.student.email,
+                "student_email": a.student.email,
+                "status": a.status,
+                "score": a.score,
+                "max_score": a.max_score,
+                "percentage": a.percentage,
+                "passed": a.passed,
+                "started_at": a.started_at,
+                "submitted_at": a.submitted_at,
+            })
+
+        return Response({
+            "quiz_id": str(quiz.id),
+            "quiz_title": quiz.title,
+            "count": len(data),
+            "results": data,
+        })

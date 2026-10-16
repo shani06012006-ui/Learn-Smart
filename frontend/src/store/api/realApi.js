@@ -231,6 +231,10 @@ export const realApi = createApi({
       providesTags: ["AdminAttendance"],
     }),
 
+    getStudentQuizzes: builder.query({
+      query: () => "/student/quizzes/",
+      providesTags: ["StudentQuizzes"],
+    }),
     // ---- Quizzes ----
     getQuizzes: builder.query({
       query: (params = {}) => {
@@ -277,6 +281,33 @@ export const realApi = createApi({
         body: formData,
         formData: true,
       }),
+    }),
+
+    startQuizAttempt: builder.mutation({
+      query: (quizId) => ({
+        url: `/student/quizzes/${quizId}/start/`,
+        method: "POST",
+      }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+
+    submitQuizAttempt: builder.mutation({
+      query: ({ quizId, answers }) => ({
+        url: `/student/quizzes/${quizId}/submit/`,
+        method: "POST",
+        body: { answers },
+      }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+
+    getQuizAttemptResult: builder.query({
+      query: (attemptId) => `/student/quiz-attempts/${attemptId}/`,
+      providesTags: (_r, _e, id) => [{ type: "QuizAttempt", id }],
+    }),
+
+    getTeacherQuizSubmissions: builder.query({
+      query: (quizId) => `/quizzes/${quizId}/submissions/`,
+      providesTags: (_r, _e, id) => [{ type: "QuizSubmissions", id }],
     }),
     publishQuiz: builder.mutation({
       query: (id) => ({
@@ -980,9 +1011,9 @@ export const realApi = createApi({
       ],
     }),
 
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Classes (teacher / student, role-scoped by backend)
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     getClasses: builder.query({
       query: (params = {}) => {
@@ -1102,9 +1133,9 @@ export const realApi = createApi({
       invalidatesTags: [{ type: "ClassMaterial", id: "LIST" }],
     }),
 
-    // ─────────────────────────────────────────────────────────
-    // Chat — institution teacher group
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Chat â€” institution teacher group
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     getTeacherGroupThread: builder.query({
       query: () => `/chat/teacher-group/`,
@@ -1116,9 +1147,9 @@ export const realApi = createApi({
       providesTags: [{ type: "ChatThread", id: "teacher-group-members" }],
     }),
 
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // My leaves (teacher or student)
-    // ─────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     getMyLeaves: builder.query({
       query: (params = {}) => {
@@ -1419,6 +1450,7 @@ export const {
   useGetAdminAttendanceAuditQuery,
   useUnpublishQuizMutation,
 
+  useGetStudentQuizzesQuery,
   useGetQuizzesQuery,
   useGetQuizQuery,
   useCreateQuizMutation,
@@ -1549,7 +1581,10 @@ export const {
   useCreateAdminAbsenceMutation,
   useSuggestSubstitutesMutation,
   useAssignSubstituteMutation,
-
+  useStartQuizAttemptMutation,
+  useSubmitQuizAttemptMutation,
+  useGetQuizAttemptResultQuery,
+  useGetTeacherQuizSubmissionsQuery,
 
   usePurgeStaleSessionsMutation,
 

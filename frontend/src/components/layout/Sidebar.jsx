@@ -6,10 +6,10 @@ import { LogOut } from "lucide-react";
 
 import { sidebarClosed } from "../../store/slices/uiSlice";
 import { useAuth } from "../../hooks/useAuth";
-import { getSidebarConfig } from "./chromeConfig";
+import { getRoleConfig } from "../../config/roleConfig";
 
 export default function Sidebar({ role }) {
-  const config = getSidebarConfig(role);
+  const R = getRoleConfig(role);
   const sidebarOpen = useSelector((s) => s.ui.sidebarOpen);
   const dispatch = useDispatch();
   const { user, logout } = useAuth();
@@ -34,12 +34,12 @@ export default function Sidebar({ role }) {
       <aside
         className={clsx(
           "fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r transition-transform md:static md:translate-x-0",
-          config.sidebarClass,
+          R.sidebar.wrapper,
           sidebarOpen && "translate-x-0",
         )}
       >
         {/* Brand */}
-        <div className={clsx("border-b px-5 py-5", config.footerDivider)}>
+        <div className={clsx("border-b px-5 py-5", R.sidebar.divider)}>
           <Link
             to={role === "teacher" ? "/teacher" : "/student"}
             className="flex items-center gap-2.5"
@@ -53,10 +53,10 @@ export default function Sidebar({ role }) {
               <p
                 className={
                   "text-[10px] font-semibold uppercase tracking-wider " +
-                  config.brandLabelClass
+                  R.sidebar.brandLabel
                 }
               >
-                {role === "teacher" ? "Teacher" : "Student"}
+                {R.longLabel}
               </p>
             </div>
           </Link>
@@ -65,7 +65,7 @@ export default function Sidebar({ role }) {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="flex flex-col gap-0.5">
-            {config.items.map((item) => {
+            {R.sidebar.navItems.map((item) => {
               const Icon = item.icon;
               return (
                 <li key={item.label}>
@@ -75,7 +75,9 @@ export default function Sidebar({ role }) {
                     onClick={() => dispatch(sidebarClosed())}
                     className={({ isActive }) =>
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
-                      (isActive ? config.navItemActive : config.navItemIdle)
+                      (isActive
+                        ? R.sidebar.navItemActive
+                        : R.sidebar.navItemIdle)
                     }
                   >
                     <Icon size={16} />
@@ -88,12 +90,12 @@ export default function Sidebar({ role }) {
         </nav>
 
         {/* User + logout */}
-        <div className={clsx("border-t px-3 py-3", config.footerDivider)}>
+        <div className={clsx("border-t px-3 py-3", R.sidebar.divider)}>
           <div className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2">
             <div
               className={
                 "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold " +
-                config.avatarClass
+                R.sidebar.avatarClass
               }
             >
               {user?.first_name?.[0]?.toUpperCase() ||
@@ -101,10 +103,10 @@ export default function Sidebar({ role }) {
                 "U"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-bold text-navy-950">
+              <p className={"truncate text-xs font-bold " + R.sidebar.userName}>
                 {displayName}
               </p>
-              <p className="truncate text-[10px] text-slate-400">
+              <p className={"truncate text-[10px] " + R.sidebar.userEmail}>
                 {user?.email}
               </p>
             </div>
@@ -114,7 +116,7 @@ export default function Sidebar({ role }) {
             onClick={logout}
             className={
               "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
-              config.signOutClass
+              R.sidebar.signOutClass
             }
           >
             <LogOut size={16} />

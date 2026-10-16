@@ -14,7 +14,7 @@ from attendance.student_views import StudentSelfViewSet
 from chat.student_views import StudentChatViewSet, TeacherChatViewSet
 from admin_api.views import PerformanceTrendView, TeacherPerformanceTrendView
 from leaves.views import TeacherStudentLeavesViewSet
-from quizzes.views import StudentQuizListView
+from quizzes.views import ( StudentQuizListView, StudentStartQuizAttemptView, StudentSubmitQuizAttemptView, StudentQuizAttemptResultView, TeacherQuizSubmissionsView, )
 from classes.sections_views import (
     AdminSectionsView, AdminSectionDetailView, SectionAssignStudentsView,SectionStudentsView, 
 )
@@ -22,6 +22,7 @@ from admin_api.timetable_generate_views import AdminGenerateTimetableView
 from admin_api.substitution_views import (
     AdminAbsencesView, SuggestSubstitutesView, AssignSubstituteView,
 )
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -90,7 +91,12 @@ urlpatterns = [
     path("api/v1/student/chat/rooms/<uuid:pk>/send/", StudentChatViewSet.as_view({"post": "send"}), name="student-chat-send"),
     path("api/v1/student/chat/rooms/dm/<uuid:teacher_id>/", StudentChatViewSet.as_view({"post": "dm"}), name="student-chat-dm"),
     path("api/v1/student/chat/rooms/teachers/", StudentChatViewSet.as_view({"get": "teachers"}), name="student-chat-teachers"),
-
+    path("api/v1/student/quizzes/", StudentQuizListView.as_view(), name="student-quizzes"),
+    path("api/v1/student/quizzes/<uuid:quiz_id>/start/",StudentStartQuizAttemptView.as_view(), name="student-quiz-start"),
+    path("api/v1/student/quizzes/<uuid:quiz_id>/submit/",StudentSubmitQuizAttemptView.as_view(),name="student-quiz-submit" ),
+    path("api/v1/student/quiz-attempts/<uuid:attempt_id>/",StudentQuizAttemptResultView.as_view(),name="student-quiz-attempt-result" ),
+    path("api/v1/quizzes/<uuid:quiz_id>/submissions/", TeacherQuizSubmissionsView.as_view(), name="teacher-quiz-submissions" ),
+    
     # ============================================================
     # Top-level attendance
     # ============================================================

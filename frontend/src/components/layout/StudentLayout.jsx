@@ -15,7 +15,7 @@ export default function StudentLayout() {
       <Navbar role="student" />
 
       <div className="relative flex">
-        <Sidebar role="student" transparent />
+        <Sidebar role="student" />
         <main className="min-w-0 flex-1 p-4 md:p-6">
           <Outlet />
         </main>

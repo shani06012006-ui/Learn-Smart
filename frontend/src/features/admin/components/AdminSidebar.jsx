@@ -1,6 +1,10 @@
 // frontend/src/features/admin/components/AdminSidebar.jsx
 import { NavLink, Link } from "react-router-dom";
-import { LayoutDashboard, BookOpen, Layers, UserCog, GraduationCap, ClipboardCheck, CalendarDays, CalendarX, Monitor, MessageSquare, Grid3X3, Sparkles, UserCheck, LogOut } from "lucide-react";
+import {
+  LayoutDashboard, BookOpen, Layers, UserCog, GraduationCap,
+  ClipboardCheck, CalendarDays, CalendarX, Monitor, MessageSquare,
+  UserCheck, LogOut,
+} from "lucide-react";
 import { useAdminAuth } from "../../../hooks/useAdminAuth";
 import {
   useGetStudentLeavesQuery,
@@ -8,21 +12,53 @@ import {
 } from "../../../store/api/realApi";
 
 const NAV_ITEMS = [
-  { to: "/admin",              end: true, label: "Dashboard",  icon: LayoutDashboard },
-  { to: "/admin/courses",                 label: "Courses",    icon: BookOpen },
-  { to: "/admin/grades",                  label: "Grades",     icon: Layers },
-  { to: "/admin/teachers",                label: "Teachers",   icon: UserCog },
-  { to: "/admin/students",                label: "Students",   icon: GraduationCap },
-  { to: "/admin/attendance",              label: "Attendance", icon: ClipboardCheck },
-  { to: "/admin/timetable",               label: "Timetable",  icon: CalendarDays },
-  { to: "/admin/substitutions",           label: "Substitutions",  icon: UserCheck },
-  { to: "/admin/leaves",                  label: "Leaves",     icon: CalendarX, badgeKey: "leaves" },
-  { to: "/admin/sessions",                label: "Sessions",   icon: Monitor },
-  { to: "/admin/messages",                label: "Messages",   icon: MessageSquare },
+  { to: "/admin",              end: true, label: "Dashboard",     icon: LayoutDashboard },
+  { to: "/admin/courses",                 label: "Courses",       icon: BookOpen },
+  { to: "/admin/grades",                  label: "Grades",        icon: Layers },
+  { to: "/admin/teachers",                label: "Teachers",      icon: UserCog },
+  { to: "/admin/students",                label: "Students",      icon: GraduationCap },
+  { to: "/admin/attendance",              label: "Attendance",    icon: ClipboardCheck },
+  { to: "/admin/timetable",               label: "Timetable",     icon: CalendarDays },
+  { to: "/admin/substitutions",           label: "Substitutions", icon: UserCheck },
+  { to: "/admin/leaves",                  label: "Leaves",        icon: CalendarX, badgeKey: "leaves" },
+  { to: "/admin/sessions",                label: "Sessions",      icon: Monitor },
+  { to: "/admin/messages",                label: "Messages",      icon: MessageSquare },
 ];
+
+/* =================================================================
+   ADMIN PALETTE — slate / dark charcoal
+   Change these 5 strings to restyle the entire admin sidebar.
+   ================================================================= */
+const ADMIN_PALETTE = {
+  // Sidebar wrapper
+  sidebarBg: "border-slate-800/60 bg-slate-900/85 backdrop-blur-md",
+
+  // Brand + section text
+  brandLabel: "text-slate-400",
+  sectionLabel: "text-slate-500",
+  sectionValue: "text-slate-100",
+
+  // Nav links
+  navItemActive: "bg-slate-700 text-white shadow-sm ring-1 ring-slate-600",
+  navItemIdle: "text-slate-400 hover:bg-slate-800/70 hover:text-slate-100",
+
+  // Dividers
+  divider: "border-slate-800/60",
+
+  // Avatar
+  avatarClass: "bg-gradient-to-br from-slate-600 to-slate-800 text-white",
+
+  // User info
+  userName: "text-slate-100",
+  userEmail: "text-slate-500",
+
+  // Sign out
+  signOutClass: "text-slate-400 hover:bg-coral-500/10 hover:text-coral-400",
+};
 
 export default function AdminSidebar() {
   const { user, logout } = useAdminAuth();
+  const P = ADMIN_PALETTE;
 
   const { data: pendingStudentLeaves } = useGetStudentLeavesQuery({ status: "pending", page: 1 });
   const { data: pendingTeacherLeaves } = useGetTeacherLeavesQuery({ status: "pending", page: 1 });
@@ -31,19 +67,21 @@ export default function AdminSidebar() {
   const badgeCounts = { leaves: pendingLeaves };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200/70 bg-white/80 backdrop-blur-md">
-
+    <aside
+      className={
+        "flex h-full w-64 shrink-0 flex-col border-r " + P.sidebarBg
+      }
+    >
       {/* Brand */}
-      <div className="border-b border-slate-100 px-5 py-5">
+      <div className={"border-b px-5 py-5 " + P.divider}>
         <Link to="/admin" className="flex items-center gap-2.5">
-          {/* HERE IS YOUR IMAGE — logo mark — paste a URL over the gradient below */}
           <img
             src="/learn-smart-logo.png"
             alt="Learn Smart"
             className="h-20 w-auto object-contain"
           />
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className={"text-[10px] font-semibold uppercase tracking-wider " + P.brandLabel}>
               Platform Admin
             </p>
           </div>
@@ -51,11 +89,11 @@ export default function AdminSidebar() {
       </div>
 
       {/* Platform info */}
-      <div className="border-b border-slate-100 px-5 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <div className={"border-b px-5 py-3 " + P.divider}>
+        <p className={"text-[10px] font-bold uppercase tracking-wider " + P.sectionLabel}>
           Platform
         </p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-navy-950">
+        <p className={"mt-0.5 truncate text-sm font-semibold " + P.sectionValue}>
           Learn Smart Platform
         </p>
       </div>
@@ -70,9 +108,7 @@ export default function AdminSidebar() {
                 end={end}
                 className={({ isActive }) =>
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
-                  (isActive
-                    ? "bg-purple-500 text-white shadow-purple-glow"
-                    : "text-slate-500 hover:bg-purple-50 hover:text-navy-950")
+                  (isActive ? P.navItemActive : P.navItemIdle)
                 }
               >
                 <Icon size={16} />
@@ -89,24 +125,34 @@ export default function AdminSidebar() {
       </nav>
 
       {/* User + logout */}
-      <div className="border-t border-slate-100 px-3 py-3">
+      <div className={"border-t px-3 py-3 " + P.divider}>
         <div className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-purple-700 text-[10px] font-bold text-white">
+          <div
+            className={
+              "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold " +
+              P.avatarClass
+            }
+          >
             {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || "A"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-bold text-navy-950">
+            <p className={"truncate text-xs font-bold " + P.userName}>
               {user?.first_name
                 ? `${user.first_name} ${user.last_name || ""}`.trim()
                 : user?.email}
             </p>
-            <p className="truncate text-[10px] text-slate-400">{user?.email}</p>
+            <p className={"truncate text-[10px] " + P.userEmail}>
+              {user?.email}
+            </p>
           </div>
         </div>
         <button
           type="button"
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-coral-50 hover:text-coral-600"
+          className={
+            "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
+            P.signOutClass
+          }
         >
           <LogOut size={16} />
           Sign out
