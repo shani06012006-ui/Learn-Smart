@@ -28,7 +28,7 @@ const TEACHER_ITEMS = [
   { label: "Timetable",     to: "/teacher/timetable",          icon: CalendarDays },
   { label: "Attendance",    to: "/teacher/attendance",         icon: ClipboardCheck },
   { label: "Leaves",        to: "/teacher/leaves",             icon: CalendarX },
-  { label: "Quizzes",       to: "/teacher/quizzes",           icon: Brain },
+  { label: "Quizzes",       to: "/teacher/quizzes",            icon: Brain },
   { label: "Materials",     to: "/teacher/materials",          icon: FileText },
   { label: "Announcements", to: "/teacher/announcements",      icon: Megaphone },
   { label: "Live Classes",  to: "/teacher/live-classes",       icon: Video },
@@ -67,9 +67,9 @@ export default function Sidebar({ role }) {
         />
       )}
 
-      <aside
-        className={clsx(
-          "fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200 bg-white transition-transform md:static md:translate-x-0",
+      <aside 
+        className={clsx( 
+             "fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full flex-col border-r border-slate-200/60 bg-white/80 backdrop-blur-md transition-transform md:static md:translate-x-0",
           sidebarOpen && "translate-x-0"
         )}
       >
@@ -117,8 +117,8 @@ export default function Sidebar({ role }) {
                     className={({ isActive }) =>
                       "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors " +
                       (isActive
-                        ? "bg-purple-500 text-white shadow-purple-glow"
-                        : "text-slate-500 hover:bg-purple-50 hover:text-navy-950")
+                        ? "bg-red-800 text-white shadow-purple-glow"
+                        : "text-slate-500 hover:bg-purple-50 hover:text-red-900")
                     }
                   >
                     <Icon size={16} />
@@ -133,7 +133,7 @@ export default function Sidebar({ role }) {
         {/* User + logout */}
         <div className="border-t border-slate-100 px-3 py-3">
           <div className="mb-2 flex items-center gap-2.5 rounded-xl px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-purple-700 text-[10px] font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-black to-red-500 text-[10px] font-bold text-white">
               {user?.first_name?.[0]?.toUpperCase()
                 || user?.email?.[0]?.toUpperCase()
                 || "U"}

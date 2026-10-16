@@ -1,23 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  BookOpen,
-  GraduationCap,
-  ArrowRight,
-  Plus,
-  MoreVertical,
-  Pencil,
-  Trash2,
-  Archive,
-  ArchiveRestore,
-} from "lucide-react";
+// frontend/src/features/teacher/pages/TeacherClassesPage.jsx
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { BookOpen, Plus } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import Button from "../../../components/ui/Button";
-import Badge from "../../../components/ui/Badge";
 import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import ClassFormModal from "../components/ClassFormModal";
+import ClassCard from "../components/ClassCard";
+import ClassFiltersBar from "../components/ClassFiltersBar";
+import ClassRosterModal from "../components/ClassRosterModal";
 import {
   useGetClassesQuery,
   useUpdateClassMutation,
@@ -25,133 +18,16 @@ import {
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
-
-/* Row dropdown menu */
-function RowMenu({ items }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
-        aria-label="Class actions"
-      >
-        <MoreVertical size={15} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg">
-          {items.map(({ label, icon: Icon, onClick, tone = "default" }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setOpen(false);
-                onClick();
-              }}
-              className={
-                "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition " +
-                (tone === "danger"
-                  ? "text-coral-600 hover:bg-coral-50"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-navy-950")
-              }
-            >
-              {Icon && <Icon size={13} />}
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-/* Card for one class */
-function ClassCard({ klass, onEdit, onArchiveToggle, onDelete }) {
-  return (
-    <div className="group relative flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-elevated">
-      <div className="flex items-start justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
-          {klass.subject || "Class"}
-        </span>
-
-        <RowMenu
-          items={[
-            {
-              label: "Edit details",
-              icon: Pencil,
-              onClick: () => onEdit(klass),
-            },
-            {
-              label: klass.is_archived ? "Unarchive" : "Archive",
-              icon: klass.is_archived ? ArchiveRestore : Archive,
-              onClick: () => onArchiveToggle(klass),
-            },
-            {
-              label: "Delete class",
-              icon: Trash2,
-              tone: "danger",
-              onClick: () => onDelete(klass),
-            },
-          ]}
-        />
-      </div>
-
-      <Link to={`/teacher/classes/${klass.id}`} className="flex flex-col gap-2">
-        <p className="text-base font-bold text-navy-950 line-clamp-2">
-          {klass.name}
-        </p>
-        <p className="text-xs text-slate-500 line-clamp-2">
-          {klass.description || "No description provided."}
-        </p>
-      </Link>
-
-      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
-        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-          <GraduationCap size={14} />
-          {klass.student_count} student{klass.student_count === 1 ? "" : "s"}
-        </span>
-        {klass.is_archived ? (
-          <Badge variant="neutral">Archived</Badge>
-        ) : (
-          <Link
-            to={`/teacher/classes/${klass.id}`}
-            className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700"
-          >
-            Open
-            <ArrowRight size={12} />
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
 export default function TeacherClassesPage() {
   const navigate = useNavigate();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [rosterFor, setRosterFor] = useState(null);
+
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [search, setSearch] = useState("");
 
   const {
     data: classesData,
@@ -164,12 +40,69 @@ export default function TeacherClassesPage() {
   const [updateClass, { isLoading: updating }] = useUpdateClassMutation();
   const [deleteClass, { isLoading: deleting }] = useDeleteClassMutation();
 
-  // ── ALL HOOKS FIRST — no early returns above these ──
   const classes = classesData?.results ?? classesData ?? [];
-  const activeClasses = classes.filter((c) => !c.is_archived);
-  const archivedClasses = classes.filter((c) => c.is_archived);
 
-  // Group active classes by grade; ungrouped classes go to a final bucket.
+  // ---------------- Derived filter options ----------------
+  const gradeOptions = useMemo(() => {
+    const map = new Map();
+    classes.forEach((c) => {
+      if (c.grade?.id && !map.has(c.grade.id)) {
+        map.set(c.grade.id, {
+          id: c.grade.id,
+          name: c.grade.name,
+          level: c.grade.level ?? 999,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.level - b.level);
+  }, [classes]);
+
+  const sectionOptions = useMemo(() => {
+    const map = new Map();
+    classes.forEach((c) => {
+      if (!c.section?.id) return;
+      // if a grade is chosen, only show sections belonging to that grade
+      if (gradeFilter && c.grade?.id !== gradeFilter) return;
+      if (!map.has(c.section.id)) {
+        map.set(c.section.id, {
+          id: c.section.id,
+          name: c.section.name,
+          gradeId: c.grade?.id,
+        });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [classes, gradeFilter]);
+
+  // ---------------- Apply filters ----------------
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return classes.filter((c) => {
+      if (gradeFilter && c.grade?.id !== gradeFilter) return false;
+      if (sectionFilter && c.section?.id !== sectionFilter) return false;
+      if (q) {
+        const haystack = [
+          c.name,
+          c.subject,
+          c.description,
+          c.grade?.name,
+          c.section?.name,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [classes, gradeFilter, sectionFilter, search]);
+
+  const activeClasses = filtered.filter((c) => !c.is_archived);
+  const archivedClasses = filtered.filter((c) => c.is_archived);
+
+  // ---------------- Group actives by grade ----------------
   const groupedActive = useMemo(() => {
     const byGrade = new Map();
     for (const c of activeClasses) {
@@ -181,20 +114,27 @@ export default function TeacherClassesPage() {
       }
       byGrade.get(gid).classes.push(c);
     }
+    // Sort each group's classes by section name then class name
+    for (const g of byGrade.values()) {
+      g.classes.sort((a, b) => {
+        const sa = a.section?.name || "";
+        const sb = b.section?.name || "";
+        if (sa && sb) return sa.localeCompare(sb);
+        return (a.name || "").localeCompare(b.name || "");
+      });
+    }
     return Array.from(byGrade.values()).sort((a, b) => a.level - b.level);
   }, [activeClasses]);
 
-  // ── NOW the early returns — safe, no hooks below this line ──
-  if (isLoading) return <LoadingState label="Loading your classes..." />;
-  if (isError) {
-    return (
-      <ErrorState
-        message={extractErrorMessage(error)}
-        onRetry={refetch}
-      />
-    );
-  }
+  const hasAnyFilter = gradeFilter || sectionFilter || search;
 
+  const clearAllFilters = () => {
+    setGradeFilter("");
+    setSectionFilter("");
+    setSearch("");
+  };
+
+  // ---------------- Handlers ----------------
   function handleCreate() {
     setEditing(null);
     setFormOpen(true);
@@ -233,6 +173,14 @@ export default function TeacherClassesPage() {
     });
   }
 
+  // ---------------- Render ----------------
+  if (isLoading) return <LoadingState label="Loading your classes..." />;
+  if (isError) {
+    return (
+      <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -241,7 +189,7 @@ export default function TeacherClassesPage() {
             My classes
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Create and manage the classes you teach.
+            Browse by grade and section, and jump into attendance or the roster.
           </p>
         </div>
 
@@ -251,9 +199,25 @@ export default function TeacherClassesPage() {
         </Button>
       </header>
 
-      {activeClasses.length === 0 && archivedClasses.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+      {classes.length > 0 && (
+        <ClassFiltersBar
+          gradeOptions={gradeOptions}
+          sectionOptions={sectionOptions}
+          gradeFilter={gradeFilter}
+          setGradeFilter={setGradeFilter}
+          sectionFilter={sectionFilter}
+          setSectionFilter={setSectionFilter}
+          search={search}
+          setSearch={setSearch}
+          count={filtered.length}
+          onClearAll={clearAllFilters}
+        />
+      )}
+
+      {/* Empty states */}
+      {classes.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center">
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500 ring-1 ring-purple-100">
             <BookOpen size={26} />
           </span>
           <p className="mt-4 text-sm font-semibold text-navy-950">
@@ -267,37 +231,61 @@ export default function TeacherClassesPage() {
             Create your first class
           </Button>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50/60 p-12 text-center">
+          <p className="text-sm font-semibold text-navy-950">
+            No classes match your filters
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Try clearing one of the filters above.
+          </p>
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="mt-4 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-purple-700"
+          >
+            Clear all filters
+          </button>
+        </div>
       ) : (
         <>
-          {activeClasses.length > 0 && (
-            <>
-              {groupedActive.map((group) => (
-                <section key={group.id}>
-                  <h2 className="mb-3 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                    {group.name} ({group.classes.length})
-                  </h2>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {group.classes.map((c) => (
-                      <ClassCard
-                        key={c.id}
-                        klass={c}
-                        onEdit={handleEdit}
-                        onArchiveToggle={handleArchiveToggle}
-                        onDelete={promptDelete}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </>
-          )}
+          {groupedActive.map((group) => (
+            <section key={group.id}>
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  {group.name}
+                </h2>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
+                  {group.classes.length}{" "}
+                  {group.classes.length === 1 ? "class" : "classes"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {group.classes.map((c) => (
+                  <ClassCard
+                    key={c.id}
+                    klass={c}
+                    onEdit={handleEdit}
+                    onArchiveToggle={handleArchiveToggle}
+                    onDelete={promptDelete}
+                    onViewStudents={setRosterFor}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
 
           {archivedClasses.length > 0 && (
             <section>
-              <h2 className="mb-3 font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-                Archived ({archivedClasses.length})
-              </h2>
-              <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mb-3 flex items-center gap-3">
+                <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Archived
+                </h2>
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
+                  {archivedClasses.length}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
                 {archivedClasses.map((c) => (
                   <ClassCard
                     key={c.id}
@@ -305,6 +293,7 @@ export default function TeacherClassesPage() {
                     onEdit={handleEdit}
                     onArchiveToggle={handleArchiveToggle}
                     onDelete={promptDelete}
+                    onViewStudents={setRosterFor}
                   />
                 ))}
               </div>
@@ -335,6 +324,12 @@ export default function TeacherClassesPage() {
         description={confirm?.description}
         confirmLabel={confirm?.confirmLabel}
         loading={deleting || updating}
+      />
+
+      <ClassRosterModal
+        klass={rosterFor}
+        open={!!rosterFor}
+        onClose={() => setRosterFor(null)}
       />
     </div>
   );

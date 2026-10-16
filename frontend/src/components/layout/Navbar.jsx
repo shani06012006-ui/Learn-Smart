@@ -11,7 +11,7 @@ export default function Navbar() {
   const dispatch = useDispatch();
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-ink-300 bg-white px-4 md:px-6">
+      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-ink-300/60 bg-white/80 px-4 backdrop-blur-md md:px-6">
       <div className="flex items-center gap-3">
         <button
           className="focus-ring rounded-md p-2 text-ink-700 hover:bg-ink-100 md:hidden"

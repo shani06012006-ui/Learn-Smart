@@ -100,20 +100,20 @@ export default function TeacherDashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       {/* Welcome banner */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy-900 via-navy-800 to-purple-700 p-6 text-white shadow-elevated sm:p-8">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br p-6 text-white shadow-elevated sm:p-8">
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-purple-500/20 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-coral-500/10 blur-3xl" />
 
         <div className="relative mt-1 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl text-white">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl text-black">
               {getGreeting()}, <span className="text-coral-300">{displayName}</span>!
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-white/70">
+            <p className="mt-2 max-w-xl text-sm text-black">
               Here&rsquo;s your teaching overview for today.
             </p>
           </div>
-          <p className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/70 backdrop-blur">
+          <p className="rounded-full bg-white/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-black backdrop-blur">
             {getFormattedDate()}
           </p>
         </div>

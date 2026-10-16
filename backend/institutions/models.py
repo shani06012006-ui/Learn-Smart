@@ -1,13 +1,13 @@
-import uuid
-
+﻿import uuid
 from django.db import models
 
 from core.models import TimeStampedModel
 
 
+
 class Institution(TimeStampedModel):
     """
-    Minimal institution record for Module A/B — just enough to scope users
+    Minimal institution record for Module A/B â€” just enough to scope users
     and classes to a tenant. Departments, academic years, and admin-facing
     management (roles/permissions UI, institution-wide reports) are built
     out in Module J without needing to change this table's shape.
@@ -31,7 +31,7 @@ class Grade(TimeStampedModel):
     Students belong to one Grade; ClassCourse rows may belong to a Grade.
 
     Design notes:
-      - (institution, level) is unique — every institution has its own
+      - (institution, level) is unique â€” every institution has its own
         Grade 1..Grade 12 set (auto-seeded via `manage.py seed_grades`).
       - `name` is the display label; admins can rename ("Class 5" vs
         "Grade 5" vs "Year 5") without affecting structure.
@@ -67,4 +67,3 @@ class Grade(TimeStampedModel):
 
     def __str__(self):
         return f"{self.name} ({self.institution.name})"
-

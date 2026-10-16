@@ -11,6 +11,8 @@ class ClassCourseSerializer(serializers.ModelSerializer):
     student_count = serializers.SerializerMethodField()
     grade_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
     grade = serializers.SerializerMethodField()
+    section_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    section = serializers.SerializerMethodField()        # NEW
     auto_enrolled_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -18,11 +20,13 @@ class ClassCourseSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "subject", "description", "teacher",
             "is_archived", "student_count", "created_at",
-            "grade_id", "grade", "auto_enrolled_count",
+            "grade_id", "grade",
+            "section_id", "section",
+            "auto_enrolled_count",
         ]
         read_only_fields = [
             "id", "teacher", "is_archived", "student_count", "created_at",
-            "grade", "auto_enrolled_count",
+            "grade", "section", "auto_enrolled_count",
         ]
 
     def get_grade(self, obj):
@@ -44,26 +48,97 @@ class ClassCourseSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         qs = Grade.objects.filter(id=value)
         if request and request.user.institution_id:
-            qs = qs.filter(institution_id=request.user.institution_id)
+            qs = qs.filter(grade__institution_id=request.user.institution_id)
         try:
             return qs.get()
         except Grade.DoesNotExist:
             raise serializers.ValidationError("Unknown grade for your institution.")
 
+    def get_section(self, obj):
+        if not obj.section_id:
+            return None
+        return {
+            "id": str(obj.section.id),
+            "name": obj.section.name,
+        }
+        
+    def validate_section_id(self, value):
+        if value in (None, ""):
+            return None
+        from classes.models import ClassSection
+        request = self.context.get("request")
+        qs = ClassSection.objects.filter(id=value)
+        if request and request.user.institution_id:
+            qs = qs.filter(grade__institution_id=request.user.institution_id)
+        try:
+            return qs.get()
+        except ClassSection.DoesNotExist:
+            raise serializers.ValidationError("Unknown section for your institution.")
+        
+
     def create(self, validated_data):
         grade = validated_data.pop("grade_id", None)
+        section = validated_data.pop("section_id", None)
+        teacher_id = validated_data.pop("teacher_id", None)   # NEW
+
         request = self.context["request"]
-        validated_data["teacher"] = request.user
+
+        if teacher_id and (
+            getattr(request.user, "role", None) == "admin"
+            or request.user.is_superuser
+        ):
+            from accounts.models import User
+            try:
+                validated_data["teacher"] = User.objects.get(
+                    id=teacher_id, role="teacher"
+                )
+            except User.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"teacher_id": "Unknown teacher."}
+                )
+        else:
+            validated_data["teacher"] = request.user
+
         validated_data["institution"] = request.user.institution
         if grade is not None:
             validated_data["grade"] = grade
+        if section is not None:
+            validated_data["section"] = section
         return super().create(validated_data)
-
+    
+    
     def update(self, instance, validated_data):
         grade = validated_data.pop("grade_id", None)
-        if "grade_id" in self.initial_data:
+        section = validated_data.pop("section_id", None)
+        teacher_id = validated_data.pop("teacher_id", None)   # NEW
+
+        request = self.context.get("request")
+
+        if grade is not None:
             instance.grade = grade
+        if section is not None:
+            instance.section = section
+
+        if (
+            teacher_id
+            and request
+            and (
+                getattr(request.user, "role", None) == "admin"
+                or request.user.is_superuser
+            )
+        ):
+            from accounts.models import User
+            try:
+                instance.teacher = User.objects.get(
+                    id=teacher_id, role="teacher"
+                )
+            except User.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"teacher_id": "Unknown teacher."}
+                )
+
         return super().update(instance, validated_data)
+    
 
     def get_student_count(self, obj):
         """
@@ -90,10 +165,12 @@ class ClassCourseDetailSerializer(ClassCourseSerializer):
     class Meta(ClassCourseSerializer.Meta):
         fields = ClassCourseSerializer.Meta.fields + ["institution"]
         read_only_fields = ClassCourseSerializer.Meta.read_only_fields + ["institution"]
+        teacher_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+
 
 
 class AddStudentSerializer(serializers.Serializer):
-    """Input serializer for POST /classes/{id}/students/ — not a ModelSerializer
+    """Input serializer for POST /classes/{id}/students/ â€” not a ModelSerializer
     since it drives classes.services.add_student_to_class rather than a
     direct model create (the student User and the enrollment are two
     separate, conditionally-created objects)."""
@@ -111,7 +188,7 @@ class AddStudentSerializer(serializers.Serializer):
         from institutions.models import Grade
         qs = Grade.objects.filter(id=value)
         if request and getattr(request.user, "institution_id", None):
-            qs = qs.filter(institution_id=request.user.institution_id)
+            qs = qs.filter(grade__institution_id=request.user.institution_id)
         try:
             return qs.get()
         except Grade.DoesNotExist:

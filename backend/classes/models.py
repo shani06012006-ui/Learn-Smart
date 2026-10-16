@@ -43,6 +43,13 @@ class ClassCourse(SoftDeleteModel, TimeStampedModel):
             "If set, all students in that grade auto-enroll."
         ),
     )
+    section = models.ForeignKey(
+        "classes.ClassSection",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="class_courses",
+    )
     is_archived = models.BooleanField(
         default=False,
         help_text="Archived = read-only but still visible. Distinct from is_deleted (soft-delete).",
