@@ -24,20 +24,6 @@ const DIFFICULTIES = [
 
 const COUNTS = [5, 10, 15, 20];
 
-function blankQuestion() {
-  return {
-    question_text: "",
-    explanation: "",
-    points: 1,
-    choices: [
-      { choice_text: "", is_correct: true },
-      { choice_text: "", is_correct: false },
-      { choice_text: "", is_correct: false },
-      { choice_text: "", is_correct: false },
-    ],
-  };
-}
-
 export default function CreateQuizModal({
   open,
   onClose,
@@ -82,6 +68,7 @@ export default function CreateQuizModal({
           question_text: q.question_text,
           explanation: q.explanation || "",
           points: q.points || 1,
+          question_image: q.question_image || null, // Preserve existing image
           choices: (q.choices || []).map((c) => ({
             choice_text: c.choice_text,
             is_correct: !!c.is_correct,
@@ -128,6 +115,7 @@ export default function CreateQuizModal({
         question_text: q.question_text,
         explanation: q.explanation || "",
         points: q.points || 1,
+        question_image: null, // AI doesn't generate images yet
         choices: (q.choices || []).map((c) => ({
           choice_text: c.choice_text,
           is_correct: !!c.is_correct,
@@ -140,33 +128,46 @@ export default function CreateQuizModal({
     }
   };
 
-  const buildPayload = () => ({
-    title: title.trim(),
-    class_course: classId,
-    duration_minutes: Number(duration),
-    passing_score: Number(passing),
-    difficulty,
-    source_filename: file?.name || quiz?.source_filename || "",
-    questions: questions.map((q, i) => ({
-      question_text: q.question_text,
-      explanation: q.explanation || "",
-      points: q.points || 1,
-      order: i,
-      choices: q.choices.map((c, ci) => ({
-        choice_text: c.choice_text,
-        is_correct: !!c.is_correct,
-        order: ci,
-      })),
-    })),
-  });
+  // 🔥 CRITICAL FIX: Build FormData instead of JSON for file uploads
+  const buildFormData = () => {
+    const fd = new FormData();
+    fd.append("title", title.trim());
+    fd.append("class_course", classId);
+    fd.append("duration_minutes", String(duration));
+    fd.append("passing_score", String(passing));
+    fd.append("difficulty", difficulty);
+    fd.append("source_filename", file?.name || quiz?.source_filename || "");
+
+    questions.forEach((q, i) => {
+      fd.append(`questions[${i}]question_text`, q.question_text);
+      fd.append(`questions[${i}]explanation`, q.explanation || "");
+      fd.append(`questions[${i}]points`, String(q.points || 1));
+      fd.append(`questions[${i}]order`, String(i));
+
+      // Handle image upload if a File object exists
+      if (q.question_image instanceof File) {
+        fd.append(`questions[${i}]question_image`, q.question_image);
+      }
+
+      q.choices.forEach((c, ci) => {
+        fd.append(`questions[${i}]choices[${ci}]choice_text`, c.choice_text);
+        fd.append(`questions[${i}]choices[${ci}]is_correct`, c.is_correct ? "true" : "false");
+        fd.append(`questions[${i}]choices[${ci}]order`, String(ci));
+      });
+    });
+    
+    return fd;
+  };
 
   const onSaveDraft = async () => {
     setError("");
     try {
+      const payload = buildFormData();
+      
       if (isEdit) {
-        await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
+        await updateQuiz({ id: quiz.id, body: payload }).unwrap();
       } else {
-        await createQuiz(buildPayload()).unwrap();
+        await createQuiz(payload).unwrap();
       }
       onCreated?.();
       close();
@@ -178,11 +179,13 @@ export default function CreateQuizModal({
   const onSaveAndPublish = async () => {
     setError("");
     try {
+      const payload = buildFormData();
+      
       if (isEdit) {
-        await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
+        await updateQuiz({ id: quiz.id, body: payload }).unwrap();
         await publishQuiz(quiz.id).unwrap();
       } else {
-        const created = await createQuiz(buildPayload()).unwrap();
+        const created = await createQuiz(payload).unwrap();
         await publishQuiz(created.id).unwrap();
       }
       onCreated?.();
@@ -196,8 +199,8 @@ export default function CreateQuizModal({
     if (!isEdit) return;
     setError("");
     try {
-      // Save edits AND unpublish
-      await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
+      const payload = buildFormData();
+      await updateQuiz({ id: quiz.id, body: payload }).unwrap();
       await unpublishQuiz(quiz.id).unwrap();
       onCreated?.();
       close();

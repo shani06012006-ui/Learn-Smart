@@ -1,4 +1,5 @@
-import { Trash2, RefreshCw, CheckCircle2 } from "lucide-react";
+// frontend/src/features/teacher/components/quizzes/ReviewQuestionCard.jsx
+import { Trash2, RefreshCw, CheckCircle2, Image, X } from "lucide-react";
 
 export default function ReviewQuestionCard({
   index,
@@ -54,7 +55,7 @@ export default function ReviewQuestionCard({
         </div>
       </div>
 
-      <label className="block">
+      <div className="block">
         <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
           Question
         </span>
@@ -64,7 +65,42 @@ export default function ReviewQuestionCard({
           rows={2}
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
         />
-      </label>
+        
+        {/* IMAGE UPLOAD */}
+        <div className="mt-2"> 
+          {question.question_image && typeof question.question_image === "string" ? ( 
+            <div className="flex items-start gap-3 rounded-xl border border-gray-200 bg-slate-50 p-3"> 
+              <img 
+                src={question.question_image} 
+                alt="Question" 
+                className="max-h-32 rounded-lg object-contain" 
+              /> 
+              <button 
+                type="button" 
+                onClick={() => setField({ question_image: null })} 
+                className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-coral-600" 
+                title="Remove image"
+              > 
+                <X size={14} /> 
+              </button> 
+            </div> 
+          ) : (
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-purple-300 hover:bg-purple-50/40">
+              <Image size={14} className="text-purple-500" /> 
+              {question.question_image ? "Change image" : "Add image (optional)"} 
+              <input 
+                type="file"
+                accept="image/*" 
+                className="hidden" 
+                onChange={(e) => { 
+                  const f = e.target.files?.[0]; 
+                  if (f) setField({ question_image: f }); 
+                }} 
+              />
+            </label>
+          )}
+        </div>
+      </div>
 
       <div className="mt-3">
         <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">

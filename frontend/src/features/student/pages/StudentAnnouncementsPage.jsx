@@ -1,39 +1,14 @@
-// frontend/src/features/student/pages/StudentAnnouncementsPage.jsx
-import { useMemo, useState } from "react";
-import {
-  BookOpen,
-  Loader2,
-  Megaphone,
-  Search,
-  User,
-} from "lucide-react";
-
+import { useState, useMemo } from "react";
+import { Megaphone, Search, Loader2, User, BookOpen } from "lucide-react";
 import { useGetStudentAnnouncementsQuery } from "../../../store/api/realApi";
 import { getRoleConfig } from "../../../config/roleConfig";
-
-function formatDate(iso) {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export default function StudentAnnouncementsPage() {
   const R = getRoleConfig("student");
   const [search, setSearch] = useState("");
+  const { data, isLoading, isError, refetch } = useGetStudentAnnouncementsQuery();
 
-  const { data, isLoading, isError, refetch } =
-    useGetStudentAnnouncementsQuery();
-
-  const announcements = useMemo(() => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.results)) return data.results;
-    return [];
-  }, [data]);
+  const announcements = useMemo(() => data?.results || data || [], [data]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -42,7 +17,7 @@ export default function StudentAnnouncementsPage() {
       (a) =>
         (a.title || "").toLowerCase().includes(q) ||
         (a.body || "").toLowerCase().includes(q) ||
-        (a.class_name || "").toLowerCase().includes(q),
+        (a.class_name || "").toLowerCase().includes(q)
     );
   }, [announcements, search]);
 
@@ -53,27 +28,9 @@ export default function StudentAnnouncementsPage() {
           {R.headings?.announcements?.title || "Announcements"}
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          {R.headings?.announcements?.subtitle ||
-            "Updates from your teachers."}
+          {R.headings?.announcements?.subtitle || "Updates from your teachers."}
         </p>
       </header>
-
-      {announcements.length > 0 && (
-        <div className="rounded-2xl border border-gray-100 bg-white/90 p-3 shadow-sm backdrop-blur-md">
-          <div className="relative">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search announcements…"
-              className="h-10 w-full rounded-xl border border-gray-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-            />
-          </div>
-        </div>
-      )}
 
       {isLoading && (
         <div className="flex items-center justify-center rounded-2xl border border-gray-100 bg-white/90 py-24 backdrop-blur-md">
@@ -83,9 +40,7 @@ export default function StudentAnnouncementsPage() {
 
       {isError && (
         <div className="rounded-2xl border border-coral-200 bg-coral-50 p-5 text-sm">
-          <p className="font-semibold text-coral-700">
-            Could not load announcements.
-          </p>
+          <p className="font-semibold text-coral-700">Could not load announcements.</p>
           <button
             onClick={refetch}
             className="mt-2 rounded-lg bg-coral-600 px-3 py-1.5 text-xs font-bold text-white"
@@ -95,7 +50,7 @@ export default function StudentAnnouncementsPage() {
         </div>
       )}
 
-      {!isLoading && !isError && announcements.length === 0 && (
+      {!isLoading && !isError && filtered.length === 0 && (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white/85 p-14 text-center backdrop-blur-md">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-500 ring-1 ring-emerald-100">
             <Megaphone size={26} />
@@ -107,12 +62,6 @@ export default function StudentAnnouncementsPage() {
             When your teachers post an update, it will appear here.
           </p>
         </div>
-      )}
-
-      {!isLoading && !isError && announcements.length > 0 && filtered.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-gray-200 bg-white/85 py-10 text-center text-sm text-slate-400 backdrop-blur-md">
-          No announcements match "{search}".
-        </p>
       )}
 
       {!isLoading && !isError && filtered.length > 0 && (
@@ -145,13 +94,12 @@ export default function StudentAnnouncementsPage() {
                     )}
                     {(a.published_at || a.created_at) && (
                       <span className="text-slate-400">
-                        {formatDate(a.published_at || a.created_at)}
+                        {new Date(a.published_at || a.created_at).toLocaleDateString()}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
-
               <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-slate-700">
                 {a.body}
               </p>

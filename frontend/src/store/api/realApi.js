@@ -12,8 +12,7 @@ const rawBaseQuery = fetchBaseQuery({
     const token =
       state.adminAuth?.accessToken || state.auth?.accessToken || null;
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    headers.set("Content-Type", "application/json");
-    return headers;
+    return headers; // Note: Don't set Content-Type globally; RTK Query/FormData handles it
   },
 });
 
@@ -80,9 +79,16 @@ export const realApi = createApi({
     "MaterialList",
     "ChatMembers",
     "TeacherChat",
+    "StudentSelf",
+    "StudentQuizzes",
+    "StudentLiveClasses",
+    "StudentAnnouncements",
+    "Quiz",
+    "QuizAttempt",
+    "QuizSubmissions",
   ],
   endpoints: (builder) => ({
-        // ---- Sections ----
+    // ---- Sections ----
     getAdminSections: builder.query({
       query: (params = {}) => {
         const s = new URLSearchParams();
@@ -142,6 +148,7 @@ export const realApi = createApi({
       query: (body) => ({ url: "/admin/substitutions/assign/", method: "POST", body }),
       invalidatesTags: ["AdminTimetable"],
     }),
+
     // ---- Teacher announcements ----
     getTeacherAnnouncements: builder.query({
       query: (params = {}) => {
@@ -231,23 +238,19 @@ export const realApi = createApi({
       providesTags: ["AdminAttendance"],
     }),
 
+    // ---- Student Data ----
     getStudentQuizzes: builder.query({
       query: () => "/student/quizzes/",
       providesTags: ["StudentQuizzes"],
     }),
-    // ---- Student Live Classes ----
     getStudentLiveClasses: builder.query({
       query: () => "/live-classes/",
       providesTags: ["StudentLiveClasses"],
     }),
-        // ---- Student announcements ----
     getStudentAnnouncements: builder.query({
       query: () => "/student/announcements/",
       providesTags: ["StudentAnnouncements"],
     }),
-
-    // ---- Quizzes ----
-
     joinClassWithCode: builder.mutation({
       query: (joining_code) => ({
         url: "/enrollments/join/",
@@ -256,8 +259,8 @@ export const realApi = createApi({
       }),
       invalidatesTags: ["StudentSelf", { type: "Class", id: "LIST" }],
     }),
-    
-    
+
+    // ---- Quizzes ----
     getQuizzes: builder.query({
       query: (params = {}) => {
         const s = new URLSearchParams();
@@ -278,14 +281,20 @@ export const realApi = createApi({
       providesTags: (_r, _e, id) => [{ type: "Quiz", id }],
     }),
     createQuiz: builder.mutation({
-      query: (body) => ({ url: "/quizzes/", method: "POST", body }),
+      query: (body) => ({
+        url: "/quizzes/",
+        method: "POST",
+        body,
+        formData: true,
+      }),
       invalidatesTags: [{ type: "Quiz", id: "LIST" }],
     }),
     updateQuiz: builder.mutation({
-      query: ({ id, ...body }) => ({
+      query: ({ id, body }) => ({
         url: `/quizzes/${id}/`,
         method: "PATCH",
         body,
+        formData: true,
       }),
       invalidatesTags: (_r, _e, { id }) => [
         { type: "Quiz", id },
@@ -303,33 +312,6 @@ export const realApi = createApi({
         body: formData,
         formData: true,
       }),
-    }),
-
-    startQuizAttempt: builder.mutation({
-      query: (quizId) => ({
-        url: `/student/quizzes/${quizId}/start/`,
-        method: "POST",
-      }),
-      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
-    }),
-
-    submitQuizAttempt: builder.mutation({
-      query: ({ quizId, answers }) => ({
-        url: `/student/quizzes/${quizId}/submit/`,
-        method: "POST",
-        body: { answers },
-      }),
-      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
-    }),
-
-    getQuizAttemptResult: builder.query({
-      query: (attemptId) => `/student/quiz-attempts/${attemptId}/`,
-      providesTags: (_r, _e, id) => [{ type: "QuizAttempt", id }],
-    }),
-
-    getTeacherQuizSubmissions: builder.query({
-      query: (quizId) => `/quizzes/${quizId}/submissions/`,
-      providesTags: (_r, _e, id) => [{ type: "QuizSubmissions", id }],
     }),
     publishQuiz: builder.mutation({
       query: (id) => ({
@@ -352,7 +334,32 @@ export const realApi = createApi({
       ],
     }),
 
-    // ---- Teacher: performance trend scoped to own classes ----
+    // ---- Student Quiz Taking ----
+    startQuizAttempt: builder.mutation({
+      query: (quizId) => ({
+        url: `/student/quizzes/${quizId}/start/`,
+        method: "POST",
+      }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+    submitQuizAttempt: builder.mutation({
+      query: ({ quizId, answers }) => ({
+        url: `/student/quizzes/${quizId}/submit/`,
+        method: "POST",
+        body: { answers },
+      }),
+      invalidatesTags: [{ type: "Quiz", id: "LIST" }],
+    }),
+    getQuizAttemptResult: builder.query({
+      query: (attemptId) => `/student/quiz-attempts/${attemptId}/`,
+      providesTags: (_r, _e, id) => [{ type: "QuizAttempt", id }],
+    }),
+    getTeacherQuizSubmissions: builder.query({
+      query: (quizId) => `/quizzes/${quizId}/submissions/`,
+      providesTags: (_r, _e, id) => [{ type: "QuizSubmissions", id }],
+    }),
+
+    // ---- Teacher Performance ----
     getTeacherPerformanceTrend: builder.query({
       query: ({ period = "month" } = {}) => ({
         url: `/teacher/dashboard/performance-trend/`,
@@ -360,8 +367,15 @@ export const realApi = createApi({
       }),
       providesTags: ["TeacherStats"],
     }),
+    getAdminPerformanceTrend: builder.query({
+      query: ({ period = "month" } = {}) => ({
+        url: `/admin/dashboard/performance-trend/`,
+        params: { period },
+      }),
+      providesTags: ["AdminStats"],
+    }),
 
-    // ---- Teacher: student leaves from own classes ----
+    // ---- Teacher Leaves ----
     getTeacherStudentLeaves: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -396,22 +410,13 @@ export const realApi = createApi({
       invalidatesTags: [{ type: "StudentLeave", id: "TEACHER-LIST" }, { type: "StudentLeave", id: "LIST" }],
     }),
 
-    // ---- Admin: purge stale sessions ----
+    // ---- Admin Cleanup ----
     purgeStaleSessions: builder.mutation({
       query: () => ({
         url: `/admin/sessions/purge-stale/`,
         method: "POST",
       }),
       invalidatesTags: ["AdminSessions"],
-    }),
-
-    // ---- Admin: student performance trend (attendance-based) ----
-    getAdminPerformanceTrend: builder.query({
-      query: ({ period = "month" } = {}) => ({
-        url: `/admin/dashboard/performance-trend/`,
-        params: { period },
-      }),
-      providesTags: ["AdminStats"],
     }),
 
     // ---- Passwordless email OTP ----
@@ -518,7 +523,7 @@ export const realApi = createApi({
       invalidatesTags: [{ type: "StudentChat", id: "LIST" }],
     }),
 
-    // ---- Student timetable + materials ----
+    // ---- Student Self Service ----
     getStudentMyTimetable: builder.query({
       query: () => `/student/my-timetable/`,
       providesTags: ["StudentSelf"],
@@ -527,8 +532,6 @@ export const realApi = createApi({
       query: () => `/student/my-materials/`,
       providesTags: ["StudentSelf"],
     }),
-
-    // ---- Student self-service ----
     getStudentMe: builder.query({
       query: () => `/student/me/`,
       providesTags: ["StudentSelf"],
@@ -549,7 +552,7 @@ export const realApi = createApi({
       providesTags: ["StudentSelf"],
     }),
 
-    // ---- Teacher students (real enrollments only) ----
+    // ---- Teacher students ----
     getTeacherStudents: builder.query({
       query: ({ grade } = {}) => ({
         url: `/teacher/students/`,
@@ -589,7 +592,7 @@ export const realApi = createApi({
       providesTags: ["Attendance"],
     }),
 
-    // ---- Attendance ----
+    // ---- Admin Attendance ----
     getAttendanceSummary: builder.query({
       query: ({ klass, grade, from, to } = {}) => ({
         url: `/admin/attendance/summary/`,
@@ -621,7 +624,6 @@ export const realApi = createApi({
     }),
 
     // ---------- auth -------------------------------------------------
-
     adminLogin: builder.mutation({
       query: (credentials) => ({
         url: "/auth/login/",
@@ -630,7 +632,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: ["AdminUser", "AdminStats"],
     }),
-
     studentPinLogin: builder.mutation({
       query: (body) => ({
         url: "/auth/student-login/",
@@ -638,12 +639,10 @@ export const realApi = createApi({
         body,
       }),
     }),
-
     adminMe: builder.query({
       query: () => "/auth/me/",
       providesTags: ["AdminUser"],
     }),
-
     adminLogout: builder.mutation({
       query: (refresh) => ({
         url: "/auth/logout/",
@@ -653,17 +652,14 @@ export const realApi = createApi({
     }),
 
     // ---------- admin users -----------------------------------------
-
     getGrades: builder.query({
       query: () => `/grades/`,
       providesTags: [{ type: "AdminGrade", id: "LIST" }],
     }),
-
     getGrade: builder.query({
       query: (id) => `/grades/${id}/`,
       providesTags: (result, error, id) => [{ type: "AdminGrade", id }],
     }),
-
     createGrade: builder.mutation({
       query: (body) => ({
         url: "/grades/",
@@ -672,7 +668,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
     }),
-
     updateGrade: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/grades/${id}/`,
@@ -681,7 +676,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
     }),
-
     deleteGrade: builder.mutation({
       query: (id) => ({
         url: `/grades/${id}/`,
@@ -689,7 +683,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "AdminGrade", id: "LIST" }],
     }),
-
     getAdminUsers: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -713,12 +706,10 @@ export const realApi = createApi({
             ]
           : [{ type: "AdminUser", id: "LIST" }],
     }),
-
     getAdminUser: builder.query({
       query: (id) => `/admin/users/${id}/`,
       providesTags: (result, error, id) => [{ type: "AdminUser", id }],
     }),
-
     createAdminUser: builder.mutation({
       query: (body) => ({
         url: "/admin/users/",
@@ -730,7 +721,6 @@ export const realApi = createApi({
         { type: "AdminStats" },
       ],
     }),
-
     updateAdminUser: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/admin/users/${id}/`,
@@ -743,7 +733,6 @@ export const realApi = createApi({
         { type: "AdminGrade", id: "LIST" },
       ],
     }),
-
     removeAdminUser: builder.mutation({
       query: (id) => ({
         url: `/admin/users/${id}/remove/`,
@@ -755,7 +744,6 @@ export const realApi = createApi({
         { type: "AdminGrade", id: "LIST" },
       ],
     }),
-
     hardDeleteAdminUser: builder.mutation({
       query: (id) => ({
         url: `/admin/users/${id}/hard/?confirm=YES`,
@@ -763,7 +751,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: ["AdminUser"],
     }),
-
     toggleAdminUserActive: builder.mutation({
       query: ({ id, is_active }) => ({
         url: `/admin/users/${id}/toggle-active/`,
@@ -776,14 +763,12 @@ export const realApi = createApi({
         { type: "AdminStats" },
       ],
     }),
-
     getAdminUserClasses: builder.query({
       query: (id) => `/admin/users/${id}/classes/`,
       providesTags: (result, error, id) => [
         { type: "AdminUser", id: `classes-${id}` },
       ],
     }),
-
     getAdminUserEnrollments: builder.query({
       query: (id) => `/admin/users/${id}/enrollments/`,
       providesTags: (result, error, id) => [
@@ -791,9 +776,7 @@ export const realApi = createApi({
       ],
     }),
 
-
     // ---------- admin sessions -------------------------------------
-
     getAdminSessions: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -815,7 +798,6 @@ export const realApi = createApi({
             ]
           : [{ type: "AdminSession", id: "LIST" }],
     }),
-
     revokeAdminSession: builder.mutation({
       query: (id) => ({
         url: `/admin/sessions/${id}/revoke/`,
@@ -828,7 +810,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin enrollments ----------------------------------
-
     getAdminEnrollments: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -853,7 +834,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin attendance -----------------------------------
-
     getAdminTeacherAttendance: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -869,7 +849,6 @@ export const realApi = createApi({
       },
       providesTags: ["AdminAttendance"],
     }),
-
     getAdminStudentAttendance: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -889,7 +868,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin timetable ------------------------------------
-
     getAdminTimetable: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -904,7 +882,6 @@ export const realApi = createApi({
       },
       providesTags: ["AdminTimetable"],
     }),
-
     getTimetable: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -920,7 +897,6 @@ export const realApi = createApi({
       },
       providesTags: ["AdminTimetable", "Timetable"],
     }),
-
     createAdminTimetable: builder.mutation({
       query: (body) => ({
         url: "/admin/timetable/",
@@ -932,7 +908,6 @@ export const realApi = createApi({
         "Timetable",
       ],
     }),
-
     updateAdminTimetable: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/admin/timetable/${id}/`,
@@ -945,7 +920,6 @@ export const realApi = createApi({
         "Timetable",
       ],
     }),
-
     deactivateAdminTimetable: builder.mutation({
       query: (id) => ({
         url: `/admin/timetable/${id}/deactivate/`,
@@ -958,14 +932,12 @@ export const realApi = createApi({
     }),
 
     // ---------- admin stats -----------------------------------------
-
     getAdminStats: builder.query({
       query: () => "/admin/stats/",
       providesTags: ["AdminStats"],
     }),
 
     // ---------- admin courses ---------------------------------------
-
     getAdminCourses: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -989,12 +961,10 @@ export const realApi = createApi({
             ]
           : [{ type: "AdminCourse", id: "LIST" }],
     }),
-
     getAdminCourse: builder.query({
       query: (id) => `/admin/courses/${id}/`,
       providesTags: (result, error, id) => [{ type: "AdminCourse", id }],
     }),
-
     createAdminCourse: builder.mutation({
       query: (body) => ({
         url: "/admin/courses/",
@@ -1007,7 +977,6 @@ export const realApi = createApi({
         { type: "AdminGrade", id: "LIST" },
       ],
     }),
-
     updateAdminCourse: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/admin/courses/${id}/`,
@@ -1021,7 +990,6 @@ export const realApi = createApi({
         { type: "AdminGrade", id: "LIST" },
       ],
     }),
-
     deleteAdminCourse: builder.mutation({
       query: (id) => ({
         url: `/admin/courses/${id}/`,
@@ -1033,10 +1001,9 @@ export const realApi = createApi({
       ],
     }),
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ============================================================
     // Classes (teacher / student, role-scoped by backend)
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-
+    // ============================================================
     getClasses: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1046,12 +1013,10 @@ export const realApi = createApi({
       },
       providesTags: [{ type: "Class", id: "LIST" }],
     }),
-
     getClass: builder.query({
       query: (id) => `/classes/${id}/`,
       providesTags: (result, error, id) => [{ type: "ClassDetail", id }],
     }),
-
     createClass: builder.mutation({
       query: (body) => ({
         url: "/classes/",
@@ -1063,7 +1028,6 @@ export const realApi = createApi({
         { type: "ClassDetail", id: "NEW" },
       ],
     }),
-
     updateClass: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/classes/${id}/`,
@@ -1075,7 +1039,6 @@ export const realApi = createApi({
         { type: "ClassDetail", id },
       ],
     }),
-
     deleteClass: builder.mutation({
       query: (id) => ({
         url: `/classes/${id}/`,
@@ -1083,17 +1046,14 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "Class", id: "LIST" }],
     }),
-
     getClassStudents: builder.query({
       query: (id) => `/classes/${id}/students/`,
       providesTags: (result, error, id) => [{ type: "ClassRoster", id }],
     }),
-
     getClassMaterials: builder.query({
       query: (id) => `/classes/${id}/materials/`,
       providesTags: (result, error, id) => [{ type: "ClassMaterial", id }],
     }),
-
     getAllMaterials: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1104,7 +1064,6 @@ export const realApi = createApi({
       },
       providesTags: [{ type: "MaterialList", id: "ALL" }],
     }),
-
     addClassStudent: builder.mutation({
       query: ({ classId, email, first_name, last_name, grade_id }) => ({
         url: `/classes/${classId}/students/`,
@@ -1122,7 +1081,6 @@ export const realApi = createApi({
         { type: "ClassDetail", id: classId },
       ],
     }),
-
     updateEnrollmentStatus: builder.mutation({
       query: ({ classId, enrollmentId, status }) => ({
         url: `/classes/${classId}/students/${enrollmentId}/`,
@@ -1134,7 +1092,6 @@ export const realApi = createApi({
         { type: "ClassDetail", id: classId },
       ],
     }),
-
     uploadClassMaterial: builder.mutation({
       query: ({ classId, formData }) => ({
         url: `/classes/${classId}/materials/`,
@@ -1146,7 +1103,6 @@ export const realApi = createApi({
         { type: "ClassDetail", id: classId },
       ],
     }),
-
     deleteMaterial: builder.mutation({
       query: ({ materialId }) => ({
         url: `/materials/${materialId}/`,
@@ -1155,24 +1111,49 @@ export const realApi = createApi({
       invalidatesTags: [{ type: "ClassMaterial", id: "LIST" }],
     }),
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    // Chat Ã¢â‚¬â€ institution teacher group
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-
+    // ============================================================
+    // Chat — institution teacher group
+    // ============================================================
     getTeacherGroupThread: builder.query({
       query: () => `/chat/teacher-group/`,
       providesTags: [{ type: "ChatThread", id: "teacher-group" }],
     }),
-
     getTeacherGroupMembers: builder.query({
       query: () => `/chat/teacher-group/members/`,
       providesTags: [{ type: "ChatThread", id: "teacher-group-members" }],
     }),
+    getTeacherGroupMessages: builder.query({
+      query: ({ after } = {}) =>
+        `/chat/teacher-group/messages/${after ? `?after=${encodeURIComponent(after)}` : ""}`,
+      providesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+    sendTeacherGroupMessage: builder.mutation({
+      query: (body) => ({
+        url: `/chat/teacher-group/messages/`,
+        method: "POST",
+        body: { body },
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+    toggleMessageReaction: builder.mutation({
+      query: ({ messageId, emoji }) => ({
+        url: `/chat/messages/${messageId}/react/`,
+        method: "POST",
+        body: { emoji },
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+    removeMessageReaction: builder.mutation({
+      query: ({ messageId }) => ({
+        url: `/chat/messages/${messageId}/react/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
 
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    // ============================================================
     // My leaves (teacher or student)
-    // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-
+    // ============================================================
     getMyLeaves: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1182,7 +1163,6 @@ export const realApi = createApi({
       },
       providesTags: [{ type: "MyLeave", id: "LIST" }],
     }),
-
     createMyLeave: builder.mutation({
       query: (body) => ({
         url: "/leaves/my/",
@@ -1191,7 +1171,6 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "MyLeave", id: "LIST" }],
     }),
-
     cancelMyLeave: builder.mutation({
       query: ({ leaveId }) => ({
         url: `/leaves/${leaveId}/cancel/`,
@@ -1199,12 +1178,10 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "MyLeave", id: "LIST" }],
     }),
-
     getMyLeaveSummary: builder.query({
       query: () => `/leaves/summary/`,
       providesTags: [{ type: "MyLeave", id: "SUMMARY" }],
     }),
-
     getStudentsList: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1216,7 +1193,6 @@ export const realApi = createApi({
       },
       providesTags: [{ type: "AdminUser", id: "STUDENT_LIST" }],
     }),
-
     createTeacherStudent: builder.mutation({
       query: (body) => ({
         url: "/auth/students/create/",
@@ -1229,48 +1205,12 @@ export const realApi = createApi({
         { type: "ClassRoster", id: "LIST" },
       ],
     }),
-
-
-    getTeacherGroupMessages: builder.query({
-      query: ({ after } = {}) =>
-        `/chat/teacher-group/messages/${after ? `?after=${encodeURIComponent(after)}` : ""}`,
-      providesTags: [{ type: "ChatMessage", id: "teacher-group" }],
-    }),
-
-    sendTeacherGroupMessage: builder.mutation({
-      query: (body) => ({
-        url: `/chat/teacher-group/messages/`,
-        method: "POST",
-        body: { body },
-      }),
-      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
-    }),
-
-    toggleMessageReaction: builder.mutation({
-      query: ({ messageId, emoji }) => ({
-        url: `/chat/messages/${messageId}/react/`,
-        method: "POST",
-        body: { emoji },
-      }),
-      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
-    }),
-
-    removeMessageReaction: builder.mutation({
-      query: ({ messageId }) => ({
-        url: `/chat/messages/${messageId}/react/`,
-        method: "DELETE",
-      }),
-      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
-    }),
-
-
     getAdminCourseStudents: builder.query({
       query: (id) => `/admin/courses/${id}/students/`,
       providesTags: (result, error, id) => [
         { type: "AdminCourse", id: `students-${id}` },
       ],
     }),
-
     addAdminCourseStudent: builder.mutation({
       query: ({ courseId, email, first_name, last_name, grade_id }) => ({
         url: `/admin/courses/${courseId}/students/`,
@@ -1288,7 +1228,6 @@ export const realApi = createApi({
         { type: "AdminCourse", id: "LIST" },
       ],
     }),
-
     updateAdminCourseStudentStatus: builder.mutation({
       query: ({ courseId, enrollmentId, status }) => ({
         url: `/admin/courses/${courseId}/students/${enrollmentId}/`,
@@ -1302,7 +1241,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin leaves (students) ----------------------------
-
     getStudentLeaves: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1325,12 +1263,10 @@ export const realApi = createApi({
             ]
           : [{ type: "StudentLeave", id: "LIST" }],
     }),
-
     createStudentLeave: builder.mutation({
       query: (body) => ({ url: "/admin/leaves/students/", method: "POST", body }),
       invalidatesTags: [{ type: "StudentLeave", id: "LIST" }],
     }),
-
     updateStudentLeave: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/admin/leaves/students/${id}/`,
@@ -1342,7 +1278,6 @@ export const realApi = createApi({
         { type: "StudentLeave", id: "LIST" },
       ],
     }),
-
     approveStudentLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/students/${id}/approve/`,
@@ -1354,7 +1289,6 @@ export const realApi = createApi({
         { type: "StudentLeave", id: "LIST" },
       ],
     }),
-
     rejectStudentLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/students/${id}/reject/`,
@@ -1366,7 +1300,6 @@ export const realApi = createApi({
         { type: "StudentLeave", id: "LIST" },
       ],
     }),
-
     cancelStudentLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/students/${id}/cancel/`,
@@ -1380,7 +1313,6 @@ export const realApi = createApi({
     }),
 
     // ---------- admin leaves (teachers) ----------------------------
-
     getTeacherLeaves: builder.query({
       query: (params = {}) => {
         const search = new URLSearchParams();
@@ -1403,12 +1335,10 @@ export const realApi = createApi({
             ]
           : [{ type: "TeacherLeave", id: "LIST" }],
     }),
-
     createTeacherLeave: builder.mutation({
       query: (body) => ({ url: "/admin/leaves/teachers/", method: "POST", body }),
       invalidatesTags: [{ type: "TeacherLeave", id: "LIST" }],
     }),
-
     updateTeacherLeave: builder.mutation({
       query: ({ id, ...patch }) => ({
         url: `/admin/leaves/teachers/${id}/`,
@@ -1420,7 +1350,6 @@ export const realApi = createApi({
         { type: "TeacherLeave", id: "LIST" },
       ],
     }),
-
     approveTeacherLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/teachers/${id}/approve/`,
@@ -1432,7 +1361,6 @@ export const realApi = createApi({
         { type: "TeacherLeave", id: "LIST" },
       ],
     }),
-
     rejectTeacherLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/teachers/${id}/reject/`,
@@ -1444,7 +1372,6 @@ export const realApi = createApi({
         { type: "TeacherLeave", id: "LIST" },
       ],
     }),
-
     cancelTeacherLeave: builder.mutation({
       query: ({ id, admin_remarks }) => ({
         url: `/admin/leaves/teachers/${id}/cancel/`,
@@ -1465,7 +1392,6 @@ export const {
   useUpdateTeacherAnnouncementMutation,
   useDeleteTeacherAnnouncementMutation,
   useGetTeacherColleaguesQuery,
-
   useGetAttendanceSheetQuery,
   useBulkSaveAttendanceMutation,
   useGetTeacherStudentsDirectoryQuery,
@@ -1473,7 +1399,6 @@ export const {
   useUnpublishQuizMutation,
   useGetStudentLiveClassesQuery,
   useGetStudentAnnouncementsQuery,
-
   useGetStudentQuizzesQuery,
   useGetQuizzesQuery,
   useJoinClassWithCodeMutation,
@@ -1487,7 +1412,6 @@ export const {
   useApproveTeacherStudentLeaveMutation,
   useGetTeacherStudentLeavesQuery,
   useGetAdminPerformanceTrendQuery,
-
   useVerifyOtpMutation,
   useRequestOtpMutation,
   useSendTeacherChatMessageMutation,
@@ -1512,17 +1436,14 @@ export const {
   useStudentPinLoginMutation,
   useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
-
   useGetAttendanceSummaryQuery,
   useGetTeacherAttendanceQuery,
   useMarkTeacherAttendanceMutation,
   useGetTeacherAttendanceStatsQuery,
   useGetTeacherAttendanceSummaryQuery,
-
   useGetAttendanceQuery,
   useMarkAttendanceMutation,
   useGetAttendanceStatsQuery,
-
   useAdminLoginMutation,
   useGetAdminCoursesQuery,
   useGetAdminCourseQuery,
@@ -1594,7 +1515,6 @@ export const {
   useRejectTeacherLeaveMutation,
   useCancelTeacherLeaveMutation,
   useDeactivateAdminTimetableMutation,
-  
   useGetAdminSectionsQuery,
   useCreateAdminSectionMutation,
   useGetSectionStudentsQuery,
@@ -1610,8 +1530,6 @@ export const {
   useSubmitQuizAttemptMutation,
   useGetQuizAttemptResultQuery,
   useGetTeacherQuizSubmissionsQuery,
-
   usePurgeStaleSessionsMutation,
-
   useGetTeacherPerformanceTrendQuery,
 } = realApi;

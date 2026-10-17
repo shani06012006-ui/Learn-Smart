@@ -120,6 +120,17 @@ export default function StudentQuizResultPage() {
                 <p className="text-sm font-bold text-navy-950">
                   {idx + 1}. {a.question_text}
                 </p>
+                {/* ADDED: Review Image */}
+                {a.question_image && ( 
+                <div className="my-3 flex justify-center rounded-xl border border-gray-200 bg-gray-50 p-3"> 
+                  <img 
+                  src={a.question_image} 
+                  alt="Question illustration" 
+                  className="max-h-48 w-auto cursor-zoom-in rounded-lg object-contain" 
+                  onClick={() => window.open(a.question_image, "_blank")} 
+                  /> 
+                </div>
+              )}
 
                 <div className="mt-3 space-y-1.5 text-xs">
                   <p

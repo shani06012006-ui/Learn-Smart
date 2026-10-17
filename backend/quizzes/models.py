@@ -68,11 +68,16 @@ class Quiz(TimeStampedModel):
 class Question(TimeStampedModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
-    question_text = models.TextField()
-    explanation = models.TextField(blank=True)
+    question_text = models.TextField() 
     points = models.PositiveIntegerField(default=1)
     order = models.PositiveIntegerField(default=0)
-
+    explanation = models.TextField(blank=True)
+    question_image = models.ImageField(     
+        upload_to="quiz_questions/",
+        blank=True,
+        null=True,
+    )
+    
     class Meta:
         ordering = ["order", "created_at"]
         indexes = [models.Index(fields=["quiz", "order"])]
