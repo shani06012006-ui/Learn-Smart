@@ -23,6 +23,7 @@ from .serializers import (
     MaterialUploadSerializer,
     StudentEnrollmentSerializer,
 )
+from django.db import models
 
 
 class ClassCourseListCreateView(generics.ListCreateAPIView):
@@ -560,3 +561,45 @@ class TeacherAnnouncementsViewSet(viewsets.GenericViewSet):
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class StudentAnnouncementsView(APIView):
+    """
+    GET /api/v1/student/announcements/
+    Returns published announcements for any of the student's active classes.
+    Also includes teacher-wide announcements (class_course=None) from
+    teachers who teach at least one of the student's classes.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if getattr(user, "role", None) != "student":
+            return Response(
+                {"detail": "Student access only."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        from classes.models import Announcement, StudentEnrollment
+
+        class_ids = StudentEnrollment.objects.filter(
+            student=user, status="active"
+        ).values_list("class_course_id", flat=True)
+
+        teacher_ids = StudentEnrollment.objects.filter(
+            student=user, status="active"
+        ).values_list("class_course__teacher_id", flat=True)
+
+        qs = (
+            Announcement.objects.filter(is_published=True)
+            .filter(
+                models.Q(class_course_id__in=class_ids)
+                | models.Q(class_course__isnull=True, teacher_id__in=teacher_ids)
+            )
+            .distinct()
+            .select_related("teacher", "class_course")
+            .order_by("-published_at", "-created_at")
+        )
+
+        from classes.serializers import StudentAnnouncementReadSerializer
+        return Response(
+            StudentAnnouncementReadSerializer(qs, many=True).data
+        )

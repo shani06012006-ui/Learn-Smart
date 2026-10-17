@@ -14,6 +14,7 @@ import {
   Archive,
 } from "lucide-react";
 
+import QuizSubmissionsModal from "../components/quizzes/QuizSubmissionsModal";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import Button from "../../../components/ui/Button";
@@ -58,7 +59,8 @@ function MetricCard({ icon: Icon, label, value, tone = "purple" }) {
   );
 }
 
-function QuizCard({ quiz, onEdit, onDelete, onPublish, onUnpublish, onPreview }) {
+// ✅ Added onViewSubmissions prop here
+function QuizCard({ quiz, onEdit, onDelete, onPublish, onUnpublish, onPreview, onViewSubmissions }) {
   const published = quiz.is_published;
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-card transition hover:shadow-elevated">
@@ -99,7 +101,7 @@ function QuizCard({ quiz, onEdit, onDelete, onPublish, onUnpublish, onPreview })
         </span>
       </div>
 
-      <div className="mt-auto flex items-center justify-between gap-1 border-t border-slate-100 pt-3">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
         <button
           type="button"
           onClick={() => onPreview(quiz)}
@@ -107,15 +109,27 @@ function QuizCard({ quiz, onEdit, onDelete, onPublish, onUnpublish, onPreview })
         >
           <Eye size={12} /> Preview
         </button>
-        <div className="flex items-center gap-1">
+        
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          {/* ✅ Submissions button correctly calls the prop */}
+          <button
+            type="button"
+            onClick={() => onViewSubmissions(quiz)}
+            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200"
+            title="View Submissions"
+          >
+            <Users size={12} /> Submissions
+          </button>
+
           <button
             type="button"
             onClick={() => onEdit(quiz)}
             className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-200"
             title="Edit"
           >
-            <Pencil size={12} /> Edit
+            <Pencil size={12} />
           </button>
+
           {published ? (
             <button
               type="button"
@@ -155,6 +169,9 @@ export default function TeacherQuizzesPage() {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editQuiz, setEditQuiz] = useState(null);
+  
+  // ✅ State for the modal
+  const [submissionsFor, setSubmissionsFor] = useState(null);
 
   const { data: classesData } = useGetClassesQuery();
   const classes = classesData?.results ?? classesData ?? [];
@@ -327,6 +344,7 @@ export default function TeacherQuizzesPage() {
               onPublish={handlePublish}
               onUnpublish={handleUnpublish}
               onPreview={handlePreview}
+              onViewSubmissions={setSubmissionsFor} // ✅ Pass the state setter
             />
           ))}
         </div>
@@ -347,6 +365,13 @@ export default function TeacherQuizzesPage() {
           refetch();
         }}
       />
+
+      <QuizSubmissionsModal 
+        quiz={submissionsFor} 
+        open={!!submissionsFor} 
+        onClose={() => setSubmissionsFor(null)} 
+      />
+
     </div>
   );
 }

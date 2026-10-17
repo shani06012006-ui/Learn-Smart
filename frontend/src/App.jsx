@@ -15,6 +15,8 @@ import RegisterPage from "./features/auth/RegisterPage";
 import RootRoute from "./routes/RootRoute";
 import StudentJoinClassPage from "./features/student/pages/StudentJoinClassPage";
 import StudentLiveClassesPage from "./features/student/pages/StudentLiveClassesPage";
+import StudentAnnouncementsPage from "./features/student/pages/StudentAnnouncementsPage";
+
 
 
 // Public
@@ -95,7 +97,7 @@ export default function App() {
             <Route path="timetable" element={<StudentTimetablePage />} />
             <Route path="join-class" element={<StudentJoinClassPage />} />
             <Route path="materials" element={<StudentMaterialsPage />} />
-            <Route path="announcements" element={ <StudentPlaceholderPage title="Announcements"  description="Notices and updates from your teachers and admin." /> } />
+            <Route path="announcements" element={<StudentAnnouncementsPage />} />
             <Route path="live-classes" element={<StudentLiveClassesPage />} />
             <Route path="chat" element={<StudentChatPage />} />
           </Route>

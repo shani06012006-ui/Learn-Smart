@@ -328,3 +328,34 @@ class MaterialUpdateSerializer(serializers.Serializer):
     """
     title = serializers.CharField(max_length=200, allow_blank=False, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
+
+
+# ---------------------------------------------------------------
+# Student-facing announcements
+# ---------------------------------------------------------------
+
+class StudentAnnouncementReadSerializer(serializers.ModelSerializer):
+    """Announcement as seen by a student — read-only, rich display fields."""
+    teacher_name = serializers.SerializerMethodField()
+    class_name = serializers.SerializerMethodField()
+
+    class Meta:
+        from classes.models import Announcement
+        model = Announcement
+        fields = [
+            "id", "title", "body",
+            "class_name", "teacher_name",
+            "is_published", "published_at", "created_at",
+        ]
+
+    def get_teacher_name(self, obj):
+        t = getattr(obj, "teacher", None)
+        if not t:
+            return None
+        return t.get_full_name() or t.email
+
+    def get_class_name(self, obj):
+        cc = getattr(obj, "class_course", None)
+        if not cc:
+            return None
+        return cc.name

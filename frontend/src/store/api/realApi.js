@@ -240,6 +240,11 @@ export const realApi = createApi({
       query: () => "/live-classes/",
       providesTags: ["StudentLiveClasses"],
     }),
+        // ---- Student announcements ----
+    getStudentAnnouncements: builder.query({
+      query: () => "/student/announcements/",
+      providesTags: ["StudentAnnouncements"],
+    }),
 
     // ---- Quizzes ----
 
@@ -1467,6 +1472,7 @@ export const {
   useGetAdminAttendanceAuditQuery,
   useUnpublishQuizMutation,
   useGetStudentLiveClassesQuery,
+  useGetStudentAnnouncementsQuery,
 
   useGetStudentQuizzesQuery,
   useGetQuizzesQuery,

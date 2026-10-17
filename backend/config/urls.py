@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
+from classes.views import StudentAnnouncementsView
 
 from attendance.views import AttendanceViewSet, TeacherAttendanceViewSet, TeacherStudentsViewSet
 from classes.views import TeacherAnnouncementsViewSet
@@ -95,6 +96,7 @@ urlpatterns = [
     path("api/v1/student/quizzes/<uuid:quiz_id>/start/",StudentStartQuizAttemptView.as_view(), name="student-quiz-start"),
     path("api/v1/student/quizzes/<uuid:quiz_id>/submit/",StudentSubmitQuizAttemptView.as_view(),name="student-quiz-submit" ),
     path("api/v1/student/quiz-attempts/<uuid:attempt_id>/",StudentQuizAttemptResultView.as_view(),name="student-quiz-attempt-result" ),
+    path("api/v1/student/announcements/",StudentAnnouncementsView.as_view(),name="student-announcements", ),     
     path("api/v1/quizzes/<uuid:quiz_id>/submissions/", TeacherQuizSubmissionsView.as_view(), name="teacher-quiz-submissions" ),
     
     # ============================================================
