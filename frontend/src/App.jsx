@@ -14,6 +14,8 @@ import StudentChatPage from "./features/student/pages/StudentChatPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import RootRoute from "./routes/RootRoute";
 import StudentJoinClassPage from "./features/student/pages/StudentJoinClassPage";
+import StudentLiveClassesPage from "./features/student/pages/StudentLiveClassesPage";
+
 
 // Public
 import ShopPage from "./features/shop/ShopPage";
@@ -93,7 +95,7 @@ export default function App() {
             <Route path="join-class" element={<StudentJoinClassPage />} />
             <Route path="materials" element={<StudentMaterialsPage />} />
             <Route path="announcements" element={ <StudentPlaceholderPage title="Announcements"  description="Notices and updates from your teachers and admin." /> } />
-            <Route path="live-classes" element={ <StudentPlaceholderPage title="Live Classes" description="Your scheduled live class sessions will appear here." /> } />
+            <Route path="live-classes" element={<StudentLiveClassesPage />} />
             <Route path="chat" element={<StudentChatPage />} />
           </Route>
         </Route>
