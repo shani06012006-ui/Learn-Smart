@@ -170,38 +170,39 @@ const student = {
 
   background: {
     imageUrl: "https://i.pinimg.com/1200x/2a/e9/a8/2ae9a8ddec1c99cebf5594b3b6462c50.jpg",
-    
-    veil: "from-white/15 via-white/10 to-white/20",
+    opacity: 0.35,
+    veil: "from-white/60 via-white/40 to-white/70", 
   },
 
   sidebar: {
-    wrapper: "border-white/20 bg-white/40 ",
-    brandLabel: "text-black ",
-    sectionLabel: "text-slate-500",
-    sectionValue: "text-red-900",
-    navItemActive: "bg-black text-white shadow-sm",
-    navItemIdle: "text-black hover:bg-white/30 hover:text-black",
-    divider: "border-white/20",
-    avatarClass: "bg-gradient-to-br from-blue-600 to-cyan-600 text-white",
+    // Emerald tinted glass
+    wrapper: "border-emerald-200/50 bg-white/40 backdrop-blur-md",
+    brandLabel: "text-emerald-700",
+    sectionLabel: "text-emerald-600",
+    sectionValue: "text-navy-950",
+    // Emerald active pill
+    navItemActive: "bg-emerald-600 text-white shadow-sm",
+    navItemIdle: "text-slate-700 hover:bg-emerald-50/80 hover:text-emerald-700",
+    divider: "border-emerald-100/50",
+    avatarClass: "bg-gradient-to-br from-emerald-500 to-teal-600 text-white",
     userName: "text-navy-950",
-    userEmail: "text-slate-400",
-    signOutClass: "text-white hover:bg-white/30 hover:text-coral-600",
+    userEmail: "text-slate-500",
+    signOutClass: "text-slate-600 hover:bg-rose-50 hover:text-rose-600",
     navItems: STUDENT_NAV,
   },
 
   navbar: {
-    wrapper: "border-white/20 bg-white/10 backdrop-blur-sm",
-    brandIcon: "text-blue-600",
+    wrapper: "border-white/20 bg-white/40 backdrop-blur-md",
+    brandIcon: "text-emerald-600",
     brandText: "text-navy-950",
-    roleBadge: "bg-blue-600 text-white ring-1 ring-blue-500",
-    iconButton: "text-slate-700 hover:bg-white/30 hover:text-blue-700",
+    roleBadge: "bg-emerald-600 text-white ring-1 ring-emerald-500",
+    iconButton: "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700",
   },
 
-  // ============ TEXT YOU SEE ON SCREEN ============
-  // Change these strings — they update wherever the page uses them.
   headings: {
-    dashboard:     { title: "My Progress",    subtitle: "Welcome back" },
+    dashboard:     { title: "My Dashboard",   subtitle: "Welcome back" },
     classes:       { title: "My Classes",     subtitle: "Classes you're actively enrolled in." },
+    quizzes:       { title: "My Quizzes",     subtitle: "Quizzes from your enrolled classes." },
     timetable:     { title: "My Timetable",   subtitle: "Your weekly class schedule." },
     joinClass:     { title: "Join a class",   subtitle: "Enter the code your teacher gave you." },
     materials:     { title: "My Materials",   subtitle: "Resources from your classes." },
@@ -210,14 +211,13 @@ const student = {
     liveClasses:   { title: "Live Classes",   subtitle: "Sessions happening now or soon." },
     messages:      { title: "Messages",       subtitle: "Chat with teachers and peers." },
 
-    // In-page section headings (used by dashboard widgets)
     attendanceSection:  "MY ATTENDANCE",
     classesSection:     "MY CLASSES",
     timetableSection:   "MY TIMETABLE",
     performanceSection: "MY PERFORMANCE",
   },
 
-  emptyStateIcon: "text-blue-500",
+  emptyStateIcon: "text-emerald-500",
 };
 
 /* ================================================================

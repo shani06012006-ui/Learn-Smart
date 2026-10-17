@@ -235,7 +235,20 @@ export const realApi = createApi({
       query: () => "/student/quizzes/",
       providesTags: ["StudentQuizzes"],
     }),
+
+    
     // ---- Quizzes ----
+
+    joinClassWithCode: builder.mutation({
+      query: (joining_code) => ({
+        url: "/enrollments/join/",
+        method: "POST",
+        body: { joining_code },
+      }),
+      invalidatesTags: ["StudentSelf", { type: "Class", id: "LIST" }],
+    }),
+    
+    
     getQuizzes: builder.query({
       query: (params = {}) => {
         const s = new URLSearchParams();
@@ -1452,6 +1465,7 @@ export const {
 
   useGetStudentQuizzesQuery,
   useGetQuizzesQuery,
+  useJoinClassWithCodeMutation,
   useGetQuizQuery,
   useCreateQuizMutation,
   useUpdateQuizMutation,
