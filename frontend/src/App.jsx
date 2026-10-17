@@ -71,6 +71,7 @@ import RoleRoute from "./routes/RoleRoute";
 import AdminSectionsPage from "./features/admin/pages/AdminSectionsPage";
 import AdminTimetableGeneratorPage from "./features/admin/pages/AdminTimetableGeneratorPage";
 import AdminSubstitutionsPage from "./features/admin/pages/AdminSubstitutionsPage";
+import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesPage";
 
 export default function App() {
   return (
@@ -153,7 +154,7 @@ export default function App() {
             <Route path="quizzes" element={<TeacherQuizzesPage />} />
             <Route path="materials" element={<TeacherMaterialsPage />} />
             <Route path="announcements" element={<TeacherAnnouncementsPage />} />
-            <Route path="live-classes" element={<TeacherPlaceholder title="Live Classes" />} />
+            <Route path="live-classes" element={<TeacherLiveClassesPage />} />
           </Route>
         </Route>
       </Route>
