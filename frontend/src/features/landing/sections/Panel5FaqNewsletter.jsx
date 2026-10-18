@@ -1,15 +1,20 @@
 // frontend/src/features/landing/sections/Panel5FaqNewsletter.jsx
 import { useRef, useState } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
-import { ChevronDown, Mail, Sparkles, CheckCircle2 } from "lucide-react";
+import { ChevronDown, Mail, CheckCircle2, BookOpen, Users, GraduationCap } from "lucide-react";
 
 const EASE = [0.22, 1, 0.36, 1];
+
+const STATS = [
+  { icon: GraduationCap, value: "50,000", label: "Students Trained" },
+  { icon: BookOpen, value: "1,200", label: "Courses Available" },
+  { icon: Users, value: "98%", label: "Success Rate" },
+];
 
 const FAQS = [
   { q: "Is Learn Smart really free to start?", a: "Yes! Students can join classes for free, take AI-generated quizzes, and build streaks. No credit card required." },
   { q: "How does the AI quiz generation work?", a: "Teachers upload any PDF (lesson notes, chapter, worksheet). Our Gemini-powered AI reads the content and creates a 10-question multiple-choice quiz in about 30 seconds." },
   { q: "Is it safe for young kids?", a: "Absolutely. Every account is created by a teacher or admin. Students log in with a simple PIN. No ads, no external links, no tracking." },
-  { q: "What are streaks and XP?", a: "Every day a student logs in and completes a quiz, their streak grows. They earn XP points, unlock badges, and can see their progress over time — just like a game." },
 ];
 
 export default function Panel5FaqNewsletter() {
@@ -30,54 +35,52 @@ export default function Panel5FaqNewsletter() {
   };
 
   return (
-    <section
-      ref={ref}
-      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-navy-950 py-20"
-    >
-      {/* Ambient glows */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-32 top-1/3 h-[500px] w-[500px] rounded-full bg-emerald-500/15 blur-[120px]" />
-        <div className="absolute -right-32 bottom-1/4 h-[500px] w-[500px] rounded-full bg-purple-600/20 blur-[120px]" />
-      </div>
+    <section ref={ref} className="relative w-full overflow-hidden bg-slate-50 py-20 lg:py-28">
+      <div className="container-wide">
+        
+        {/* Stats Row */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, ease: EASE }}
+          className="grid grid-cols-1 gap-6 rounded-3xl bg-[#0a0f16] p-8 sm:grid-cols-3 sm:p-10"
+        >
+          {STATS.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <motion.div
+                key={s.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.5, delay: 0.1 + i * 0.08 }}
+                className="flex flex-col items-center justify-center text-center"
+              >
+                <Icon size={24} className="text-purple-400 mb-3" />
+                <p className="font-display text-3xl font-extrabold text-white sm:text-4xl md:text-5xl">
+                  {s.value}
+                </p>
+                <p className="mt-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {s.label}
+                </p>
+              </motion.div>
+            );
+          })}
+        </motion.div>
 
-      {/* Grid */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.05]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          maskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
-        }}
-      />
-
-      <div className="container-wide relative">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-16">
+        {/* FAQ & Newsletter */}
+        <div className="mt-24 grid grid-cols-1 gap-12 lg:grid-cols-2 lg:gap-16">
+          
           {/* FAQ */}
           <div>
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, ease: EASE }}
-              className="text-xs font-bold uppercase tracking-widest text-purple-400"
-            >
-              Got questions?
-            </motion.p>
             <motion.h2
               initial={{ opacity: 0, y: 16 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-              className="mt-3 font-display text-3xl font-extrabold leading-tight text-white sm:text-4xl md:text-5xl"
+              className="font-display text-3xl font-extrabold leading-tight text-[#0a0f16] sm:text-4xl"
             >
-              Everything you{" "}
-              <span className="bg-gradient-to-r from-purple-400 to-emerald-400 bg-clip-text text-transparent">
-                need to know.
-              </span>
+              Frequently Asked Questions
             </motion.h2>
-
-            <div className="mt-8 space-y-3">
+            <div className="mt-8 space-y-4">
               {FAQS.map((faq, i) => {
                 const isOpen = openIdx === i;
                 return (
@@ -86,17 +89,20 @@ export default function Panel5FaqNewsletter() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={inView ? { opacity: 1, y: 0 } : {}}
                     transition={{ duration: 0.5, delay: 0.2 + i * 0.08 }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.03] shadow-sm backdrop-blur-xl"
+                    className="rounded-2xl border border-gray-200 bg-white shadow-sm"
                   >
                     <button
                       onClick={() => setOpenIdx(isOpen ? -1 : i)}
-                      className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                      className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
                     >
-                      <span className="text-sm font-bold text-white">{faq.q}</span>
+                      <span className="text-sm font-bold text-[#0a0f16]">
+                        {faq.q}
+                      </span>
                       <ChevronDown
                         size={16}
                         className={
-                          "shrink-0 text-slate-400 transition-transform " + (isOpen ? "rotate-180" : "")
+                          "shrink-0 text-slate-400 transition-transform " +
+                          (isOpen ? "rotate-180" : "")
                         }
                       />
                     </button>
@@ -109,7 +115,9 @@ export default function Panel5FaqNewsletter() {
                           transition={{ duration: 0.3, ease: EASE }}
                           className="overflow-hidden"
                         >
-                          <p className="px-5 pb-4 text-sm leading-relaxed text-slate-400">{faq.a}</p>
+                          <p className="px-6 pb-5 text-sm leading-relaxed text-slate-600">
+                            {faq.a}
+                          </p>
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -124,51 +132,49 @@ export default function Panel5FaqNewsletter() {
             initial={{ opacity: 0, y: 24 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, delay: 0.3, ease: EASE }}
-            className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-600/90 via-purple-700/90 to-emerald-600/90 p-8 text-white shadow-2xl backdrop-blur-xl"
+            className="relative overflow-hidden rounded-[2rem] bg-white p-8 shadow-xl border border-gray-100 sm:p-12"
           >
-            <div aria-hidden className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/10 blur-3xl" />
             <div className="relative">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider backdrop-blur-sm">
-                <Sparkles size={11} /> Weekly updates
-              </span>
-              <h3 className="mt-4 font-display text-2xl font-extrabold leading-tight sm:text-3xl">
-                Get learning tips, new features, and quiz ideas — every Sunday.
+              <h3 className="font-display text-2xl font-extrabold leading-tight text-[#0a0f16] sm:text-3xl">
+                Stay updated with our newsletter
               </h3>
-              <p className="mt-3 text-sm leading-relaxed text-white/80">
-                Join 2,400+ parents who stay in the loop. No spam, unsubscribe anytime.
+              <p className="mt-3 text-sm leading-relaxed text-slate-500">
+                Get the latest learning tips, platform updates, and exclusive
+                offers delivered straight to your inbox.
               </p>
 
-              <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+              <form onSubmit={handleSubmit} className="mt-8 space-y-3">
                 <div className="relative">
-                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
+                  <Mail
+                    size={16}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="h-12 w-full rounded-xl border border-white/20 bg-white/10 pl-11 pr-4 text-sm text-white placeholder:text-white/50 outline-none backdrop-blur-sm focus:border-white/40 focus:bg-white/15"
+                    placeholder="Enter your email address"
+                    className="h-14 w-full rounded-xl border border-gray-200 bg-slate-50 pl-11 pr-4 text-sm text-[#0a0f16] placeholder:text-slate-400 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-4 focus:ring-purple-100"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-6 text-sm font-bold text-purple-700 transition hover:bg-slate-50"
+                  className="inline-flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#0a0f16] px-6 text-sm font-bold text-white transition hover:bg-slate-800"
                 >
                   {submitted ? (
                     <>
                       <CheckCircle2 size={16} /> Subscribed!
                     </>
                   ) : (
-                    "Subscribe free"
+                    "Subscribe Now"
                   )}
                 </button>
               </form>
 
-              <div className="mt-6 flex flex-wrap gap-4 text-[11px] font-semibold text-white/60">
-                <span>✓ No spam</span>
-                <span>✓ Weekly only</span>
-                <span>✓ Unsubscribe anytime</span>
-              </div>
+              <p className="mt-4 text-[11px] font-semibold text-slate-400 text-center">
+                No spam, unsubscribe anytime.
+              </p>
             </div>
           </motion.div>
         </div>
