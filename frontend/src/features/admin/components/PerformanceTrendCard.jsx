@@ -1,7 +1,7 @@
 // frontend/src/features/admin/components/PerformanceTrendCard.jsx
 import { useState } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, XAxis, YAxis, Tooltip,
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Loader2, Activity } from "lucide-react";

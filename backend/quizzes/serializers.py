@@ -3,7 +3,7 @@ from rest_framework import serializers
 from classes.models import ClassCourse
 
 from .models import Quiz, Question, Choice, QuizAttempt, AttemptAnswer
-
+import random
 
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -147,11 +147,16 @@ class StudentChoiceSerializer(serializers.ModelSerializer):
 
 
 class StudentQuestionSerializer(serializers.ModelSerializer):
-    choices = StudentChoiceSerializer(many=True, read_only=True)
+    choices = serializers.SerializerMethodField()
 
     class Meta:
         model = Question
         fields = ["id", "question_text", "points", "order", "choices"]
+
+    def get_choices(self, obj):
+        choices = list(obj.choices.all())
+        random.shuffle(choices)
+        return StudentChoiceSerializer(choices, many=True).data
 
 
 class StudentQuizTakeSerializer(serializers.ModelSerializer):

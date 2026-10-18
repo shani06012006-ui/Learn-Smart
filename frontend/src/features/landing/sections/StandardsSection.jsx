@@ -1,191 +1,227 @@
 ﻿// frontend/src/features/landing/sections/StandardsSection.jsx
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import {
+  Sparkles,
+  Flame,
+  Users,
+  FileText,
+  ArrowRight,
+  CheckCircle2,
+  Zap,
+  GraduationCap,
+  BookOpen,
+} from "lucide-react";
 
 const EASE = [0.22, 1, 0.36, 1];
 
-/* 3 tabs */
-const TABS = ["Kindergarten", "High School", "College"];
-
-/* 8 cards — colors + copy match the reference */
-const CARDS = [
+const FEATURES = [
   {
-    n: 1,
-    title: "Standard One",
-    body: "Standard 1 is a foundation Standard that reflects 7 important concepts…",
-    badge: "bg-coral-500",
-    active: false,
+    icon: Sparkles,
+    tone: "purple",
+    title: "AI quiz generation",
+    body:
+      "Upload any PDF from your class. Our AI turns it into a ready-to-publish multiple-choice quiz in under a minute — no manual question writing.",
+    mockup: "ai",
   },
   {
-    n: 2,
-    title: "Standard Two",
-    body: "Standard 2 builds on the foundations of Standard 1 and includes requirements…",
-    badge: "bg-navy-950",
-    active: false,
+    icon: Flame,
+    tone: "amber",
+    title: "Gamified streaks",
+    body:
+      "Students build daily streaks for showing up, earn XP for every quiz completed, and unlock achievement badges. Learning finally feels worth coming back to.",
+    mockup: "streak",
   },
   {
-    n: 3,
-    title: "Standard Three",
-    body: "Standard 3 of the Aged Care Quality Standards applies to all services delivering personal…",
-    badge: "bg-teal-400",
-    active: true,
-  },
-  {
-    n: 4,
-    title: "Standard Four",
-    body: "Standard 4 of the Aged Care Quality Standards focuses on services and supports…",
-    badge: "bg-navy-950",
-    active: false,
-  },
-  {
-    n: 5,
-    title: "Standard Five",
-    body: "Standard 5 Learning Resources. Learning Resources ensure that the school has the…",
-    badge: "bg-teal-400",
-    active: false,
-  },
-  {
-    n: 6,
-    title: "Standard Six",
-    body: "Standard 6 requires an organisation to have a system to resolve complaints…",
-    badge: "bg-orange-400",
-    active: false,
-  },
-  {
-    n: 7,
-    title: "Standard Seven",
-    body: "Standard 7 Blood Management mandates that leaders of health service organisations…",
-    badge: "bg-coral-600",
-    active: false,
-  },
-  {
-    n: 8,
-    title: "Standard Eight",
-    body: "Standard 8 Course from NCERT Solutions help students to understand…",
-    badge: "bg-orange-400",
-    active: false,
+    icon: Users,
+    tone: "emerald",
+    title: "Role-based portals",
+    body:
+      "Separate dashboards for students, teachers, and admins — each tuned to what they need. One platform, three clean views, zero confusion.",
+    mockup: "roles",
   },
 ];
 
-/* Small detail card — the 8 cards are all this shape */
-function StandardCard({ card, index, inView }) {
+const TONES = {
+  purple: {
+    iconBg: "bg-purple-100 text-purple-600",
+    gradient: "from-purple-500 to-indigo-600",
+  },
+  amber: {
+    iconBg: "bg-amber-100 text-amber-600",
+    gradient: "from-amber-500 to-orange-500",
+  },
+  emerald: {
+    iconBg: "bg-emerald-100 text-emerald-600",
+    gradient: "from-emerald-500 to-teal-600",
+  },
+};
+
+/* ============ Mini mockups per feature ============ */
+
+function AIMockup() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.55, delay: 0.3 + index * 0.05, ease: EASE }}
-      className="group relative flex flex-col items-center rounded-2xl border border-slate-100 bg-white px-5 py-7 text-center shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-elevated"
-    >
-      {/* Number badge */}
-      <span
-        className={`flex h-12 w-12 items-center justify-center rounded-full text-lg font-black text-white shadow-soft ${card.badge}`}
-      >
-        {card.n}
-      </span>
-
-      {/* Title */}
-      <h3 className="mt-5 font-display text-lg font-extrabold text-navy-950">
-        {card.title}
-      </h3>
-
-      {/* Body */}
-      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-500">
-        {card.body}
-      </p>
-
-      {/* Class Details button — outlined normally, filled for the active card */}
-      <button
-        type="button"
-        className={`mt-6 inline-flex items-center justify-center rounded-full border-2 px-5 py-2 text-xs font-bold transition-all ${
-          card.active
-            ? "border-purple-500 bg-purple-500 text-white shadow-purple-glow hover:bg-purple-600"
-            : "border-purple-200 bg-white text-purple-600 hover:border-purple-400 hover:bg-purple-50"
-        }`}
-      >
-        Class Details
-      </button>
-    </motion.div>
+    <div className="flex items-center gap-2">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-50 ring-1 ring-rose-100">
+        <FileText size={18} className="text-rose-500" />
+      </div>
+      <ArrowRight size={14} className="text-slate-300" />
+      <div className="flex flex-1 items-center gap-2 rounded-xl bg-purple-50 px-3 py-2 ring-1 ring-purple-100">
+        <Sparkles size={12} className="text-purple-600" />
+        <span className="text-[10px] font-bold text-purple-700">
+          10 questions ready
+        </span>
+      </div>
+    </div>
   );
 }
+
+function StreakMockup() {
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-white px-3 py-2 ring-1 ring-amber-100">
+      <div className="flex items-center gap-2">
+        <span className="animate-pulse-soft flex h-7 w-7 items-center justify-center rounded-full bg-amber-100">
+          <Flame size={12} className="text-amber-500" />
+        </span>
+        <div>
+          <p className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+            Streak
+          </p>
+          <p className="text-xs font-extrabold text-navy-950">14 days</p>
+        </div>
+      </div>
+      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+        +50 XP
+      </span>
+    </div>
+  );
+}
+
+function RolesMockup() {
+  return (
+    <div className="flex gap-1.5">
+      <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1.5 ring-1 ring-emerald-100">
+        <GraduationCap size={11} className="text-emerald-600" />
+        <span className="text-[9px] font-bold text-emerald-700">Student</span>
+      </div>
+      <div className="flex flex-1 items-center gap-1.5 rounded-lg bg-purple-50 px-2 py-1.5 ring-1 ring-purple-100">
+        <BookOpen size={11} className="text-purple-600" />
+        <span className="text-[9px] font-bold text-purple-700">Teacher</span>
+      </div>
+    </div>
+  );
+}
+
+const MOCKUPS = {
+  ai: AIMockup,
+  streak: StreakMockup,
+  roles: RolesMockup,
+};
+
+/* ============ Page ============ */
 
 export default function StandardsSection() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: "-80px" });
-  const [activeTab, setActiveTab] = useState("High School");
 
   return (
-    <section id="standards" className="section-pad relative overflow-hidden">
+    <section id="features" className="relative overflow-hidden py-16 md:py-24">
       <div ref={ref} className="container-wide">
         {/* Heading */}
-        <div className="text-center">
+        <div className="mx-auto max-w-2xl text-center">
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, ease: EASE }}
+            className="text-[11px] font-bold uppercase tracking-widest text-purple-600"
+          >
+            Built for real classrooms
+          </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 16 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="h2"
+            transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
+            className="mt-3 font-display text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl md:text-5xl"
           >
-            Qualified lessons for students
+            Three features that change{" "}
+            <span className="bg-gradient-to-r from-purple-600 to-emerald-500 bg-clip-text text-transparent">
+              everything
+            </span>
           </motion.h2>
-
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-            className="body-lg mx-auto mt-5 max-w-2xl"
+            transition={{ duration: 0.6, delay: 0.2, ease: EASE }}
+            className="mt-4 text-base leading-relaxed text-slate-500 sm:text-lg"
           >
-            A lesson or class is a structured period of time where learning is
-            intended to occur. It involves one or more students being taught by
-            a teacher or instructor.
+            We didn't just build another LMS. We built the one your students will
+            actually open every day.
           </motion.p>
         </div>
 
-        {/* Tabs */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.55, delay: 0.2, ease: EASE }}
-          className="mt-8 flex items-center justify-center gap-1"
-          role="tablist"
-        >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab;
+        {/* Feature cards */}
+        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {FEATURES.map((f, i) => {
+            const Icon = f.icon;
+            const tone = TONES[f.tone];
+            const Mockup = MOCKUPS[f.mockup];
+
             return (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setActiveTab(tab)}
-                className={`-translate-y-0 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-300 ${
-                  isActive
-                    ? "bg-coral-500 text-white shadow-coral-glow -translate-y-0.5"
-                    : "text-slate-600 hover:text-navy-950"
-                }`}
+              <motion.div
+                key={f.title}
+                initial={{ opacity: 0, y: 24 }}
+                animate={inView ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.55, delay: 0.3 + i * 0.1, ease: EASE }}
+                className="group relative overflow-hidden rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
-                {tab}
-              </button>
+                {/* Gradient corner accent */}
+                <div
+                  aria-hidden
+                  className={
+                    "pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-to-br opacity-10 blur-2xl transition-opacity group-hover:opacity-20 " +
+                    tone.gradient
+                  }
+                />
+
+                {/* Icon */}
+                <span
+                  className={
+                    "flex h-12 w-12 items-center justify-center rounded-2xl " +
+                    tone.iconBg
+                  }
+                >
+                  <Icon size={22} />
+                </span>
+
+                {/* Title */}
+                <h3 className="mt-5 font-display text-lg font-extrabold text-navy-950">
+                  {f.title}
+                </h3>
+
+                {/* Body */}
+                <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  {f.body}
+                </p>
+
+                {/* Mini mockup */}
+                <div className="mt-6 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                  <Mockup />
+                </div>
+              </motion.div>
             );
           })}
-        </motion.div>
-
-        {/* 8-card grid */}
-        <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {CARDS.map((card, i) => (
-            <StandardCard key={card.n} card={card} index={i} inView={inView} />
-          ))}
         </div>
 
-        {/* Visit More Classes button */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.55, delay: 0.9, ease: EASE }}
-          className="mt-12 flex justify-center"
+        {/* Closing line */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={inView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6, delay: 0.7 }}
+          className="mt-12 flex items-center justify-center gap-2 text-center text-sm font-semibold text-slate-500"
         >
-          <a href="#courses" className="btn-purple">
-            Visit More Classes
-          </a>
-        </motion.div>
+          <CheckCircle2 size={15} className="text-emerald-500" />
+          All included. No credit card. Free for the first 100 students.
+        </motion.p>
       </div>
     </section>
   );

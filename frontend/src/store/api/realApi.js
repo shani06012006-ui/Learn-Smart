@@ -12,7 +12,7 @@ const rawBaseQuery = fetchBaseQuery({
     const token =
       state.adminAuth?.accessToken || state.auth?.accessToken || null;
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return headers; // Note: Don't set Content-Type globally; RTK Query/FormData handles it
+    return headers; 
   },
 });
 
@@ -88,6 +88,7 @@ export const realApi = createApi({
     "QuizSubmissions",
   ],
   endpoints: (builder) => ({
+
     // ---- Sections ----
     getAdminSections: builder.query({
       query: (params = {}) => {
@@ -189,7 +190,7 @@ export const realApi = createApi({
       providesTags: ["TeacherColleagues"],
     }),
 
-    // ---- Class-wise attendance sheet (spec: /api/v1/attendance/) ----
+    // ---- Class-wise attendance sheet ----
     getAttendanceSheet: builder.query({
       query: ({ class_id, klass, grade, date }) => {
         const s = new URLSearchParams();
@@ -435,7 +436,7 @@ export const realApi = createApi({
       }),
     }),
 
-    // ---- Teacher chat (multi-room) ----
+    // ---- Teacher chat ----
     getTeacherChatRooms: builder.query({
       query: () => `/teacher/chat/rooms/`,
       providesTags: ["TeacherChat"],
@@ -456,7 +457,7 @@ export const realApi = createApi({
       ],
     }),
 
-    // ---- Chat thread membership (shared student + teacher) ----
+    // ---- Chat thread membership ----
     getChatThreadMembers: builder.query({
       query: (threadId) => `/chat/threads/${threadId}/members/`,
       providesTags: (r, e, id) => [{ type: "ChatMembers", id }],
@@ -1532,4 +1533,9 @@ export const {
   useGetTeacherQuizSubmissionsQuery,
   usePurgeStaleSessionsMutation,
   useGetTeacherPerformanceTrendQuery,
+
+  useCheckoutMutation,
+  useGetMyOrdersQuery,
+  useGetMyOrderQuery,
+
 } = realApi;

@@ -2,19 +2,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { Menu, X, ChevronDown, ShoppingCart, User } from "lucide-react";
+import { Menu, X, ChevronDown, User } from "lucide-react";
 
 /* ── Nav links ────────────────────────────────────────────────────
    `route: true`  → uses <Link to={href}>
    `route: false` → uses <a href={href}> (anchor on same page)
    `dropdown`     → shows a chevron; wire real dropdowns later
    ────────────────────────────────────────────────────────────── */
-const NAV_LINKS = [
-  { label: "Shop",    href: "/shop",    route: true,  dropdown: false },
-  { label: "Courses", href: "/courses", route: true,  dropdown: true  },
-  { label: "Blogs",   href: "/blogs",   route: true,  dropdown: false },
-  { label: "Contact", href: "/contact", route: true,  dropdown: false },
-];
+const NAV_LINKS = [];
+
 
 function EduviLogo() {
   return (
@@ -94,27 +90,6 @@ export default function EduviNavbar() {
             {NAV_LINKS.map((link) => renderNavItem(link))}
           </nav>
 
-          {/* RIGHT — cart + account */}
-          <div className="hidden items-center gap-4 lg:flex">
-            <a
-              href="#cart"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-navy-900 transition-colors hover:text-coral-500"
-            >
-              <ShoppingCart size={16} className="text-coral-500" />
-              Cart (0)
-            </a>
-
-            <a
-              href="#account"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-navy-900 transition-colors hover:text-coral-500"
-            >
-              My Account
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-600">
-                <User size={14} />
-              </span>
-            </a>
-          </div>
-
           {/* Mobile toggle */}
           <button
             type="button"
@@ -138,25 +113,7 @@ export default function EduviNavbar() {
             {NAV_LINKS.map((link) =>
               renderNavItem(link, () => setOpen(false), true)
             )}
-            <div className="my-2 h-px bg-slate-100" />
-            <a
-              href="#cart"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-950 hover:bg-slate-50"
-            >
-              <ShoppingCart size={16} className="text-coral-500" />
-              Cart (0)
-            </a>
-            <a
-              href="#account"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-navy-950 hover:bg-slate-50"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-100 text-purple-600">
-                <User size={14} />
-              </span>
-              My Account
-            </a>
+
           </nav>
         </motion.div>
       )}

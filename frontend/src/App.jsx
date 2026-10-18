@@ -16,18 +16,6 @@ import RootRoute from "./routes/RootRoute";
 import StudentJoinClassPage from "./features/student/pages/StudentJoinClassPage";
 import StudentLiveClassesPage from "./features/student/pages/StudentLiveClassesPage";
 import StudentAnnouncementsPage from "./features/student/pages/StudentAnnouncementsPage";
-
-
-
-
-// Public
-import ShopPage from "./features/shop/ShopPage";
-import CoursesPage from "./features/courses/CoursesPage";
-import CourseDetailsPage from "./features/course-details/CourseDetailsPage";
-import PricingPage from "./features/pricing/PricingPage";
-import BlogsPage from "./features/blogs/BlogsPage";
-import ContactPage from "./features/contact/ContactPage";
-
 import StudentQuizzesPage from "./features/student/pages/StudentQuizzesPage";
 import StudentTakeQuizPage from "./features/student/pages/StudentTakeQuizPage";
 import StudentQuizResultPage from "./features/student/pages/StudentQuizResultPage";
@@ -48,12 +36,13 @@ import AdminGradeDetailPage from "./features/admin/pages/AdminGradeDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
 import AdminSessionsPage from "./features/admin/pages/AdminSessionsPage";
 import AdminMessagesPage from "./features/admin/pages/AdminMessagesPage";
-import AttendancePage from "./features/admin/pages/AttendancePage"; 
+import AttendancePage from "./features/admin/pages/AttendancePage";
 import AdminTimetablePage from "./features/admin/pages/AdminTimetablePage";
 import AdminLeavesPage from "./features/admin/pages/AdminLeavesPage";
 import AdminSectionDetailPage from "./features/admin/pages/AdminSectionDetailPage";
-
-
+import AdminSectionsPage from "./features/admin/pages/AdminSectionsPage";
+import AdminTimetableGeneratorPage from "./features/admin/pages/AdminTimetableGeneratorPage";
+import AdminSubstitutionsPage from "./features/admin/pages/AdminSubstitutionsPage";
 
 // Teacher
 import TeacherLayout from "./components/layout/TeacherLayout";
@@ -68,13 +57,10 @@ import TeacherStudentsPage from "./features/teacher/pages/TeacherStudentsPage";
 import TeacherLeavesPage from "./features/teacher/pages/TeacherLeavesPage";
 import TeacherQuizzesPage from "./features/teacher/pages/TeacherQuizzesPage";
 import TeacherAnnouncementsPage from "./features/teacher/pages/TeacherAnnouncementsPage";
-import TeacherPlaceholder from "./features/teacher/components/TeacherPlaceholder";
+import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesPage";
+
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
-import AdminSectionsPage from "./features/admin/pages/AdminSectionsPage";
-import AdminTimetableGeneratorPage from "./features/admin/pages/AdminTimetableGeneratorPage";
-import AdminSubstitutionsPage from "./features/admin/pages/AdminSubstitutionsPage";
-import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesPage";
 
 export default function App() {
   return (
@@ -83,14 +69,12 @@ export default function App() {
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/student-login" element={<StudentLoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-      {/* Student (PIN-based login) */}
+      {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["student"]} />}>
           <Route path="/student" element={<StudentLayout />}>
-            <Route path="quizzes" element={<StudentQuizzesPage />} />
-            <Route path="quizzes/:quizId" element={<StudentTakeQuizPage />} />
-            <Route path="quiz-attempts/:attemptId" element={<StudentQuizResultPage />} />
             <Route index element={<StudentProgressPage />} />
             <Route path="progress" element={<StudentProgressPage />} />
             <Route path="classes" element={<StudentMyClassesPage />} />
@@ -101,23 +85,17 @@ export default function App() {
             <Route path="announcements" element={<StudentAnnouncementsPage />} />
             <Route path="live-classes" element={<StudentLiveClassesPage />} />
             <Route path="chat" element={<StudentChatPage />} />
+            <Route path="quizzes" element={<StudentQuizzesPage />} />
+            <Route path="quizzes/:quizId" element={<StudentTakeQuizPage />} />
+            <Route path="quiz-attempts/:attemptId" element={<StudentQuizResultPage />} />
           </Route>
         </Route>
       </Route>
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/shop" element={<ShopPage />} />
-      <Route path="/courses" element={<CoursesPage />} />
-      <Route path="/courses/standard-3" element={<CourseDetailsPage />} />
-      <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/blogs" element={<BlogsPage />} />
-      <Route path="/contact" element={<ContactPage />} />
 
       {/* ── Admin (protected) ──────────────────────────────────── */}
       <Route element={<AdminRouteGuard />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
-
-          {/* Sidebar items — real pages restored in later batches */}
           <Route path="users"      element={<AdminUsersPage />} />
           <Route path="users/:id"  element={<AdminUserDetailPage />} />
           <Route path="teachers"       element={<AdminTeachersPage />} />
@@ -135,14 +113,12 @@ export default function App() {
           <Route path="timetable/generate" element={<AdminTimetableGeneratorPage />} />
           <Route path="substitutions"  element={<AdminSubstitutionsPage />} />
           <Route path="leaves"         element={<AdminLeavesPage />} />
-          <Route path="leaves"         element={<AdminLeavesPage />} />
           <Route path="sessions"       element={<AdminSessionsPage />} />
           <Route path="messages"       element={<AdminMessagesPage />} />
         </Route>
       </Route>
 
-      {/* ── Catch-all ──────────────────────────────────────────── */}
-      {/* ── Teacher (protected, role-scoped) ───────────────────────── */}
+      {/* ── Teacher (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["teacher"]} />}>
           <Route path="/teacher" element={<TeacherLayout />}>
@@ -162,6 +138,7 @@ export default function App() {
         </Route>
       </Route>
 
+      {/* ── Catch-all ──────────────────────────────────────────── */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
