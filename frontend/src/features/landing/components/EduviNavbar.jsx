@@ -2,26 +2,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useMotionValueEvent, useScroll } from "framer-motion";
-import { Menu, X, ChevronDown, User } from "lucide-react";
+import { Menu, X, ChevronDown, User, LogIn } from "lucide-react";
 
 /* ── Nav links ────────────────────────────────────────────────────
-   `route: true`  → uses <Link to={href}>
-   `route: false` → uses <a href={href}> (anchor on same page)
-   `dropdown`     → shows a chevron; wire real dropdowns later
+   Empty for now — landing page is single-screen per panel,
+   so no in-page anchors needed.
    ────────────────────────────────────────────────────────────── */
 const NAV_LINKS = [];
-
 
 function EduviLogo() {
   return (
     <Link to="/" className="flex items-center gap-2" aria-label="Learn Smart home">
-      {/* HERE IS YOUR IMAGE — logo mark — paste a URL over the gradient below */}
       <img
         src="/learn-smart-logo.png"
         alt="Learn Smart"
-        className="h-20 w-auto object-contain"
+        className="h-16 w-auto object-contain sm:h-20"
       />
-      </Link>
+    </Link>
   );
 }
 
@@ -48,7 +45,11 @@ export default function EduviNavbar() {
         {link.dropdown && (
           <ChevronDown
             size={14}
-            className={mobile ? "text-slate-400" : "text-slate-400 transition-transform group-hover:translate-y-0.5"}
+            className={
+              mobile
+                ? "text-slate-400"
+                : "text-slate-400 transition-transform group-hover:translate-y-0.5"
+            }
           />
         )}
       </>
@@ -77,11 +78,11 @@ export default function EduviNavbar() {
       <div
         className={`transition-all duration-300 ${
           scrolled
-            ? "border-b border-slate-200 bg-white/90 shadow-card backdrop-blur-xl"
+            ? "border-b border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl"
             : "border-b border-transparent bg-transparent"
         }`}
       >
-        <div className="container-wide flex h-20 items-center justify-between">
+        <div className="container-wide flex h-16 items-center justify-between sm:h-20">
           {/* LEFT — logo */}
           <EduviLogo />
 
@@ -89,6 +90,23 @@ export default function EduviNavbar() {
           <nav className="hidden items-center gap-1 lg:flex">
             {NAV_LINKS.map((link) => renderNavItem(link))}
           </nav>
+
+          {/* RIGHT — Auth buttons (desktop) */}
+          <div className="hidden items-center gap-3 lg:flex">
+            <Link
+              to="/student-login"
+              className="text-sm font-bold text-slate-600 transition-colors hover:text-purple-600"
+            >
+              Student Login
+            </Link>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-1.5 rounded-full bg-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-purple-500/30 transition-all hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-lg"
+            >
+              <LogIn size={14} />
+              Login
+            </Link>
+          </div>
 
           {/* Mobile toggle */}
           <button
@@ -107,13 +125,31 @@ export default function EduviNavbar() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-3 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-elevated lg:hidden"
+          className="mx-3 mt-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg lg:hidden"
         >
           <nav className="flex flex-col gap-1">
             {NAV_LINKS.map((link) =>
               renderNavItem(link, () => setOpen(false), true)
             )}
 
+            <div className="mt-2 border-t border-gray-100 pt-3">
+              <Link
+                to="/student-login"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <User size={16} className="text-slate-400" />
+                Student Login
+              </Link>
+              <Link
+                to="/login"
+                onClick={() => setOpen(false)}
+                className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white"
+              >
+                <LogIn size={14} />
+                Login
+              </Link>
+            </div>
           </nav>
         </motion.div>
       )}
