@@ -19,7 +19,6 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const isHorizontal = layout === "horizontal";
 
   const checkScroll = () => {
     const el = scrollRef.current;
@@ -37,18 +36,37 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
 
   return (
     <section
-  ref={ref}
-  className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-paper-50"
->
-      {/* ✅ FIXED: container-wide + flex-col justify-center */}
-      <div className="container-wide relative flex h-full flex-col justify-center py-10">
+      ref={ref}
+      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-navy-950 py-20"
+    >
+      {/* Ambient glows */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 top-1/4 h-[500px] w-[500px] rounded-full bg-fuchsia-600/15 blur-[120px]" />
+        <div className="absolute -right-32 bottom-1/4 h-[500px] w-[500px] rounded-full bg-purple-500/20 blur-[120px]" />
+      </div>
+
+      {/* Grid overlay */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.05]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+          maskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+        }}
+      />
+
+      <div className="container-wide relative">
+        {/* Header */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, ease: EASE }}
-              className="text-xs font-bold uppercase tracking-widest text-purple-600"
+              className="text-xs font-bold uppercase tracking-widest text-purple-400"
             >
               Loved by families
             </motion.p>
@@ -56,10 +74,10 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
               initial={{ opacity: 0, y: 16 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.1, ease: EASE }}
-              className="mt-3 font-display text-3xl font-extrabold leading-tight text-navy-950 sm:text-4xl md:text-5xl"
+              className="mt-3 font-display text-3xl font-extrabold leading-tight text-white sm:text-4xl md:text-5xl"
             >
               Real parents.{" "}
-              <span className="bg-gradient-to-r from-purple-600 to-emerald-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-purple-400 via-fuchsia-400 to-emerald-400 bg-clip-text text-transparent">
                 Real progress.
               </span>
             </motion.h2>
@@ -74,20 +92,21 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
             <button
               onClick={() => scroll(-1)}
               disabled={!canScrollLeft}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-navy-950 shadow-sm transition hover:border-purple-300 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white shadow-sm transition hover:border-white/30 hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft size={18} />
             </button>
             <button
               onClick={() => scroll(1)}
               disabled={!canScrollRight}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-navy-950 shadow-sm transition hover:border-purple-300 hover:text-purple-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-white shadow-sm transition hover:border-white/30 hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight size={18} />
             </button>
           </motion.div>
         </div>
 
+        {/* Carousel */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
@@ -102,11 +121,11 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
               initial={{ opacity: 0, y: 20 }}
               animate={inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: 0.3 + i * 0.08 }}
-              className="w-[300px] shrink-0 snap-start rounded-3xl border border-gray-100 bg-white p-6 shadow-sm sm:w-[360px]"
+              className="w-[300px] shrink-0 snap-start rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-lg backdrop-blur-xl sm:w-[360px]"
             >
-              <Quote size={28} className="text-purple-200" />
-              <p className="mt-4 text-sm leading-relaxed text-slate-700">"{t.text}"</p>
-              <div className="mt-5 flex items-center gap-3 border-t border-gray-100 pt-4">
+              <Quote size={28} className="text-purple-400/50" />
+              <p className="mt-4 text-sm leading-relaxed text-slate-300">"{t.text}"</p>
+              <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
                 <span
                   className={
                     "flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br text-sm font-extrabold text-white " +
@@ -116,15 +135,15 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
                   {t.avatar}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-navy-950">{t.name}</p>
-                  <p className="truncate text-[11px] text-slate-500">{t.role}</p>
+                  <p className="truncate text-sm font-bold text-white">{t.name}</p>
+                  <p className="truncate text-[11px] text-slate-400">{t.role}</p>
                 </div>
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <Star
                       key={n}
                       size={11}
-                      className={n <= t.rating ? "fill-amber-400 text-amber-400" : "text-slate-300"}
+                      className={n <= t.rating ? "fill-amber-400 text-amber-400" : "text-slate-600"}
                     />
                   ))}
                 </div>
@@ -133,6 +152,9 @@ export default function Panel4Testimonials({ layout = "horizontal" }) {
           ))}
         </motion.div>
       </div>
+
+      {/* Fade to next panel */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-paper-50" />
     </section>
   );
 }
