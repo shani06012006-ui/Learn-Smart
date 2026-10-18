@@ -1,9 +1,33 @@
 // frontend/src/features/landing/sections/Panel4Testimonials.jsx
-import { useRef } from "react";
-import { motion, useInView } from "framer-motion";
-import { Quote, Star } from "lucide-react";
+import { BarChart3, Flame, Send, ShieldCheck, Sparkles, Star } from "lucide-react";
+import SafeImage from "../components/SafeImage";
+import { IMAGES } from "../landingAssets";
 
-const EASE = [0.22, 1, 0.36, 1];
+const LEFT = [
+  {
+    icon: Sparkles,
+    title: "Quizzes from your own notes",
+    text: "Upload a lesson PDF and get a 10-question quiz in about 30 seconds.",
+  },
+  {
+    icon: Flame,
+    title: "Streaks that build habits",
+    text: "Daily streaks and badges make practice something kids come back to.",
+  },
+];
+
+const RIGHT = [
+  {
+    icon: ShieldCheck,
+    title: "Safe for young learners",
+    text: "Teachers create every account. Students sign in with a PIN. No ads, no tracking.",
+  },
+  {
+    icon: BarChart3,
+    title: "Progress you can see",
+    text: "Score trends and performance reports show exactly where to help next.",
+  },
+];
 
 const TESTIMONIALS = [
   {
@@ -29,58 +53,93 @@ const TESTIMONIALS = [
   },
 ];
 
-export default function Panel4Testimonials() {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
-
+function Point({ icon: Icon, title, text, align }) {
+  const right = align === "right";
   return (
-    <section ref={ref} className="relative w-full overflow-hidden bg-[#0a0f16] py-20 lg:py-28">
-      <div className="container-wide">
-        {/* Header */}
-        <div className="text-center">
-          <motion.h2
-            initial={{ opacity: 0, y: 16 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="font-display text-3xl font-extrabold leading-tight text-white sm:text-4xl md:text-5xl"
-          >
-            Guidance from Learning Experts
-          </motion.h2>
-        </div>
+    <div className={`flex items-start gap-4 ${right ? "lg:flex-row-reverse lg:text-right" : ""}`}>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-sage-300">
+        <Icon size={20} />
+      </span>
+      <div>
+        <h3 className="font-display text-base font-semibold text-white">{title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-white/65">{text}</p>
+      </div>
+    </div>
+  );
+}
 
-        {/* Testimonial Cards */}
-        <div className="mt-14 grid grid-cols-1 gap-6 md:grid-cols-3">
-          {TESTIMONIALS.map((t, i) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: 24 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.55, delay: 0.2 + i * 0.1, ease: EASE }}
-              className="relative rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-md transition hover:-translate-y-1 hover:bg-white/10"
-            >
-              <Quote size={28} className="text-purple-500/50" />
-              <p className="mt-4 text-sm leading-relaxed text-slate-300">
-                "{t.text}"
-              </p>
-              
-              <div className="mt-8 flex items-center gap-4 border-t border-white/10 pt-6">
-                <img
-                  src={t.avatar}
-                  alt={t.name}
-                  className="h-12 w-12 rounded-full object-cover ring-2 ring-white/20"
+export default function Panel4Testimonials() {
+  return (
+    <section id="experts" className="scroll-mt-4 px-3 sm:px-4">
+      <div className="relative overflow-hidden rounded-[2rem] bg-ink-800 py-20 sm:rounded-[2.5rem] lg:py-28">
+        <Send
+          aria-hidden
+          size={34}
+          strokeWidth={1.5}
+          className="absolute right-10 top-10 hidden -rotate-12 text-white/50 lg:block"
+        />
+
+        <div className="container-wide">
+          <h2 className="text-center font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Guidance from Learning Experts
+          </h2>
+          <p className="mx-auto mt-4 max-w-lg text-center text-base text-white/65">
+            Built with teachers, for classrooms — every feature exists to make
+            learning easier to start and easier to keep up.
+          </p>
+
+          {/* Photo + four points */}
+          <div className="mt-16 grid items-center gap-10 lg:grid-cols-[1fr_auto_1fr] lg:gap-14">
+            <div className="order-2 space-y-8 lg:order-none">
+              {LEFT.map((p) => (
+                <Point key={p.title} {...p} align="right" />
+              ))}
+            </div>
+
+            <div className="order-1 mx-auto lg:order-none">
+              <div className="relative h-64 w-64 sm:h-72 sm:w-72">
+                <div aria-hidden className="absolute -inset-4 rounded-full border border-dashed border-white/20" />
+                <SafeImage
+                  src={IMAGES.expert}
+                  alt="Learning expert"
+                  className="h-full w-full rounded-full border-[6px] border-white object-cover"
                 />
-                <div>
-                  <p className="text-sm font-bold text-white">{t.name}</p>
-                  <p className="text-[11px] text-slate-400">{t.role}</p>
-                </div>
-                <div className="ml-auto flex gap-0.5">
+              </div>
+            </div>
+
+            <div className="order-3 space-y-8 lg:order-none">
+              {RIGHT.map((p) => (
+                <Point key={p.title} {...p} align="left" />
+              ))}
+            </div>
+          </div>
+
+          {/* Testimonials */}
+          <div className="mt-20 grid gap-5 md:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <figure key={t.id} className="flex flex-col rounded-3xl border border-white/10 bg-white/[0.04] p-7">
+                <div className="flex gap-0.5" aria-label="5 out of 5 stars">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <Star key={n} size={12} className="fill-purple-500 text-purple-500" />
+                    <Star key={n} size={14} className="fill-sage-300 text-sage-300" />
                   ))}
                 </div>
-              </div>
-            </motion.div>
-          ))}
+                <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-white/80">
+                  “{t.text}”
+                </blockquote>
+                <figcaption className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
+                  <SafeImage
+                    src={t.avatar}
+                    alt=""
+                    className="h-11 w-11 rounded-full object-cover ring-2 ring-white/20"
+                  />
+                  <div>
+                    <p className="text-sm font-bold text-white">{t.name}</p>
+                    <p className="text-xs text-white/55">{t.role}</p>
+                  </div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       </div>
     </section>

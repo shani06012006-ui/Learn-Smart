@@ -5,9 +5,8 @@ import HorizontalStoryboard from "./sections/HorizontalStoryboard";
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-paper-50 font-sans text-navy-950">
+    <div className="landing min-h-screen bg-white font-sans text-ink-900">
       <EduviNavbar />
-      <div className="h-20" aria-hidden="true" />
       <main>
         <HorizontalStoryboard />
       </main>

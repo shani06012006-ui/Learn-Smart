@@ -43,6 +43,28 @@ export default {
         shine: "shine 1.5s ease-in-out infinite",
       },
       colors: {
+        // ── Landing page palette (charcoal-green + sage, from the reference) ──
+        ink: {
+          50:  "#f2f6f4",
+          100: "#e3eae7",
+          200: "#c6d3ce",
+          300: "#9fb3ab",
+          400: "#6f8a80",
+          500: "#4a635a",
+          600: "#3c5249",
+          700: "#33463f",
+          800: "#2b3a36",
+          900: "#212d2a",
+          950: "#151e1c",
+        },
+        sage: {
+          100: "#e8f0e5",
+          200: "#d0e0cb",
+          300: "#b6cfb0",
+          400: "#9dbb96",
+          500: "#86a87e",
+          600: "#6b8d63",
+        },
         // Page background — very light warm off-white (from reference)
         paper: {
           50:  "#fdfcfa",
