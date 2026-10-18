@@ -24,6 +24,13 @@ export default {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        sparkle: {
+          "0%": { transform: "scale(0) rotate(0deg)", opacity: "1" },
+          "100%": { transform: "scale(1.5) rotate(180deg)", opacity: "0" },
+        },
+        shine: {
+          "100%": { transform: "translateX(100%)" },
+        },
       },
       animation: {
         float: "float 6s ease-in-out infinite",
@@ -31,6 +38,9 @@ export default {
         "pulse-soft": "pulse-soft 4s ease-in-out infinite",
         "gradient-x": "gradient-x 8s ease infinite",
         marquee: "marquee 60s linear infinite",
+        // 👇 NEW ANIMATIONS ADDED HERE
+        sparkle: "sparkle 0.6s ease-out forwards",
+        shine: "shine 1.5s ease-in-out infinite",
       },
       colors: {
         // Page background — very light warm off-white (from reference)

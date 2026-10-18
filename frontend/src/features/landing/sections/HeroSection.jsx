@@ -1,68 +1,195 @@
 // frontend/src/features/landing/sections/HeroSection.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
-  Search, ChevronDown, Sparkles, Flame, CheckCircle2, 
-  ArrowRight, ShieldCheck, Rocket
+  motion, useScroll, useTransform, useMotionValue, useSpring, AnimatePresence
+} from "framer-motion";
+import {
+  ChevronDown, Sparkles, Flame, CheckCircle2, ArrowRight,
+  ShieldCheck, Rocket, Check, X
 } from "lucide-react";
+import confetti from "canvas-confetti";
 
 const EASE = [0.22, 1, 0.36, 1];
 
 /* ──────────────────────────────────────────────────────────────────
-   Floating Badge Notifications (Trust & Excitement)
+   Word-by-Word Text Reveal
    ────────────────────────────────────────────────────────────────── */
-const FLOATING_BADGES = [
-  {
-    id: "safe",
-    label: "100% Safe Learning",
-    icon: ShieldCheck,
-    color: "bg-emerald-100 text-emerald-700 ring-emerald-200",
-    top: "6%",
-    left: "0%",
-    delay: 0.6,
-  },
-  {
-    id: "ai",
-    label: "AI-Powered Quizzes",
-    icon: Rocket,
-    color: "bg-purple-100 text-purple-700 ring-purple-200",
-    top: "14%",
-    left: "72%",
-    delay: 0.8,
-  },
-];
+const TextReveal = ({ text, className }) => {
+  const words = text.split(" ");
+  return (
+    <motion.span
+      className={className}
+      variants={{ visible: { transition: { staggerChildren: 0.08 } }, hidden: {} }}
+      initial="hidden"
+      animate="visible"
+    >
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } },
+          }}
+          className="inline-block mr-[0.25em]"
+        >
+          {word}
+        </motion.span>
+      ))}
+    </motion.span>
+  );
+};
 
-export default function HeroSection() {
-  const [category, setCategory] = useState("Kindergarten");
-  const [query, setQuery] = useState("");
+/* ──────────────────────────────────────────────────────────────────
+   Interactive Quiz Widget
+   ────────────────────────────────────────────────────────────────── */
+function QuizWidget() {
+  const [answered, setAnswered] = useState(false);
+  const [correct, setCorrect] = useState(false);
+  const [showXp, setShowXp] = useState(false);
 
-  const onSearch = (e) => {
-    e.preventDefault();
-    // TODO: wire to your search route
+  const handleAnswer = (isCorrect) => {
+    if (answered) return;
+    setCorrect(isCorrect);
+    setAnswered(true);
+
+    if (isCorrect) {
+      setShowXp(true);
+      // Fire Confetti
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.8, x: 0.7 },
+        colors: ["#10b981", "#8b5cf6", "#f59e0b"],
+        disableForReducedMotion: true,
+      });
+      setTimeout(() => setShowXp(false), 2000);
+    }
   };
 
   return (
-    <section id="hero" className="relative overflow-hidden pt-10 pb-20 md:pt-16 md:pb-28">
-      {/* ── Cheerful Background Blobs ── */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-0 bg-paper-50" />
-        {/* Soft emerald & purple radial washes */}
-        <div className="absolute -left-[10%] -top-[20%] h-[700px] w-[700px] rounded-full bg-emerald-100/40 blur-[100px]" />
-        <div className="absolute -right-[10%] top-[20%] h-[600px] w-[600px] rounded-full bg-purple-100/40 blur-[100px]" />
-        {/* Subtle dot pattern */}
-        <div 
-          className="absolute inset-0 opacity-[0.15]" 
-          style={{ backgroundImage: 'radial-gradient(#7c6fdd 1px, transparent 1px)', backgroundSize: '32px 32px' }} 
-        />
-      </div>
+    <div className="relative">
+      {/* Floating XP Animation */}
+      <AnimatePresence>
+        {showXp && (
+          <motion.div
+            initial={{ opacity: 0, y: 0, scale: 0.5 }}
+            animate={{ opacity: 1, y: -60, scale: 1.2 }}
+            exit={{ opacity: 0 }}
+            className="absolute left-1/2 top-10 z-50 -translate-x-1/2 text-lg font-black text-emerald-500 drop-shadow-md"
+          >
+            +50 XP
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="container-wide">
+      <div className="pt-3">
+        <p className="text-sm font-extrabold text-navy-950 mb-3">What is 7 x 8?</p>
+        <div className="space-y-2">
+          <button
+            onClick={() => handleAnswer(false)}
+            className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-all ${
+              answered && !correct ? "border-rose-500 bg-rose-50 text-rose-800" :
+              "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <span className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold ${
+              answered && !correct ? "bg-rose-600 text-white" : "bg-slate-100"
+            }`}>A</span>
+            <span className="font-semibold">54</span>
+            {answered && !correct && <X size={14} className="ml-auto text-rose-600" />}
+          </button>
+
+          <button
+            onClick={() => handleAnswer(true)}
+            className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-all ${
+              answered && correct ? "border-emerald-500 bg-emerald-50 text-emerald-800" :
+              "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            <span className={`flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold ${
+              answered && correct ? "bg-emerald-600 text-white" : "bg-slate-100"
+            }`}>B</span>
+            <span className="font-semibold">56</span>
+            {answered && correct && <Check size={14} className="ml-auto text-emerald-600" />}
+          </button>
+        </div>
+        
+        {answered && (
+          <button
+            onClick={() => { setAnswered(false); setCorrect(false); }}
+            className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-purple-600 transition"
+          >
+            Reset Quiz
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Main Hero Component
+   ────────────────────────────────────────────────────────────────── */
+export default function HeroSection() {
+  const containerRef = useRef(null);
+
+  // 1. Scroll Parallax
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end start"],
+  });
+  const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "30%"]);
+  const orbsY = useTransform(scrollYProgress, [0, 1], ["0%", "-20%"]);
+  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+
+  // 2. 3D Cursor Tilt
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const springX = useSpring(mouseX, { stiffness: 150, damping: 20 });
+  const springY = useSpring(mouseY, { stiffness: 150, damping: 20 });
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    mouseX.set(x * 20); // Rotate up to 20deg
+    mouseY.set(y * -20);
+  };
+
+  const handleMouseLeave = () => {
+    mouseX.set(0);
+    mouseY.set(0);
+  };
+
+  return (
+    <section
+      ref={containerRef}
+      id="hero"
+      className="relative overflow-hidden pt-10 pb-20 md:pt-16 md:pb-28 perspective-1000"
+    >
+      {/* ── 1. Ambient Background (Parallax) ── */}
+      <motion.div
+        style={{ y: bgY }}
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden transform-gpu will-change-transform"
+      >
+        <div className="absolute inset-0 bg-paper-50" />
+        <div className="absolute -left-[10%] -top-[20%] h-[700px] w-[700px] rounded-full bg-emerald-400/20 mix-blend-multiply blur-[120px]" />
+        <div className="absolute -right-[10%] top-[20%] h-[600px] w-[600px] rounded-full bg-purple-400/20 mix-blend-multiply blur-[120px]" />
+        <div className="absolute left-1/2 top-1/2 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-pink-300/10 blur-[100px]" />
+        
+        {/* Dot pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.15]"
+          style={{ backgroundImage: "radial-gradient(#7c6fdd 1px, transparent 1px)", backgroundSize: "32px 32px" }}
+        />
+      </motion.div>
+
+      <div className="container-wide relative z-10">
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
           
-          {/* ── LEFT — Copy + Search + CTAs ─────────────────────────────── */}
-          <div className="min-w-0 lg:col-span-6 xl:col-span-6">
-            {/* Eyebrow */}
+          {/* ── LEFT — Copy & CTAs ── */}
+          <motion.div style={{ opacity }} className="min-w-0 lg:col-span-6 xl:col-span-6">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -73,107 +200,78 @@ export default function HeroSection() {
               The #1 AI Learning Platform for Kids
             </motion.div>
 
-            {/* Headline */}
-            <motion.h1
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1, ease: EASE }}
-              className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-navy-950 sm:text-5xl lg:text-6xl"
-            >
-              Turn any lesson into a{" "}
-              <span className="relative inline-block text-purple-600">
-                game they love.
-                <span aria-hidden className="absolute inset-x-0 bottom-1 -z-0 h-3 bg-emerald-200/60" />
+            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-navy-950 sm:text-5xl lg:text-6xl">
+              <TextReveal text="Turn any lesson into a" />
+              <span className="relative inline-block text-purple-600 mt-2">
+                <TextReveal text="game they love." />
+                <motion.span
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.8, delay: 1, ease: EASE }}
+                  className="absolute inset-x-0 bottom-1 -z-0 h-3 origin-left bg-emerald-200/60"
+                />
               </span>
-            </motion.h1>
+            </h1>
 
-            {/* Body - Refined for Parents */}
             <motion.p
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.22, ease: EASE }}
+              transition={{ duration: 0.6, delay: 0.6, ease: EASE }}
               className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg"
             >
               Help your child build a daily learning habit. Our AI transforms boring PDFs 
-              into interactive quizzes, rewarding them with streaks and badges. 
-              Safe, engaging, and trusted by thousands of parents.
+              into interactive quizzes, rewarding them with streaks and badges. Safe, engaging, and trusted by thousands of parents.
             </motion.p>
 
-            {/* Dual CTAs (Replacing the generic search bar for better conversion) */}
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.34, ease: EASE }}
-              className="mt-8 flex flex-wrap items-center gap-3"
+              transition={{ duration: 0.6, delay: 0.8, ease: EASE }}
+              className="mt-8 flex flex-wrap items-center gap-4"
             >
-              <Link
-                to="/student-login"
-                className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-7 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgb(109,40,217,0.3)] transition-all hover:-translate-y-0.5 hover:bg-purple-700 hover:shadow-[0_8px_30px_rgb(109,40,217,0.5)]"
-              >
-                Start Learning Free
-                <ArrowRight size={16} />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 rounded-full border-2 border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
-              >
-                I'm a Teacher
-              </Link>
-            </motion.div>
-
-            {/* Functional Search Bar (Kept but styled) */}
-            <motion.form
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.44, ease: EASE }}
-              onSubmit={onSearch}
-              className="mt-8 flex max-w-md items-center gap-0 overflow-hidden rounded-full border border-slate-200 bg-white p-1.5 shadow-sm focus-within:border-purple-300 focus-within:ring-4 focus-within:ring-purple-50"
-            >
-              <div className="relative hidden sm:block">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="appearance-none rounded-full bg-transparent py-2 pl-4 pr-8 text-xs font-semibold text-slate-600 outline-none"
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+                <Link
+                  to="/student-login"
+                  className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-purple-600 px-7 py-3.5 text-sm font-bold text-white shadow-[0_8px_30px_rgb(109,40,217,0.3)] transition-all hover:bg-purple-700 hover:shadow-[0_8px_30px_rgb(109,40,217,0.5)]"
                 >
-                  <option>Kindergarten</option>
-                  <option>Primary</option>
-                  <option>High School</option>
-                </select>
-                <ChevronDown size={12} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-              <span className="hidden h-5 w-px bg-slate-200 sm:block" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Find a class..."
-                className="min-w-0 flex-1 bg-transparent px-4 py-2 text-sm text-navy-950 placeholder:text-slate-400 outline-none"
-              />
-              <button
-                type="submit"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-purple-100 hover:text-purple-600"
-              >
-                <Search size={15} />
-              </button>
-            </motion.form>
-          </div>
+                  <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:animate-shine" />
+                  Start Learning Free
+                  <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
+                </Link>
+              </motion.div>
 
-          {/* ── RIGHT — Visual + Gamified Widgets ── */}
-          <div className="relative min-w-0 lg:col-span-6 xl:col-span-6">
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.95 }}>
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-slate-200 bg-white px-6 py-3 text-sm font-bold text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
+                >
+                  I'm a Teacher
+                </Link>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+
+          {/* ── RIGHT — 3D Tilt Visual & Widgets ── */}
+          <div className="relative min-w-0 lg:col-span-6 xl:col-span-6 perspective-1000">
             
-            {/* Main Visual Container */}
-            <div className="relative mx-auto aspect-[4/5] w-full max-w-sm md:max-w-md lg:max-w-lg">
-              
+            <motion.div
+              style={{ opacity }}
+              className="relative mx-auto aspect-[4/5] w-full max-w-sm md:max-w-md lg:max-w-lg"
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+            >
               {/* Organic background shape */}
-              <div className="absolute inset-4 rounded-[3rem] bg-gradient-to-tr from-emerald-100 to-purple-100 opacity-80" />
+              <div className="absolute inset-4 rounded-[3rem] bg-gradient-to-tr from-emerald-200/60 to-purple-200/60 opacity-80" />
 
-              {/* Kid Photo */}
+              {/* Kid Photo with 3D Tilt */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.9, delay: 0.2, ease: EASE }}
-                className="absolute inset-x-0 bottom-0 top-8 overflow-hidden rounded-[3rem]"
+                style={{ rotateX: springY, rotateY: springX, transformStyle: "preserve-3d" }}
+                className="absolute inset-x-0 bottom-0 top-8 overflow-hidden rounded-[3rem] shadow-2xl transform-gpu will-change-transform"
               >
+                {/* PASTE YOUR IMAGE URL HERE 👇 */}
                 <img
                   src="https://i.pinimg.com/1200x/85/e8/08/85e80878dbd55569c3f4e4e479b2e9a9.jpg"
                   alt="Happy student learning"
@@ -182,76 +280,62 @@ export default function HeroSection() {
                 />
               </motion.div>
 
-              {/* ── FLOATING GAMIFIED WIDGET (Overlaid on image) ── */}
+              {/* ── Glassmorphism Widget ── */}
               <motion.div
                 initial={{ opacity: 0, x: 20, y: 20 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
                 transition={{ duration: 0.8, delay: 1.2, ease: EASE }}
-                className="absolute -bottom-6 -right-4 z-30 w-64 animate-float rounded-2xl border border-white/60 bg-white/90 p-4 shadow-2xl backdrop-blur-xl sm:-right-8"
+                style={{ translateZ: 50 }} // Pops out in 3D
+                className="absolute -bottom-6 -right-4 z-30 w-64 animate-float rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.1)] backdrop-blur-2xl sm:-right-8"
               >
                 {/* Streak Header */}
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center justify-between border-b border-slate-100/50 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-                      <Flame size={16} className="text-amber-500 animate-pulse-soft" />
-                    </span>
+                    <motion.span
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+                    >
+                      <Flame size={16} className="text-amber-500" />
+                    </motion.span>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Daily Streak</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Daily Streak</p>
                       <p className="text-sm font-extrabold text-navy-950">5 Days</p>
                     </div>
                   </div>
                   <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">+50 XP</span>
                 </div>
 
-                {/* Mini Quiz Widget */}
-                <div className="pt-3">
-                  <p className="text-xs font-bold text-navy-950 mb-2">What is 7 x 8?</p>
-                  <div className="space-y-1.5">
-                    {[
-                      { letter: "A", text: "54", correct: false },
-                      { letter: "B", text: "56", correct: true },
-                    ].map((opt) => (
-                      <div
-                        key={opt.letter}
-                        className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] transition ${
-                          opt.correct 
-                            ? "border-emerald-500 bg-emerald-50 text-emerald-800" 
-                            : "border-slate-200 bg-white text-slate-500"
-                        }`}
-                      >
-                        <span className={`flex h-4 w-4 items-center justify-center rounded text-[9px] font-bold ${
-                          opt.correct ? "bg-emerald-600 text-white" : "bg-slate-100"
-                        }`}>
-                          {opt.letter}
-                        </span>
-                        <span className="font-semibold">{opt.text}</span>
-                        {opt.correct && <CheckCircle2 size={12} className="ml-auto text-emerald-600" />}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                {/* Interactive Quiz */}
+                <QuizWidget />
               </motion.div>
 
-              {/* ── Trust Badges (Floating) ── */}
-              {FLOATING_BADGES.map((badge) => {
-                const Icon = badge.icon;
-                return (
-                  <motion.div
-                    key={badge.id}
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.6, delay: badge.delay, ease: EASE }}
-                    style={{ top: badge.top, left: badge.left }}
-                    className="absolute z-20"
-                  >
-                    <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold shadow-lg ring-1 animate-float-slow ${badge.color}`}>
-                      <Icon size={14} />
-                      {badge.label}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+              {/* Floating Badges */}
+              <motion.div
+                style={{ translateZ: 80 }}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, delay: 0.6, ease: EASE }}
+                className="absolute left-0 top-[6%] z-20 animate-float-slow rounded-full border border-emerald-200 bg-emerald-100/90 px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-lg backdrop-blur-md"
+              >
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck size={14} /> 100% Safe Learning
+                </span>
+              </motion.div>
+
+              <motion.div
+                style={{ translateZ: 80 }}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, delay: 0.8, ease: EASE }}
+                className="absolute right-[72%] top-[14%] z-20 animate-float rounded-full border border-purple-200 bg-purple-100/90 px-3 py-1.5 text-xs font-bold text-purple-800 shadow-lg backdrop-blur-md"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Rocket size={14} /> AI-Powered Quizzes
+                </span>
+              </motion.div>
+
+            </motion.div>
           </div>
         </div>
       </div>
