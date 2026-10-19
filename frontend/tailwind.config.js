@@ -141,6 +141,7 @@ export default {
       fontFamily: {
         sans:    ["Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["Poppins", "Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+        kid:     ["Fredoka", "ui-rounded", "Nunito", "Poppins", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       borderRadius: {
         card: "1rem",

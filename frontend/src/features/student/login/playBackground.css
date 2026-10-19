@@ -1,0 +1,28 @@
+/* frontend/src/features/student/login/playBackground.css
+   Ambient motion for the student login sky. Pure CSS so it stays smooth
+   and cheap; calm mode / reduced-motion turns every animation off. */
+
+.pb-root { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+
+@keyframes pb-drift  { from { transform: translateX(-40vw); } to { transform: translateX(120vw); } }
+@keyframes pb-bob    { 0%, 100% { transform: translateY(0) rotate(var(--r0, -5deg)); }
+                       50%      { transform: translateY(-16px) rotate(var(--r1, 5deg)); } }
+@keyframes pb-twinkle{ 0%, 100% { opacity: .2; transform: scale(.7); }
+                       50%      { opacity: 1;  transform: scale(1.15); } }
+@keyframes pb-spin   { to { transform: rotate(360deg); } }
+@keyframes pb-sway   { 0%, 100% { transform: translateX(0); }
+                       50%      { transform: translateX(-3%); } }
+
+.pb-drift   { animation: pb-drift linear infinite; }
+.pb-bob     { animation: pb-bob ease-in-out infinite; }
+.pb-twinkle { animation: pb-twinkle ease-in-out infinite; }
+.pb-spin    { animation: pb-spin linear infinite; }
+.pb-sway    { animation: pb-sway ease-in-out infinite; }
+
+/* Calm mode (set by a grown-up) and the OS "reduce motion" setting */
+.pb-calm *,
+.pb-calm { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-root * { animation: none !important; }
+}
