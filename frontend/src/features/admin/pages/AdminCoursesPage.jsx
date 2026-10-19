@@ -444,7 +444,7 @@ export default function AdminCoursesPage() {
                   className={
                     "rounded-full px-3.5 py-1.5 text-xs font-bold transition-all " +
                     (isActive
-                      ? "bg-purple-600 text-white shadow-sm"
+                      ? "bg-green-600 text-white shadow-sm"
                       : "text-slate-500 hover:bg-purple-50 hover:text-purple-700")
                   }
                 >

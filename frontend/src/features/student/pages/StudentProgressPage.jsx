@@ -211,7 +211,7 @@ export default function StudentProgressPage() {
             {R.headings?.dashboard?.title || "My Dashboard"}
           </p>
           <h1 className="mt-1 font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            {greeting()}, {me?.full_name?.split(" ")[0] || "there"} 👋
+            {greeting()}, {me?.full_name?.split(" ")[0] || "there"} 
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {today.toLocaleDateString(undefined, {

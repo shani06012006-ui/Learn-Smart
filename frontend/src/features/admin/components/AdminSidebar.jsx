@@ -31,29 +31,29 @@ const NAV_ITEMS = [
    ================================================================= */
 const ADMIN_PALETTE = {
   // Sidebar wrapper
-  sidebarBg: "border-slate-800/60 bg-slate-900/85 backdrop-blur-md",
+  sidebarBg: "border-slate-800/60 backdrop-blur-md",
 
   // Brand + section text
-  brandLabel: "text-slate-400",
-  sectionLabel: "text-slate-500",
-  sectionValue: "text-slate-100",
+  brandLabel: "text-black",
+  sectionLabel: "text-black",
+  sectionValue: "text-black",
 
   // Nav links
   navItemActive: "bg-slate-700 text-white shadow-sm ring-1 ring-slate-600",
-  navItemIdle: "text-slate-400 hover:bg-slate-800/70 hover:text-slate-100",
+  navItemIdle: "text-black hover:bg-slate-800/70 hover:text-slate-100",
 
   // Dividers
-  divider: "border-slate-800/60",
+  divider: "border-blue-800/60",
 
   // Avatar
   avatarClass: "bg-gradient-to-br from-slate-600 to-slate-800 text-white",
 
   // User info
-  userName: "text-slate-100",
+  userName: "text-black",
   userEmail: "text-slate-500",
 
   // Sign out
-  signOutClass: "text-slate-400 hover:bg-coral-500/10 hover:text-coral-400",
+  signOutClass: "text-slate-700 hover:bg-coral-500/10 hover:text-coral-400",
 };
 
 export default function AdminSidebar() {

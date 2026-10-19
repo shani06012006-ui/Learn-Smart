@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, CartesianGrid 
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, Loader2, Activity } from "lucide-react";
 

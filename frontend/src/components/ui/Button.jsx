@@ -10,7 +10,7 @@ const sizes = {
 
 const variants = {
   primary:
-    "bg-purple-500 text-white shadow-purple-glow hover:bg-purple-600 hover:-translate-y-0.5",
+    "bg-green-700 text-white shadow-purple-glow hover:bg-black hover:-translate-y-0.5",
   accent:
     "bg-gradient-to-r from-coral-400 to-coral-500 text-white shadow-coral-glow hover:from-coral-300 hover:to-coral-400",
   secondary:
