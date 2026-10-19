@@ -16,7 +16,7 @@ export default function StudentLayout() {
 
       <div className="relative flex">
         <Sidebar role="student" />
-        <main className="min-w-0 flex-1 p-4 md:p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-5 md:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

@@ -1,38 +1,56 @@
 ﻿// frontend/src/features/admin/components/CreateCourseModal.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { BookOpen } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
-import Input from "../../../components/ui/Input";
 import {
   useCreateAdminCourseMutation,
-  useGetAdminUsersQuery,
   useUpdateAdminCourseMutation,
+  useGetAdminUsersQuery,
+  useGetGradesQuery,
 } from "../../../store/api/realApi";
+import { extractErrorMessage } from "../../../utils/apiError";
 
-const INITIAL = {
-  name: "",
-  subject: "",
-  description: "",
-  teacher_id: "",
-};
+export default function CreateCourseModal({
+  open,
+  onClose,
+  course = null,
+  onSuccess,
+}) {
+  const isEdit = !!course;
 
-export default function CreateCourseModal({ open, onClose, course = null }) {
-  const isEdit = Boolean(course);
-
-  const [createCourse, { isLoading: isCreating }] = useCreateAdminCourseMutation();
-  const [updateCourse, { isLoading: isUpdating }] = useUpdateAdminCourseMutation();
-  const { data: teachersData, isLoading: isLoadingTeachers } = useGetAdminUsersQuery(
-    { role: "teacher" },
-    { skip: !open }
-  );
-
-  const teachers = teachersData?.results || [];
-  const isLoading = isCreating || isUpdating;
-
-  const [form, setForm] = useState(INITIAL);
+  const [form, setForm] = useState({
+    name: "",
+    subject: "",
+    description: "",
+    teacher_id: "",
+    grade_id: "",
+  });
   const [errors, setErrors] = useState({});
-  const [formError, setFormError] = useState(null);
+  const [error, setError] = useState("");
+
+  const { data: usersData } = useGetAdminUsersQuery({ role: "teacher" });
+  const teachers = usersData?.results ?? usersData ?? [];
+
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
+
+  const [createCourse, { isLoading: creating }] = useCreateAdminCourseMutation();
+  const [updateCourse, { isLoading: updating }] = useUpdateAdminCourseMutation();
+  const isBusy = creating || updating;
+
+  // 👇 FILTER TEACHERS BASED ON SELECTED GRADE
+  const filteredTeachers = useMemo(() => {
+    if (!form.grade_id) return teachers; // Show all if no grade is selected
+
+    return teachers.filter((t) => {
+      // Check if teacher has this grade in their grade_ids array or grade field
+      const hasGradeInArray = t.grade_ids?.includes(form.grade_id) || t.grade_ids?.some((id) => String(id) === String(form.grade_id));
+      const matchesSingleGrade = t.grade?.id && String(t.grade.id) === String(form.grade_id);
+      return hasGradeInArray || matchesSingleGrade;
+    });
+  }, [teachers, form.grade_id]);
 
   useEffect(() => {
     if (!open) return;
@@ -42,16 +60,24 @@ export default function CreateCourseModal({ open, onClose, course = null }) {
         subject: course.subject || "",
         description: course.description || "",
         teacher_id: course.teacher?.id || "",
+        grade_id: course.grade?.id || "",
       });
     } else {
-      setForm(INITIAL);
+      setForm({ name: "", subject: "", description: "", teacher_id: "", grade_id: "" });
     }
     setErrors({});
-    setFormError(null);
+    setError("");
   }, [open, course]);
 
   const handleChange = (field) => (e) => {
-    setForm((f) => ({ ...f, [field]: e.target.value }));
+    const value = e.target.value;
+    setForm((f) => ({ 
+      ...f, 
+      [field]: value,
+      // 👇 Clear teacher if grade changes to prevent mismatch
+      ...(field === "grade_id" ? { teacher_id: "" } : {}) 
+    }));
+    
     if (errors[field]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -61,182 +87,148 @@ export default function CreateCourseModal({ open, onClose, course = null }) {
     }
   };
 
-  const handleClose = () => {
-    if (isLoading) return;
-    onClose();
-  };
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
     setErrors({});
-    setFormError(null);
 
-    const name = form.name.trim();
-    const subject = form.subject.trim();
-    const description = form.description.trim();
+    const errs = {};
+    if (!form.name.trim()) errs.name = "Course name is required.";
+    if (!form.subject.trim()) errs.subject = "Subject is required.";
+    if (!form.teacher_id) errs.teacher_id = "Please assign a teacher.";
 
-    const next = {};
-    if (!name) next.name = ["This field is required."];
-    if (!subject) next.subject = ["This field is required."];
-    if (!isEdit && !form.teacher_id) next.teacher_id = ["Pick a teacher."];
-    if (Object.keys(next).length > 0) {
-      setErrors(next);
+    if (Object.keys(errs).length) {
+      setErrors(errs);
       return;
     }
 
     try {
+      const payload = {
+        name: form.name.trim(),
+        subject: form.subject.trim(),
+        description: form.description.trim(),
+        teacher_id: form.teacher_id,
+        grade_id: form.grade_id || null,
+      };
+
       if (isEdit) {
-        await updateCourse({
-          id: course.id,
-          name,
-          subject,
-          description,
-        }).unwrap();
+        const res = await updateCourse({ id: course.id, ...payload }).unwrap();
+        onSuccess?.(res, "updated");
       } else {
-        await createCourse({
-          name,
-          subject,
-          description,
-          teacher_id: form.teacher_id,
-        }).unwrap();
+        const res = await createCourse(payload).unwrap();
+        onSuccess?.(res, "created");
       }
       onClose();
     } catch (err) {
-      const detail = err?.data?.error?.detail;
-      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-        setErrors(detail);
-      } else if (typeof detail === "string") {
-        setFormError(detail);
-      } else {
-        setFormError(
-          isEdit ? "Could not update the course." : "Could not create the course."
-        );
-      }
+      setError(extractErrorMessage(err));
     }
-  };
+  }
 
   return (
     <Modal
       open={open}
-      onClose={handleClose}
+      onClose={onClose}
       title={isEdit ? "Edit course" : "Create course"}
       footer={
         <>
-          <Button variant="secondary" onClick={handleClose} disabled={isLoading}>
+          <Button variant="secondary" onClick={onClose} disabled={isBusy}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            form="create-course-form"
-            loading={isLoading}
-            disabled={!isEdit && teachers.length === 0}
-          >
+          <Button variant="primary" type="submit" form="course-form" loading={isBusy}>
             {isEdit ? "Save changes" : "Create course"}
           </Button>
         </>
       }
     >
-      <form
-        id="create-course-form"
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-4"
-      >
-        <Input
-          label="Course name"
-          value={form.name}
-          onChange={handleChange("name")}
-          error={errors.name?.[0]}
-          placeholder="e.g. Grade 10 Physics"
-          autoFocus
-          required
-        />
+      <form id="course-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Course name
+          </span>
+          <input
+            type="text"
+            value={form.name}
+            onChange={handleChange("name")}
+            placeholder="e.g. Class 10 Physics - Section A"
+            autoFocus
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+          />
+          {errors.name && <span className="text-xs text-coral-600">{errors.name}</span>}
+        </label>
 
-        <Input
-          label="Subject"
-          value={form.subject}
-          onChange={handleChange("subject")}
-          error={errors.subject?.[0]}
-          placeholder="e.g. Physics"
-          required
-        />
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Subject
+          </span>
+          <input
+            type="text"
+            value={form.subject}
+            onChange={handleChange("subject")}
+            placeholder="e.g. Physics"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
+          />
+          {errors.subject && <span className="text-xs text-coral-600">{errors.subject}</span>}
+        </label>
 
-        {/* Description textarea */}
-        <div>
-          <label
-            htmlFor="create-course-description"
-            className="block text-xs font-bold text-navy-950"
+        {/* Grade Dropdown */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Grade
+          </span>
+          <select
+            value={form.grade_id}
+            onChange={handleChange("grade_id")}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
           >
-            Description{" "}
-            <span className="font-medium text-slate-400">(optional)</span>
-          </label>
+            <option value="">— No grade assigned —</option>
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Teacher Dropdown (Filtered) */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Teacher
+          </span>
+          <select
+            value={form.teacher_id}
+            onChange={handleChange("teacher_id")}
+            disabled={!form.grade_id && filteredTeachers.length === 0}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 disabled:bg-slate-50 disabled:text-slate-400"
+          >
+            <option value="">— Select teacher —</option>
+            {filteredTeachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.full_name || t.email}
+              </option>
+            ))}
+            {form.grade_id && filteredTeachers.length === 0 && (
+              <option value="" disabled>No teachers assigned to this grade</option>
+            )}
+          </select>
+          {errors.teacher_id && <span className="text-xs text-coral-600">{errors.teacher_id}</span>}
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Description (optional)
+          </span>
           <textarea
-            id="create-course-description"
             value={form.description}
             onChange={handleChange("description")}
             rows={3}
             placeholder="What this course covers."
-            className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-navy-950 placeholder:text-slate-400 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+            className="resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400"
           />
-        </div>
+        </label>
 
-        {/* Teacher dropdown */}
-        <div>
-          <label
-            htmlFor="create-course-teacher"
-            className="block text-xs font-bold text-navy-950"
-          >
-            Teacher
-          </label>
-
-          {isLoadingTeachers ? (
-            <div className="mt-2 flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white">
-              <svg className="h-4 w-4 animate-spin text-purple-500" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2" />
-                <path d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z" fill="currentColor" />
-              </svg>
-            </div>
-          ) : teachers.length === 0 ? (
-            <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-700">
-              No teachers yet. Create a teacher first, then come back to create a course.
-            </p>
-          ) : (
-            <select
-              id="create-course-teacher"
-              value={form.teacher_id}
-              onChange={handleChange("teacher_id")}
-              disabled={isEdit}
-              className="mt-2 h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 text-sm text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-            >
-              <option value="" disabled>
-                Pick a teacher…
-              </option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name || t.email}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {errors.teacher_id?.[0] && (
-            <p className="mt-1.5 text-xs font-semibold text-coral-600">
-              {errors.teacher_id[0]}
-            </p>
-          )}
-
-          {isEdit && (
-            <p className="mt-1.5 text-xs text-slate-400">
-              The teacher cannot be changed after the course is created.
-            </p>
-          )}
-        </div>
-
-        {formError && (
-          <p
-            role="alert"
-            className="rounded-xl border border-coral-200 bg-coral-50 px-3.5 py-2.5 text-sm font-semibold text-coral-600"
-          >
-            {formError}
+        {error && (
+          <p className="rounded-xl border border-coral-200 bg-coral-50 px-3 py-2 text-xs font-medium text-coral-700">
+            {error}
           </p>
         )}
       </form>

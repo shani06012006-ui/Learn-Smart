@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2, Send, Users, MessageSquare, MessagesSquare, Sparkles,
-  GraduationCap, Search,
+  GraduationCap, Search, Trash2, // 👈 ADDED Trash2
 } from "lucide-react";
 
 import {
@@ -11,6 +11,7 @@ import {
   useSendTeacherChatMessageMutation,
   useGetStudentMeQuery,
   useToggleMessageReactionMutation,
+  useDeleteChatThreadMutation,
 } from "../../../store/api/realApi";
 import useChatSocket from "../../../hooks/useChatSocket";
 import Avatar from "../../../components/ui/Avatar";
@@ -134,6 +135,7 @@ export default function TeacherChatPage() {
 
   const [sendMessage, { isLoading: sending }] = useSendTeacherChatMessageMutation();
   const [toggleReaction] = useToggleMessageReactionMutation();
+  const [deleteThread] = useDeleteChatThreadMutation();
 
   const { lastMessage } = useChatSocket(activeRoomId);
 
@@ -218,6 +220,21 @@ export default function TeacherChatPage() {
     } catch {}
   };
 
+  const handleDeleteRoom = async (e, roomId, label) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete the group "${label}"? This cannot be undone.`)) {
+      try {
+        
+        if (activeRoomId === roomId) {
+          setActiveRoomId(null);
+        }
+        await deleteThread(roomId).unwrap();
+      } catch (err) {
+        alert("Failed to delete the group. Please try again.");
+      }
+    }
+  };
+
   const headerTitle = activeRoom
     ? activeRoom.kind === "group"
       ? activeRoom.title
@@ -273,9 +290,12 @@ export default function TeacherChatPage() {
                     : (r.other_users?.[0]?.name || "Direct message");
                   const override = previewOverride[r.id];
                   const last = override || r.last_message;
+                  
+                  // Only show delete for class groups (not institution, not DMs)
+                  const isDeletable = r.kind === "group" && !!r.class_course_id;
 
                   return (
-                    <li key={r.id}>
+                    <li key={r.id} className="group relative">
                       <button
                         onClick={() => setActiveRoomId(r.id)}
                         className={
@@ -286,7 +306,7 @@ export default function TeacherChatPage() {
                         }
                       >
                         <RoomAvatar room={r} />
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 pr-6">
                           <div className="flex items-baseline justify-between gap-2">
                             <p className={
                               "truncate text-sm " +
@@ -312,6 +332,17 @@ export default function TeacherChatPage() {
                           </div>
                         </div>
                       </button>
+                      
+                      {/* Delete Button (only shows on hover for custom class groups) */}
+                      {isDeletable && (
+                        <button
+                          onClick={(e) => handleDeleteRoom(e, r.id, label)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 opacity-0 transition-all hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+                          title="Delete Group"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </li>
                   );
                 })}

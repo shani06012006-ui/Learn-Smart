@@ -1,13 +1,12 @@
 // frontend/src/features/auth/RegisterPage.jsx
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { User, Mail, Lock } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 
 import { useRegisterMutation } from "../../store/api/authApi";
 import { extractErrorMessage, extractFieldErrors } from "../../utils/apiError";
 import AuthLayout from "./components/AuthLayout";
 import FormField from "./components/FormField";
-import SocialButton from "./components/SocialButton";
 
 const initialForm = {
   first_name: "",
@@ -47,26 +46,11 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout
-      heading={
-        <>
-          Welcome to{" "}
-          <span className="text-coral-500">Learn Smart</span> Online Learning Platform
-        </>
-      }
-      illustrationSrc=""
+      heading="Join Learn Smart"
+      subheading="Turn lesson PDFs into quizzes, grade in seconds and keep every class on track."
+      title="Create your account"
+      subtitle="It only takes a minute."
     >
-      {/* Google */}
-      <SocialButton label="Signup with google" onClick={() => {}} />
-
-      {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
-          Or signup with your email
-        </span>
-        <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* First + Last name in a 2-col row */}
         <div className="grid grid-cols-2 gap-3">
@@ -108,7 +92,7 @@ export default function RegisterPage() {
 
         {/* Role dropdown styled like a FormField */}
         <div>
-          <label htmlFor="role" className="block text-xs font-bold text-navy-950">
+          <label htmlFor="role" className="block text-sm font-semibold text-ink-800">
             I am a
           </label>
           <div className="relative mt-2">
@@ -117,13 +101,13 @@ export default function RegisterPage() {
               name="role"
               value={form.role}
               onChange={handleChange}
-              className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-4 pr-10 text-sm text-navy-950 outline-none transition-all focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+              className="h-12 w-full appearance-none rounded-2xl border border-ink-100 bg-white pl-4 pr-10 text-sm text-ink-900 outline-none transition-all focus:border-ink-500 focus:ring-4 focus:ring-sage-200"
             >
               <option value="teacher">Teacher</option>
                           </select>
             <svg
               viewBox="0 0 20 20"
-              className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
@@ -163,13 +147,13 @@ export default function RegisterPage() {
         />
 
         {/* Terms checkbox */}
-        <label className="flex items-start gap-3 text-sm text-slate-600">
+        <label className="flex items-start gap-3 text-sm text-ink-600">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
             required
-            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer appearance-none rounded-md border-2 border-coral-500 bg-white transition-all checked:border-coral-500 checked:bg-coral-500 checked:bg-center checked:bg-no-repeat"
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer appearance-none rounded-md border-2 border-ink-500 bg-white transition-all checked:border-ink-800 checked:bg-ink-800 checked:bg-center checked:bg-no-repeat focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sage-200"
             style={
               agreed
                 ? {
@@ -184,7 +168,7 @@ export default function RegisterPage() {
             I agreed to the{" "}
             <Link
               to="/terms"
-              className="font-semibold text-purple-500 transition-colors hover:text-purple-600"
+              className="font-semibold text-ink-800 underline decoration-ink-200 underline-offset-4 transition-colors hover:decoration-ink-500"
             >
               Terms &amp; Conditions
             </Link>
@@ -193,7 +177,7 @@ export default function RegisterPage() {
 
         {/* Field errors from backend */}
         {Object.keys(fieldErrors).length > 0 && (
-          <ul className="space-y-1 text-sm text-coral-600">
+          <ul className="space-y-1 rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm text-coral-700">
             {Object.entries(fieldErrors).map(([field, msg]) => (
               <li key={field}>
                 <span className="font-semibold capitalize">{field.replace("_", " ")}: </span>
@@ -205,7 +189,7 @@ export default function RegisterPage() {
 
         {/* Form-level error */}
         {formError && !success && (
-          <p role="alert" className="text-sm text-coral-600">
+          <p role="alert" className="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm font-medium text-coral-700">
             {formError}
           </p>
         )}
@@ -221,18 +205,18 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={isLoading || !agreed}
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-purple-500 px-6 text-sm font-bold text-white shadow-purple-glow transition-all hover:bg-purple-600 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-ink-800 px-6 text-sm font-bold text-white transition-colors hover:bg-ink-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sage-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isLoading ? "Creating account…" : "Sign Up"}
         </button>
       </form>
 
       {/* Footer */}
-      <p className="mt-6 text-center text-sm text-slate-500">
-        Already have account?{" "}
+      <p className="mt-6 text-center text-sm text-ink-500">
+        Already have an account?{" "}
         <Link
           to="/login"
-          className="font-bold text-purple-500 transition-colors hover:text-purple-600"
+          className="font-bold text-ink-800 underline decoration-ink-200 underline-offset-4 transition-colors hover:decoration-ink-500"
         >
           Sign in
         </Link>

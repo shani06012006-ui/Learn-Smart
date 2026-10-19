@@ -20,7 +20,7 @@ from .serializers import (
     MyStudentLeaveSerializer,
     MyTeacherLeaveSerializer,
 )
-
+from notifications.service import notify 
 
 def _model_and_owner_field(user):
     """Return (model, owner_field_name) based on the user's role."""
@@ -119,7 +119,6 @@ class MyLeavesView(APIView):
 
         serializer = LeaveCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         serializer.validate_overlap(request.user, model)
 
         leave = model.objects.create(
@@ -134,12 +133,21 @@ class MyLeavesView(APIView):
 
         _broadcast_new_leave(leave, request.user)
 
+        if request.user.role == "student" and leave.class_course:
+            teacher = leave.class_course.teacher
+            if teacher:
+                notify(
+                    user_id=teacher.id,
+                    title="🏖️ New Leave Request",
+                    message=f"{request.user.get_full_name()} requested leave for {leave.start_date}",
+                    notification_type="leave_request",
+                )
+
         return Response(
             (MyTeacherLeaveSerializer if model is TeacherLeave
              else MyStudentLeaveSerializer)(leave).data,
             status=http_status.HTTP_201_CREATED,
         )
-
 
 # ─────────────────────────────────────────────────────────────
 # Cancel own pending leave

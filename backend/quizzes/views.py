@@ -19,6 +19,10 @@ from datetime import timedelta
 from django.db import transaction
 
 from .models import AttemptAnswer, Choice, Question, Quiz, QuizAttempt
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from notifications.service import notify 
+
 
 class QuizViewSet(viewsets.ModelViewSet):
     """
@@ -122,16 +126,6 @@ class QuizViewSet(viewsets.ModelViewSet):
 class GenerateFromPdfView(APIView):
     """
     POST /api/v1/quizzes/generate-from-pdf/
-    multipart/form-data:
-      - pdf: file
-      - class_course: uuid
-      - title: string
-      - duration_minutes: int
-      - passing_score: int
-      - question_count: int
-      - difficulty: easy|medium|hard|mixed
-    Returns {"title": ..., "questions": [...]} — NOT saved to DB.
-    Teacher reviews + edits, then POSTs to /api/v1/quizzes/ to save.
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -152,6 +146,7 @@ class GenerateFromPdfView(APIView):
         if not pdf.name.lower().endswith(".pdf"):
             raise ValidationError({"pdf": "Only .pdf files are accepted."})
 
+        # 1. Extract Text
         try:
             raw = pdf.read()
             text = extract_pdf_text(raw)
@@ -163,13 +158,23 @@ class GenerateFromPdfView(APIView):
                 "pdf": "PDF has too little extractable text. Use a text-based PDF (not scanned images)."
             })
 
-        questions = generate_quiz_from_text(
-            text=text,
-            question_count=data["question_count"],
-            difficulty=data["difficulty"],
-            title=data["title"],
-        )
+        # 2. Generate Questions via AI
+        try:
+            questions = generate_quiz_from_text(
+                text=text,
+                question_count=data["question_count"],
+                difficulty=data["difficulty"],
+                title=data["title"],
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error("AI generation failed: %s", exc)
+            return Response(
+                {"detail": f"AI generation failed. Please try again. ({exc})"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
+        # 3. Return Data
         return Response({
             "title": data["title"],
             "class_course": str(cls.id),
@@ -388,10 +393,18 @@ class StudentSubmitQuizAttemptView(APIView):
                                "submitted_at", "updated_at"]
             )
 
+        if quiz.teacher_id:
+            student_name = request.user.get_full_name() or request.user.email
+            notify(
+                user_id=quiz.teacher_id,
+                title=" New Quiz Submission",
+                message=f"{student_name} submitted '{quiz.title}'",
+                notification_type="quiz_submit",
+            )
+
         return Response(
             QuizAttemptSerializer(attempt, context={"request": request}).data
         )
-
 
 class StudentQuizAttemptResultView(APIView):
     """

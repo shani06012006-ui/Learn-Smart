@@ -1,3 +1,4 @@
+from notifications.service import notify_all_teachers
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status, viewsets

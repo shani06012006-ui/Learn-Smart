@@ -86,8 +86,19 @@ export const realApi = createApi({
     "Quiz",
     "QuizAttempt",
     "QuizSubmissions",
+    "Notifications",
   ],
   endpoints: (builder) => ({
+
+    // ---- Notifications ----
+    getNotifications: builder.query({
+      query: () => "/notifications/",
+      providesTags: ["Notifications"],
+    }),
+    markNotificationsRead: builder.mutation({
+      query: () => ({ url: "/notifications/", method: "POST" }),
+      invalidatesTags: ["Notifications"],
+    }),
 
     // ---- Sections ----
     getAdminSections: builder.query({
@@ -486,6 +497,29 @@ export const realApi = createApi({
     getChatThreadAvailableMembers: builder.query({
       query: (threadId) => `/chat/threads/${threadId}/available-members/`,
       providesTags: (r, e, id) => [{ type: "ChatMembers", id: `avail-${id}` }],
+    }),
+
+    deleteChatThread: builder.mutation({
+      query: (threadId) => ({
+        url: `/chat/threads/${threadId}/`, 
+        method: "DELETE",
+      }),
+      async onQueryStarted(threadId, { dispatch, queryFulfilled }) {
+        const patchResult = dispatch(
+          realApi.util.updateQueryData('getTeacherChatRooms', undefined, (draft) => {
+            if (draft && draft.results) {
+              draft.results = draft.results.filter(r => r.id !== threadId);
+            } else if (Array.isArray(draft)) {
+              return draft.filter(r => r.id !== threadId);
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchResult.undo(); 
+        }
+      },
     }),
 
     // ---- Student chat ----
@@ -1537,5 +1571,8 @@ export const {
   useCheckoutMutation,
   useGetMyOrdersQuery,
   useGetMyOrderQuery,
-
+  useDeleteChatThreadMutation,
+  
+  useGetNotificationsQuery,
+  useMarkNotificationsReadMutation,
 } = realApi;

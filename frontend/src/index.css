@@ -49,6 +49,48 @@ body {
   .btn-outline { @apply btn-pill border-2 border-purple-200 bg-white text-purple-600 hover:border-purple-400 hover:bg-purple-50; }
 }
 
+/* ================================================================
+   GLOBAL RESPONSIVE FIXES
+   ================================================================ */
+
+/* 1. Prevent horizontal scroll on the whole app */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* 2. Stop long words from breaking layouts */
+.word-break-safe {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 3. Make all tables scroll horizontally on small screens */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* 4. Hide overflowing fixed-width sidebars on mobile */
+@media (max-width: 1023px) {
+  .container-wide {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .section-pad {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #f7f5f2; }
 ::-webkit-scrollbar-thumb {

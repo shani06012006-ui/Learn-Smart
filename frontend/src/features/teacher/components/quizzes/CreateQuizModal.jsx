@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// frontend/src/features/teacher/components/quizzes/CreateQuizModal.jsx
+import { useEffect, useState, useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import Modal from "../../../../components/ui/Modal";
 import Button from "../../../../components/ui/Button";
@@ -7,6 +8,7 @@ import AiReviewStudio from "./AiReviewStudio";
 import { classLabel } from "./classLabel";
 import {
   useGetClassesQuery,
+  useGetGradesQuery,
   useGenerateQuizFromPdfMutation,
   useCreateQuizMutation,
   useUpdateQuizMutation,
@@ -33,9 +35,13 @@ export default function CreateQuizModal({
   const isEdit = Boolean(quiz);
 
   const { data: classesData } = useGetClassesQuery();
-  const classes = classesData?.results ?? classesData ?? [];
+  const allClasses = classesData?.results ?? classesData ?? [];
+
+  const { data: gradesData } = useGetGradesQuery();
+  const grades = gradesData?.results ?? gradesData ?? [];
 
   const [step, setStep] = useState(1);
+  const [gradeId, setGradeId] = useState("");
   const [classId, setClassId] = useState("");
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState(30);
@@ -53,10 +59,28 @@ export default function CreateQuizModal({
   const [publishQuiz] = usePublishQuizMutation();
   const [unpublishQuiz] = useUnpublishQuizMutation();
 
-  // Populate form when editing (or reset when creating)
+  // 👇 AUTO-SELECT CLASS BEHIND THE SCENES
+  // When the user picks a grade, grab the first class in that grade.
+  useEffect(() => {
+    if (!gradeId) {
+      setClassId("");
+      return;
+    }
+    const classesInGrade = allClasses.filter(
+      (c) => String(c.grade?.id) === String(gradeId)
+    );
+    if (classesInGrade.length > 0) {
+      setClassId(classesInGrade[0].id);
+    } else {
+      setClassId("");
+    }
+  }, [gradeId, allClasses]);
+
+  // Populate form when editing
   useEffect(() => {
     if (!open) return;
     if (isEdit && quiz) {
+      setGradeId(quiz.class_course?.grade?.id || quiz.grade?.id || "");
       setClassId(quiz.class_course || quiz.class_id || "");
       setTitle(quiz.title || "");
       setDuration(quiz.duration_minutes || 30);
@@ -68,15 +92,15 @@ export default function CreateQuizModal({
           question_text: q.question_text,
           explanation: q.explanation || "",
           points: q.points || 1,
-          question_image: q.question_image || null, // Preserve existing image
           choices: (q.choices || []).map((c) => ({
             choice_text: c.choice_text,
             is_correct: !!c.is_correct,
           })),
         }))
       );
-      setStep(2); // jump straight to review in edit mode
+      setStep(2);
     } else {
+      setGradeId("");
       setClassId("");
       setTitle("");
       setDuration(30);
@@ -97,7 +121,7 @@ export default function CreateQuizModal({
   const onGenerate = async () => {
     setError("");
     if (!classId || !title.trim() || !file) {
-      setError("Please fill the class, title, and pick a PDF.");
+      setError("Please select a grade, enter a title, and pick a PDF.");
       return;
     }
     const fd = new FormData();
@@ -115,7 +139,6 @@ export default function CreateQuizModal({
         question_text: q.question_text,
         explanation: q.explanation || "",
         points: q.points || 1,
-        question_image: null, // AI doesn't generate images yet
         choices: (q.choices || []).map((c) => ({
           choice_text: c.choice_text,
           is_correct: !!c.is_correct,
@@ -128,46 +151,33 @@ export default function CreateQuizModal({
     }
   };
 
-  // 🔥 CRITICAL FIX: Build FormData instead of JSON for file uploads
-  const buildFormData = () => {
-    const fd = new FormData();
-    fd.append("title", title.trim());
-    fd.append("class_course", classId);
-    fd.append("duration_minutes", String(duration));
-    fd.append("passing_score", String(passing));
-    fd.append("difficulty", difficulty);
-    fd.append("source_filename", file?.name || quiz?.source_filename || "");
-
-    questions.forEach((q, i) => {
-      fd.append(`questions[${i}]question_text`, q.question_text);
-      fd.append(`questions[${i}]explanation`, q.explanation || "");
-      fd.append(`questions[${i}]points`, String(q.points || 1));
-      fd.append(`questions[${i}]order`, String(i));
-
-      // Handle image upload if a File object exists
-      if (q.question_image instanceof File) {
-        fd.append(`questions[${i}]question_image`, q.question_image);
-      }
-
-      q.choices.forEach((c, ci) => {
-        fd.append(`questions[${i}]choices[${ci}]choice_text`, c.choice_text);
-        fd.append(`questions[${i}]choices[${ci}]is_correct`, c.is_correct ? "true" : "false");
-        fd.append(`questions[${i}]choices[${ci}]order`, String(ci));
-      });
-    });
-    
-    return fd;
-  };
+  const buildPayload = () => ({
+    title: title.trim(),
+    class_course: classId,
+    duration_minutes: Number(duration),
+    passing_score: Number(passing),
+    difficulty,
+    source_filename: file?.name || quiz?.source_filename || "",
+    questions: questions.map((q, i) => ({
+      question_text: q.question_text,
+      explanation: q.explanation || "",
+      points: q.points || 1,
+      order: i,
+      choices: q.choices.map((c, ci) => ({
+        choice_text: c.choice_text,
+        is_correct: !!c.is_correct,
+        order: ci,
+      })),
+    })),
+  });
 
   const onSaveDraft = async () => {
     setError("");
     try {
-      const payload = buildFormData();
-      
       if (isEdit) {
-        await updateQuiz({ id: quiz.id, body: payload }).unwrap();
+        await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
       } else {
-        await createQuiz(payload).unwrap();
+        await createQuiz(buildPayload()).unwrap();
       }
       onCreated?.();
       close();
@@ -179,13 +189,11 @@ export default function CreateQuizModal({
   const onSaveAndPublish = async () => {
     setError("");
     try {
-      const payload = buildFormData();
-      
       if (isEdit) {
-        await updateQuiz({ id: quiz.id, body: payload }).unwrap();
+        await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
         await publishQuiz(quiz.id).unwrap();
       } else {
-        const created = await createQuiz(payload).unwrap();
+        const created = await createQuiz(buildPayload()).unwrap();
         await publishQuiz(created.id).unwrap();
       }
       onCreated?.();
@@ -199,8 +207,7 @@ export default function CreateQuizModal({
     if (!isEdit) return;
     setError("");
     try {
-      const payload = buildFormData();
-      await updateQuiz({ id: quiz.id, body: payload }).unwrap();
+      await updateQuiz({ id: quiz.id, ...buildPayload() }).unwrap();
       await unpublishQuiz(quiz.id).unwrap();
       onCreated?.();
       close();
@@ -209,11 +216,8 @@ export default function CreateQuizModal({
     }
   };
 
-  const onRegenerateQuestion = (_idx) => {
-    // Not wired — no per-question AI endpoint yet.
-  };
+  const onRegenerateQuestion = (_idx) => {};
 
-  const selectedClass = classes.find((c) => c.id === classId);
   const editingPublished = isEdit && quiz?.is_published;
 
   return (
@@ -238,25 +242,27 @@ export default function CreateQuizModal({
       {!isEdit && step === 1 && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block">
+            
+            {/* 👇 ONLY GRADE DROPDOWN (No Class) */}
+            <label className="block sm:col-span-2">
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Class / Course
+                Grade
               </span>
               <select
-                value={classId}
-                onChange={(e) => setClassId(e.target.value)}
+                value={gradeId}
+                onChange={(e) => setGradeId(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
               >
-                <option value="">Select a class…</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {classLabel(c)}
+                <option value="">Select a grade…</option>
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
                   </option>
                 ))}
               </select>
             </label>
 
-            <label className="block">
+            <label className="block sm:col-span-2">
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Quiz title
               </span>
@@ -365,7 +371,6 @@ export default function CreateQuizModal({
 
       {(isEdit || step === 2) && (
         <div className="flex flex-col gap-4">
-          {/* Metadata row */}
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -380,17 +385,17 @@ export default function CreateQuizModal({
             </label>
             <label className="block">
               <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Class / Course
+                Grade
               </span>
               <select
-                value={classId}
-                onChange={(e) => setClassId(e.target.value)}
+                value={gradeId}
+                onChange={(e) => setGradeId(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               >
-                <option value="">Select a class…</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {classLabel(c)}
+                <option value="">Select a grade…</option>
+                {grades.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
                   </option>
                 ))}
               </select>
@@ -422,12 +427,6 @@ export default function CreateQuizModal({
               />
             </label>
           </div>
-
-          {selectedClass && (
-            <p className="text-[11px] text-slate-500">
-              🎯 Target: <span className="font-bold text-navy-950">{classLabel(selectedClass)}</span>
-            </p>
-          )}
 
           <AiReviewStudio
             title={title}

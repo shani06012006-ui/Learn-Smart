@@ -44,10 +44,12 @@ LOCAL_APPS = [
     "institutions",
     "classes",
     "leaves",
-    "quizzes",
     "admin_api",
     "chat",
     "attendance",
+    "shop",
+    "quizzes",
+    "notifications", 
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
