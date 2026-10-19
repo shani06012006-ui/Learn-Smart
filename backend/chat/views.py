@@ -567,3 +567,43 @@ class ThreadAvailableMembersView(APIView):
         ser = ChatUserBriefSerializer(students, many=True)
         return Response({"count": len(students), "results": ser.data})
 
+# ─────────────────────────────────────────────────────────
+# Delete a thread (group)
+# ─────────────────────────────────────────────────────────
+
+class ThreadDeleteView(APIView):
+    """
+    DELETE /api/v1/chat/threads/<uuid:thread_id>/
+    Allows admins or the group creator to delete a group.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, thread_id):
+        try:
+            thread = Thread.objects.get(pk=thread_id)
+        except Thread.DoesNotExist:
+            return Response({"detail": "Thread not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. Block deleting the Institution Group
+        if thread.kind == Thread.KIND_GROUP and not thread.class_course_id:
+            return Response(
+                {"detail": "Cannot delete the institution group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 2. Permission check: Must be admin OR the teacher of this class
+        is_admin = getattr(request.user, "role", None) == "admin"
+        is_class_teacher = (
+            thread.class_course_id and 
+            thread.class_course.teacher_id == request.user.id
+        )
+
+        if not (is_admin or is_class_teacher):
+            return Response(
+                {"detail": "You do not have permission to delete this group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 3. Delete the thread (this cascades to messages and members)
+        thread.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

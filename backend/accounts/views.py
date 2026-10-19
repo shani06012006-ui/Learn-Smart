@@ -6,6 +6,7 @@ apps once they migrate off the mock auth) talk to over HTTP.
 
 Endpoints:
     POST /api/v1/auth/login/            email + password -> access + refresh
+    POST /api/v1/auth/google/           Google ID token -> access + refresh
     POST /api/v1/auth/refresh/          rotate refresh -> new pair
     GET  /api/v1/auth/me/               Authorization -> user
     POST /api/v1/auth/logout/           revoke the supplied refresh token
@@ -26,6 +27,7 @@ from rest_framework.views import APIView
 from .models import User
 from .serializers import UserSerializer
 from .token_service import (
+    REMEMBER_ME_LIFETIME,
     RefreshTokenError,
     issue_access_token,
     issue_refresh_token,
@@ -34,8 +36,15 @@ from .token_service import (
 )
 from .ws_tickets import mint_ticket
 
-
 from .services import generate_login_otp, verify_login_otp
+
+from .google_auth import (
+       GoogleAuthNotConfigured,
+       GoogleTokenError,
+       GoogleUnavailable,
+       verify_google_credential, )
+
+
 def _client_ip(request):
     return request.META.get("REMOTE_ADDR") or None
 
@@ -101,6 +110,112 @@ class LoginView(APIView):
         return Response(
             {
                 "access": access,
+                "refresh": raw_refresh,
+                "user": UserSerializer(user).data,
+                "remember_me": remember_me,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class GoogleLoginView(APIView):
+    """
+    POST /api/v1/auth/google/   body: { credential, remember_me? }
+
+    "Sign in with Google" for teachers and admins.
+
+    `credential` is the Google ID token the browser got from Google Identity
+    Services. We verify it server-side (see accounts/google_auth.py) and then
+    sign in the EXISTING, active user whose e-mail matches the verified Google
+    e-mail. Google sign-in never creates accounts: a school admin adds people
+    first, so a stranger with a Google account cannot get into a school.
+
+    Student accounts are refused here - children sign in with their PIN.
+
+    Success returns the same { access, refresh, user, remember_me } shape as
+    LoginView. Failures use 400 / 403 / 503 (never 401) so the frontend's
+    token-refresh logic is not triggered by a failed Google attempt.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @staticmethod
+    def _error(detail, http_status, code):
+        return Response(
+            {"error": {"detail": detail, "status_code": http_status, "code": code}},
+            status=http_status,
+        )
+
+    def post(self, request):
+        credential = (request.data.get("credential") or "").strip()
+        if not credential:
+            return self._error(
+                "A Google credential is required.", status.HTTP_400_BAD_REQUEST, "missing_credential"
+            )
+
+        try:
+            claims = verify_google_credential(credential)
+        except GoogleAuthNotConfigured:
+            return self._error(
+                "Google sign-in is not set up on this server yet.",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "google_not_configured",
+            )
+        except GoogleUnavailable:
+            return self._error(
+                "Could not reach Google to verify your sign-in. Please try again.",
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "google_unreachable",
+            )
+        except GoogleTokenError:
+            return self._error(
+                "Google sign-in could not be verified. Please try again.",
+                status.HTTP_400_BAD_REQUEST,
+                "invalid_google_token",
+            )
+
+        email = claims["email"].strip().lower()
+        user = User.objects.filter(email__iexact=email).first()
+
+        if user is None:
+            return self._error(
+                f"No Learn Smart account uses {email}. Ask your school admin to add you first.",
+                status.HTTP_403_FORBIDDEN,
+                "no_account",
+            )
+        if not user.is_active:
+            return self._error(
+                "This account has been deactivated.", status.HTTP_403_FORBIDDEN, "deactivated"
+            )
+        if user.role == User.ROLE_STUDENT:
+            return self._error(
+                "Students sign in with their student code, not with Google.",
+                status.HTTP_403_FORBIDDEN,
+                "student_use_pin",
+            )
+
+        # Fill in a missing name from the Google profile (never overwrite one we already have).
+        update_fields = ["last_login"]
+        if not user.first_name and claims.get("given_name"):
+            user.first_name = claims["given_name"][:150]
+            update_fields.append("first_name")
+        if not user.last_name and claims.get("family_name"):
+            user.last_name = claims["family_name"][:150]
+            update_fields.append("last_name")
+        user.last_login = timezone.now()
+        user.save(update_fields=update_fields)
+
+        remember_me = bool(request.data.get("remember_me"))
+        raw_refresh, _row = issue_refresh_token(
+            user,
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+            lifetime=REMEMBER_ME_LIFETIME if remember_me else None,
+        )
+        return Response(
+            {
+                "access": issue_access_token(user),
                 "refresh": raw_refresh,
                 "user": UserSerializer(user).data,
                 "remember_me": remember_me,
@@ -583,4 +698,3 @@ class TeacherColleaguesView(APIView):
             })
 
         return Response({"count": len(results), "results": results})
-

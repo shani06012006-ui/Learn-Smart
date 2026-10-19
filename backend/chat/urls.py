@@ -8,6 +8,7 @@ from .views import (
     ThreadMembersView,
     ThreadMemberDetailView,
     ThreadAvailableMembersView,
+    ThreadDeleteView,
 )
 
 app_name = "chat"
@@ -48,4 +49,5 @@ urlpatterns = [
         ThreadAvailableMembersView.as_view(),
         name="thread-available-members",
     ),
+    path("threads/<uuid:thread_id>/", ThreadDeleteView.as_view(), name="thread-delete"), 
 ]
