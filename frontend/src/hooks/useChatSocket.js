@@ -1,68 +1,61 @@
 // frontend/src/hooks/useChatSocket.js
-// WebSocket subscription to a chat thread's live updates.
-// Server pushes { type: "chat.message", message: {...} }
 import { useEffect, useRef, useState } from "react";
 
-const WS_BASE = import.meta.env.VITE_WS_URL
-  || (typeof window !== "undefined"
-        ? (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host
-        : "ws://127.0.0.1:8000");
-
-export default function useChatSocket(threadId) {
+export default function useChatSocket(roomId) {
+  const socketRef = useRef(null);
   const [lastMessage, setLastMessage] = useState(null);
-  const [status, setStatus] = useState("idle");
-  const wsRef = useRef(null);
+  const [typingUsers, setTypingUsers] = useState({}); // { user_id: { name, timeout } }
 
   useEffect(() => {
-    if (!threadId) return;
+    if (!roomId) return;
 
-    const token = localStorage.getItem("admin.access");
-    if (!token) return;
+    // Assuming token is in localStorage (adjust if using Redux)
+    const token = localStorage.getItem("accessToken");
+    const wsUrl = `ws://localhost:8000/ws/chat/thread/${roomId}/?token=${token}`;
+    
+    const socket = new WebSocket(wsUrl);
+    socketRef.current = socket;
 
-    // Vite proxies /ws -> backend. Add ?token=<jwt> so the JWT middleware
-    // can authenticate (browsers can't set custom headers on WebSocket).
-    const url = `${WS_BASE}/ws/chat/thread/${threadId}/?token=${encodeURIComponent(token)}`;
-
-    let cancelled = false;
-    let ws;
-
-    try {
-      ws = new WebSocket(url);
-      wsRef.current = ws;
-      setStatus("connecting");
-
-      ws.onopen = () => {
-        if (!cancelled) setStatus("open");
-      };
-
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.type === "chat.message" && data.message) {
-            setLastMessage(data.message);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === "chat.message") {
+        setLastMessage(data.message);
+      } else if (data.type === "chat.typing") {
+        const { user_id, user_name, is_typing } = data;
+        
+        setTypingUsers((prev) => {
+          const next = { ...prev };
+          if (is_typing) {
+            next[user_id] = user_name;
+            // Auto-clear typing after 3s if no update
+            clearTimeout(next[`${user_id}_timeout`]);
+            next[`${user_id}_timeout`] = setTimeout(() => {
+              setTypingUsers((p) => {
+                const n = { ...p };
+                delete n[user_id];
+                return n;
+              });
+            }, 3000);
+          } else {
+            delete next[user_id];
+            clearTimeout(next[`${user_id}_timeout`]);
           }
-        } catch {
-          // ignore non-JSON frames
-        }
-      };
-
-      ws.onerror = () => {
-        if (!cancelled) setStatus("error");
-      };
-
-      ws.onclose = () => {
-        if (!cancelled) setStatus("closed");
-      };
-    } catch {
-      setStatus("error");
-    }
+          return next;
+        });
+      }
+    };
 
     return () => {
-      cancelled = true;
-      try { ws?.close(); } catch {}
-      setStatus("closed");
+      socket.close();
     };
-  }, [threadId]);
+  }, [roomId]);
 
-  return { lastMessage, status };
+  const sendTyping = (isTyping) => {
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: "typing", is_typing: isTyping }));
+    }
+  };
+
+  return { lastMessage, typingUsers, sendTyping };
 }

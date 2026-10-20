@@ -1,6 +1,6 @@
 // frontend/src/components/layout/TeacherLayout.jsx
-import { Outlet } from "react-router-dom";
-import { useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
+import { useState, useCallback } from "react";
 import { X, Bell } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -8,35 +8,8 @@ import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import PageBackground from "./PageBackground";
 import useLiveNotifications from "../../hooks/useLiveNotifications";
-import { NotificationProvider } from "../notifications/NotificationProvider";
 
-
-function NotificationListener() {
-  const [toasts, setToasts] = useState([]);
-
-  useLiveNotifications({
-    onNotification: (data) => {
-      console.log("🔔 toast handler fired:", data);
-      
-      // 1. Play sound
-      try {
-        const audio = new Audio("/notify.mp3");
-        audio.play().catch((e) => console.warn("Audio play blocked:", e));
-      } catch (e) {
-        console.warn("Audio failed:", e);
-      }
-
-      // 2. Add toast
-      const id = Date.now();
-      setToasts((prev) => [...prev, { ...data, id }]);
-
-      // 3. Auto-remove after 5s
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 5000);
-    },
-  });
-
+function NotificationToast({ toasts, onDismiss }) {
   return (
     <div className="fixed right-4 top-20 z-[9999] flex flex-col gap-3">
       <AnimatePresence>
@@ -56,7 +29,7 @@ function NotificationListener() {
               <p className="mt-0.5 text-xs text-slate-500">{toast.message}</p>
             </div>
             <button
-              onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
+              onClick={() => onDismiss(toast.id)}
               className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
             >
               <X size={14} />
@@ -69,26 +42,46 @@ function NotificationListener() {
 }
 
 export default function TeacherLayout() {
+  const { pathname } = useLocation();
+  const isChat = pathname === "/teacher/chat";
+  
+  const [toasts, setToasts] = useState([]);
+
+  const handleNotification = useCallback((data) => {
+    try {
+      const audio = new Audio("/notify.mp3");
+      audio.play().catch(() => {});
+    } catch (e) {}
+    const id = Date.now();
+    setToasts((prev) => [...prev, { ...data, id }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 5000);
+  }, []);
+
+  useLiveNotifications({ onNotification: handleNotification });
+
   return (
-  <NotificationProvider>
-    <div className="relative isolate min-h-screen overflow-hidden font-sans text-navy-950">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-20 bg-ink-100"
-      />
-
+    <div className="relative isolate flex h-screen flex-col overflow-hidden font-sans text-navy-950">
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-20 bg-ink-100" />
       <PageBackground role="teacher" />
-      <NotificationListener />
+      <NotificationToast toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
 
+      {/* Navbar stays at the top */}
       <Navbar role="teacher" />
-
-      <div className="relative flex">
+      
+      {/* Flex container for Sidebar + Main Content */}
+      <div className="relative flex flex-1 overflow-hidden">
         <Sidebar role="teacher" />
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-5 md:p-6 lg:p-8">
-          <Outlet />
+        
+        {/* 
+          The main area. If it's the Chat page, remove padding so it goes edge-to-edge.
+          Otherwise, keep standard padding.
+        */}
+        <main className={`min-w-0 flex-1 ${isChat ? "p-0" : "overflow-y-auto p-4 sm:p-6 lg:p-8"}`}>
+          <div className={isChat ? "h-full w-full" : "mx-auto max-w-6xl"}>
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
-  </NotificationProvider>  
   );
 }

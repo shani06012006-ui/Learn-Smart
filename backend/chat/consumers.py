@@ -40,7 +40,36 @@ class ThreadChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def receive(self, text_data=None, bytes_data=None):
-        pass
+        """Handle incoming WS messages (e.g., typing indicators)."""
+        if not text_data:
+            return
+        
+        try:
+            data = json.loads(text_data)
+            msg_type = data.get("type")
+
+            if msg_type == "typing":
+                # Broadcast to everyone else in the thread
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        "type": "chat.typing",
+                        "user_id": str(self.user.id),
+                        "user_name": self.user.get_full_name() or self.user.email,
+                        "is_typing": data.get("is_typing", False),
+                    }
+                )
+        except Exception as exc:
+            pass
+
+    async def chat_typing(self, event):
+        """Send typing event to the client."""
+        await self.send(json.dumps({
+            "type": "chat.typing",
+            "user_id": event.get("user_id"),
+            "user_name": event.get("user_name"),
+            "is_typing": event.get("is_typing"),
+        }))
 
     async def chat_message(self, event):
         await self.send(json.dumps({"type": "chat.message", "message": event.get("message")}))

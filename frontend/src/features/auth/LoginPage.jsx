@@ -30,9 +30,6 @@ function loginErrorMessage(err, fallback) {
   return typeof detail === "string" && detail ? detail : fallback;
 }
 
-// One login page for teachers and school admins, backed by the real Django
-// backend. Email + password, a one-time code, and Google all end the same way:
-// { access, refresh, user } → store the session → go to the role's home.
 export default function LoginPage() {
   const [adminLogin, adminLoginState] = useAdminLoginMutation();
   const [googleLogin, googleLoginState] = useGoogleLoginMutation();
