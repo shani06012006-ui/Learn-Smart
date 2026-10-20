@@ -2,11 +2,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, Send, Plus, Phone, Video, MoreVertical, Paperclip, Smile,
-  MessagesSquare, Loader2, ChevronLeft, X
+  MessagesSquare, Loader2, ChevronLeft
 } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
+import Peer from "peerjs";
 
 import Avatar from "../../../components/ui/Avatar";
+import CallModal from "../components/chat/CallModal";
 import {
   useGetTeacherChatRoomsQuery,
   useGetTeacherChatMessagesQuery,
@@ -38,7 +40,7 @@ export default function TeacherChatPage() {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [previewOverride, setPreviewOverride] = useState({});
-  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false); // For mobile toggling
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -50,13 +52,48 @@ export default function TeacherChatPage() {
     
   const [sendMessage] = useSendTeacherChatMessageMutation();
 
-  useEffect(() => {
-    if (lastMessage) {
-      refetchMessages();
-      refetchRooms();
-    }
-  }, [lastMessage, refetchMessages, refetchRooms]);
+  // --- WebRTC State ---
+  const [peer, setPeer] = useState(null);
+  const [call, setCall] = useState(null);
+  const [callState, setCallState] = useState({
+    isOpen: false,
+    type: "audio", // or "video"
+    status: "idle", // idle | calling | connected | incoming
+    remoteUser: null,
+  });
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
 
+  // Initialize PeerJS on mount
+  useEffect(() => {
+    if (!me?.id) return;
+    
+    // Using the free PeerJS Cloud server for signaling
+    const newPeer = new Peer(me.id); 
+    
+    newPeer.on("open", (id) => console.log("My peer ID is: " + id));
+    
+    // Handle incoming calls
+    newPeer.on("call", (incomingCall) => {
+      setCall(incomingCall);
+      setCallState({
+        isOpen: true,
+        type: incomingCall.metadata?.type || "video",
+        status: "incoming",
+        remoteUser: incomingCall.metadata?.caller || { name: "Someone" },
+      });
+    });
+
+    setPeer(newPeer);
+
+    return () => {
+      newPeer.destroy();
+      if (localStream) localStream.getTracks().forEach((t) => t.stop());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
+
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messagesData?.results?.length, typingUsers, activeRoomId]);
@@ -66,11 +103,9 @@ export default function TeacherChatPage() {
       const isArchived = r.is_archived;
       const isClass = r.kind === "group" && !!r.class_course_id;
       const isTeam = r.kind === "group" && !r.class_course_id;
-      
       if (activeTab === "archived" && !isArchived) return false;
       if (activeTab === "class" && (!isClass || isArchived)) return false;
       if (activeTab === "team" && (!isTeam || isArchived)) return false;
-
       const label = r.kind === "group" ? r.title : r.other_users?.[0]?.name;
       return (label || "").toLowerCase().includes(search.toLowerCase());
     });
@@ -91,9 +126,7 @@ export default function TeacherChatPage() {
     if (!sendTyping) return;
     sendTyping(true);
     clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      sendTyping(false);
-    }, 2000);
+    typingTimeoutRef.current = setTimeout(() => sendTyping(false), 2000);
   };
 
   const handleSend = async (e) => {
@@ -123,13 +156,100 @@ export default function TeacherChatPage() {
 
   const handleSelectRoom = (id) => {
     setActiveRoomId(id);
-    setIsMobileChatOpen(true); // On mobile, open the chat view
+    setIsMobileChatOpen(true);
+  };
+
+  // --- WebRTC Call Logic ---
+  
+  const startCall = async (type) => {
+    if (!activeRoom || !peer) return;
+    
+    // Find the recipient (only works for DMs for now, as group calls need a media server)
+    const targetUser = activeRoom.other_users?.[0];
+    if (!targetUser) {
+      alert("You can only call users in a Direct Message for now.");
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: true, 
+        video: type === "video" 
+      });
+      setLocalStream(stream);
+      setCallState({
+        isOpen: true,
+        type,
+        status: "calling",
+        remoteUser: { name: targetUser.name, id: targetUser.id },
+      });
+
+      // Send a chat message to notify the receiver (and pass peer id)
+      await sendMessage({
+        id: activeRoomId,
+        body: `📞 Started a ${type} call`,
+        is_system: true,
+      }).unwrap();
+
+      const newCall = peer.call(targetUser.id, stream, {
+        metadata: { type, caller: { name: me.full_name, id: me.id } },
+      });
+
+      setCall(newCall);
+      
+      newCall.on("stream", (remote) => {
+        setRemoteStream(remote);
+        setCallState((s) => ({ ...s, status: "connected" }));
+      });
+
+      newCall.on("close", () => endCall());
+
+    } catch (err) {
+      console.error("Failed to get media", err);
+      alert("Could not access your camera/microphone.");
+      endCall();
+    }
+  };
+
+  const handleAcceptCall = async () => {
+    if (!call) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: callState.type === "video",
+      });
+      setLocalStream(stream);
+      call.answer(stream);
+      setCallState((s) => ({ ...s, status: "connected" }));
+
+      call.on("stream", (remote) => {
+        setRemoteStream(remote);
+      });
+    } catch (err) {
+      console.error(err);
+      handleDeclineCall();
+    }
+  };
+
+  const handleDeclineCall = () => {
+    if (call) call.close();
+    endCall();
+  };
+
+  const endCall = () => {
+    if (call) call.close();
+    if (localStream) localStream.getTracks().forEach((t) => t.stop());
+    if (remoteStream) remoteStream.getTracks().forEach((t) => t.stop());
+    setLocalStream(null);
+    setRemoteStream(null);
+    setCall(null);
+    setCallState({ isOpen: false, type: "audio", status: "idle", remoteUser: null });
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-white">
+    <div className="flex h-full w-full overflow-hidden bg-white relative">
       
-      {/* 1. Middle Pane (Chats) - Hidden on mobile when chat is open */}
+      {/* ... (Chat Sidebar and List code remains exactly the same as before) ... */}
       <aside className={`flex-col border-r border-slate-100 bg-white w-full md:w-80 shrink-0 ${isMobileChatOpen ? "hidden md:flex" : "flex"}`}>
         <div className="p-4 shrink-0">
           <div className="relative">
@@ -214,15 +334,12 @@ export default function TeacherChatPage() {
         </div>
       </aside>
 
-      {/* 2. Main Active Chat Pane - Hidden on mobile unless open */}
+      {/* Main Active Chat Pane */}
       {activeRoomId ? (
         <section className={`flex flex-1 flex-col bg-slate-50/50 ${isMobileChatOpen ? "flex" : "hidden md:flex"}`}>
           <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 md:px-6">
             <div className="flex items-center gap-3 md:gap-4">
-              <button 
-                onClick={() => setIsMobileChatOpen(false)} 
-                className="md:hidden p-2 -ml-2 text-slate-400 hover:text-navy-950"
-              >
+              <button onClick={() => setIsMobileChatOpen(false)} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-navy-950">
                 <ChevronLeft size={20} />
               </button>
               <Avatar userId={activeRoom.id} initials={activeRoom.title?.[0] || "?"} size="md" />
@@ -237,8 +354,18 @@ export default function TeacherChatPage() {
               </div>
             </div>
             <div className="flex items-center gap-1 md:gap-2">
-              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"><Phone size={18} /></button>
-              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"><Video size={18} /></button>
+              <button 
+                onClick={() => startCall("audio")}
+                className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"
+              >
+                <Phone size={18} />
+              </button>
+              <button 
+                onClick={() => startCall("video")}
+                className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"
+              >
+                <Video size={18} />
+              </button>
               <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><MoreVertical size={18} /></button>
             </div>
           </header>
@@ -256,6 +383,17 @@ export default function TeacherChatPage() {
                 {messages.map((m, i) => {
                   const isMine = m.sender?.id === me?.id;
                   const showDay = i === 0 || dayLabel(messages[i-1].created_at) !== dayLabel(m.created_at);
+                  
+                  // Render System Messages (like "Started a video call")
+                  if (m.is_system) {
+                    return (
+                      <li key={m.id} className="my-2 flex justify-center">
+                        <span className="rounded-full bg-slate-200/60 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          {m.body}
+                        </span>
+                      </li>
+                    );
+                  }
                   
                   return (
                     <li key={m.id} className="flex flex-col">
@@ -335,6 +473,19 @@ export default function TeacherChatPage() {
           <p className="text-sm">Select a chat to start messaging</p>
         </div>
       )}
+
+      {/* WebRTC Call Overlay */}
+      <CallModal
+        isOpen={callState.isOpen}
+        callType={callState.type}
+        status={callState.status}
+        remoteStream={remoteStream}
+        localStream={localStream}
+        remoteUser={callState.remoteUser}
+        onAccept={handleAcceptCall}
+        onDecline={handleDeclineCall}
+        onEnd={endCall}
+      />
     </div>
   );
 }
