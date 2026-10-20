@@ -152,13 +152,13 @@ export default function LoginPage() {
             <span>Remember me for 30 days</span>
           </label>
           {/* Doubles as password recovery: sign in with an emailed code instead. */}
-          <button
+          {/* <button
             type="button"
             onClick={() => setOtpOpen(true)}
             className="whitespace-nowrap rounded text-sm font-semibold text-ink-700 underline decoration-ink-200 underline-offset-4 transition-colors hover:text-ink-900 hover:decoration-ink-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sage-200"
           >
             Use a one-time code
-          </button>
+          </button> */}
         </div>
 
         {formError && (
