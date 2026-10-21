@@ -1,6 +1,6 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
 import { useMemo, useState } from "react";
-import { Search, GraduationCap, Users, TrendingUp, RefreshCw } from "lucide-react";
+import { Search, GraduationCap, Users, TrendingUp, } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -94,14 +94,6 @@ export default function TeacherStudentsPage() {
             Class-wise student directory with attendance overview.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-        >
-          <RefreshCw size={13} />
-          Refresh
-        </button>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

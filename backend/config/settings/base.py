@@ -154,6 +154,10 @@ REST_FRAMEWORK = {
     # django-filter is wired in via DEFAULT_FILTER_BACKENDS when the
     # exams/analytics modules land and introduce filterable list views.
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
+    # Per-IP limit for the teacher sign-up endpoints (see accounts/registration.py).
+    "DEFAULT_THROTTLE_RATES": {
+        "registration": os.getenv("REGISTRATION_THROTTLE_RATE", "20/hour"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
@@ -185,6 +189,21 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+
+# ---------------------------------------------------------------------------
+# E-mail (sign-up verification codes)
+# Default = console backend: the e-mail, including the 6-digit code, is printed
+# in the Django terminal - no setup needed for development.
+# For real delivery set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# plus the EMAIL_HOST* variables below (see SIGNUP_SETUP.md).
+# ---------------------------------------------------------------------------
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Learn Smart <no-reply@learnsmart.local>")
 
 # ---------------------------------------------------------------------------
 # Channels / Redis

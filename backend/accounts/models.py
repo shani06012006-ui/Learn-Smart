@@ -476,3 +476,38 @@ class LoginOTP(models.Model):
         from django.utils import timezone
         return timezone.now() > self.expires_at
 
+
+class PendingRegistration(models.Model):
+    """
+    A teacher sign-up that is waiting for its e-mail address to be verified.
+
+    The real User row is NOT created until the 6-digit code from the e-mail is
+    confirmed. That matters because Google sign-in matches accounts by e-mail:
+    if unverified sign-ups became real accounts, someone could register
+    somebody else's address with a password they know.
+
+    Nothing secret is stored in plain text: the password is already hashed
+    (same hasher as User.password), and the code and the browser token are
+    stored as keyed hashes.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    password_hash = models.CharField(max_length=128)
+    code_hash = models.CharField(max_length=64)
+    token_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField()
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Pending sign-up for {self.email}"
+
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at

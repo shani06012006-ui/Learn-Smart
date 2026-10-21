@@ -1,5 +1,5 @@
 // frontend/src/features/teacher/components/quizzes/ReviewQuestionCard.jsx
-import { Trash2, RefreshCw, CheckCircle2, Image, X } from "lucide-react";
+import { Trash2, CheckCircle2, Image, X } from "lucide-react";
 
 export default function ReviewQuestionCard({
   index,
@@ -35,15 +35,6 @@ export default function ReviewQuestionCard({
           Q{index + 1}
         </span>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onRegenerate}
-            disabled={regenerating}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <RefreshCw size={12} className={regenerating ? "animate-spin" : ""} />
-            Regenerate
-          </button>
           <button
             type="button"
             onClick={onDelete}

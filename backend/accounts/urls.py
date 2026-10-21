@@ -1,5 +1,10 @@
 from django.urls import path
 
+from .registration_views import (
+    RegisterResendView,
+    RegisterVerifyView,
+    RegisterView,
+)
 from .views import (
     GoogleLoginView,
     LoginView,
@@ -15,6 +20,9 @@ from .views import (
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),
+    path("register/", RegisterView.as_view(), name="auth-register"),
+    path("register/verify/", RegisterVerifyView.as_view(), name="auth-register-verify"),
+    path("register/resend/", RegisterResendView.as_view(), name="auth-register-resend"),
     path("google/", GoogleLoginView.as_view(), name="auth-google"),
     path("refresh/", RefreshView.as_view(), name="auth-refresh"),
     path("me/", MeView.as_view(), name="auth-me"),

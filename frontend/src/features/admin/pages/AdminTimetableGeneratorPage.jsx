@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Sparkles, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft,
-  Calendar, Clock, Users, BookOpen, Loader2, RefreshCw,
+  Calendar, Clock, Users, BookOpen, Loader2,
 } from "lucide-react";
 
 import Button from "../../../components/ui/Button";
@@ -289,10 +289,6 @@ export default function AdminTimetableGeneratorPage() {
                   {result.source === "fallback" && " · used deterministic fallback"}
                 </p>
               </div>
-              <button type="button" onClick={() => { setStep(1); setResult(null); }}
-                className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                <RefreshCw size={12} /> Start over
-              </button>
             </div>
             {result.errors?.length > 0 && (
               <details className="mt-3">
