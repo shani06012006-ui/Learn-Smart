@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function CallModal({
   isOpen,
-  callType, // "audio" | "video"
-  status,   // "calling" | "connected" | "incoming" | "ended"
+  callType,
+  status,
   remoteStream,
   localStream,
   onAccept,
@@ -19,7 +19,7 @@ export default function CallModal({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
 
-  // Attach streams to video elements
+
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
@@ -29,7 +29,7 @@ export default function CallModal({
     }
   }, [localStream, remoteStream]);
 
-  // Handle Mute
+
   const toggleMute = () => {
     if (localStream) {
       localStream.getAudioTracks().forEach((track) => {
@@ -39,7 +39,7 @@ export default function CallModal({
     }
   };
 
-  // Handle Camera
+
   const toggleVideo = () => {
     if (localStream) {
       localStream.getVideoTracks().forEach((track) => {
