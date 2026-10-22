@@ -2,21 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import SocialButton from "./SocialButton";
 
-/*
-  Google's official "Sign in with Google" button (Google Identity Services).
-
-  How it works
-    1. We load https://accounts.google.com/gsi/client once.
-    2. Google draws its own button inside our <div>. The user clicks it, picks
-       an account in Google's popup, and Google calls us back with a signed
-       ID token ("credential").
-    3. We pass that credential up via `onCredential`; the page sends it to
-       POST /api/v1/auth/google/ where the backend verifies it.
-
-  Needs  VITE_GOOGLE_CLIENT_ID  in frontend/.env.local  (see GOOGLE_LOGIN_SETUP.md).
-  Without it, a normal-looking button is shown that explains Google isn't set up.
-*/
-
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 const GSI_SRC = "https://accounts.google.com/gsi/client";
 
@@ -41,12 +26,14 @@ function loadGoogleScript() {
 }
 
 // Google only wants initialize() once per page, so the callback is routed
-// through this variable and re-pointed at whichever button is mounted.
 let currentCallback = null;
 let initializedFor = null;
 
-const NOT_CONFIGURED_MSG =
-  "Google sign-in isn't set up yet. Please log in with your email for now.";
+// While developing (npm run dev) say exactly what is missing; visitors on the live site get the friendly text.
+const NOT_CONFIGURED_MSG = import.meta.env.DEV
+  ? "Google sign-in is off because VITE_GOOGLE_CLIENT_ID is empty. Add it to frontend/.env.local " +
+    "(exact file name, next to package.json), then stop and restart npm run dev. See GOOGLE_LOGIN_SETUP.md."
+  : "Google sign-in isn't set up yet. Please log in with your email for now.";
 const LOAD_FAILED_MSG =
   "Couldn't load Google sign-in. Check your connection, or log in with your email.";
 
