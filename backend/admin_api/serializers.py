@@ -2,6 +2,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from accounts.activation import normalise_whatsapp_number
 from accounts.models import (
     RefreshToken,
     StudentAttendance,
@@ -71,6 +72,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "grade_ids",
             "grade_names",
             "student_pin",
+            "must_set_password",
         ]
         read_only_fields = fields
 
@@ -84,10 +86,63 @@ class AdminUserSerializer(serializers.ModelSerializer):
         return {"id": str(g.id), "level": g.level, "name": g.name}
 
 
+INVITE_CHANNELS = ("email", "whatsapp")
+
+
+def _resolve_delivery(attrs):
+    """
+    Turn `send_via` + `phone` into `send_email` / `whatsapp_number`.
+    Shared by "create student" and "resend invite".
+
+    `send_via` missing  -> e-mail only (the default)
+    `send_via` == []    -> send nothing; the admin copies the link by hand
+    """
+    channels = attrs.get("send_via")
+    channels = ["email"] if channels is None else list(dict.fromkeys(channels))
+
+    attrs["send_email"] = "email" in channels
+    attrs["whatsapp_number"] = None
+    if "whatsapp" in channels:
+        number = normalise_whatsapp_number(attrs.get("phone"))
+        if number is None:
+            raise serializers.ValidationError(
+                {"phone": ["Enter a valid mobile number with country code, e.g. +91 98765 43210."]}
+            )
+        attrs["whatsapp_number"] = number
+    return attrs
+
+
+class InviteDeliverySerializer(serializers.Serializer):
+    """Body of POST /admin/users/<id>/resend-invite/."""
+
+    send_via = serializers.ListField(
+        child=serializers.ChoiceField(choices=INVITE_CHANNELS),
+        required=False,
+        allow_empty=True,
+    )
+    # Used once to build the WhatsApp link. It is NOT stored anywhere.
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
+
+    def validate(self, attrs):
+        return _resolve_delivery(attrs)
+
+
 class AdminUserCreateSerializer(serializers.Serializer):
+    """
+    Teachers: an admin chooses the password (`password` is required).
+    Students: the admin NEVER chooses a password. Any `password` sent is ignored; the
+    student gets a one-time activation link instead (`send_via` / `phone` say how it
+    is delivered). See accounts/activation.py.
+    """
 
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8)
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    send_via = serializers.ListField(
+        child=serializers.ChoiceField(choices=INVITE_CHANNELS),
+        required=False,
+        allow_empty=True,
+    )
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
     first_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default="")
     last_name = serializers.CharField(max_length=150, allow_blank=True, required=False, default="")
     role = serializers.ChoiceField(choices=[User.ROLE_TEACHER, User.ROLE_STUDENT])
@@ -159,12 +214,23 @@ class AdminUserCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("A user with this email already exists.")
         return value
 
-    def validate_password(self, value):
+    def validate(self, attrs):
+        if attrs["role"] == User.ROLE_STUDENT:
+            attrs.pop("password", None)  # students choose their own, via the link
+            return _resolve_delivery(attrs)
+
+        password = attrs.get("password") or ""
+        if not password:
+            raise serializers.ValidationError({"password": ["This field is required."]})
+        if len(password) < 8:
+            raise serializers.ValidationError(
+                {"password": ["Ensure this field has at least 8 characters."]}
+            )
         try:
-            validate_password(value)
+            validate_password(password)
         except DjangoValidationError as e:
-            raise serializers.ValidationError(list(e.messages))
-        return value
+            raise serializers.ValidationError({"password": list(e.messages)})
+        return attrs
 
 
 class AdminUserUpdateSerializer(serializers.Serializer):

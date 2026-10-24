@@ -157,6 +157,11 @@ REST_FRAMEWORK = {
     # Per-IP limit for the teacher sign-up endpoints (see accounts/registration.py).
     "DEFAULT_THROTTLE_RATES": {
         "registration": os.getenv("REGISTRATION_THROTTLE_RATE", "20/hour"),
+        # Student activation links (accounts/activation.py). `activation` covers
+        # validate + complete (generous: a whole class may share one school IP);
+        # `activation_request` covers "send me a new link" (it sends e-mail, so it is strict).
+        "activation": os.getenv("ACTIVATION_THROTTLE_RATE", "300/hour"),
+        "activation_request": os.getenv("ACTIVATION_REQUEST_THROTTLE_RATE", "10/hour"),
     },
 }
 
@@ -204,6 +209,18 @@ EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Learn Smart <no-reply@learnsmart.local>")
+
+# ---------------------------------------------------------------------------
+# Student account activation (admin creates a student -> one-time link)
+# ---------------------------------------------------------------------------
+# Public URL of the React app. Activation e-mails / WhatsApp messages link to
+# {FRONTEND_URL}/activate#token=... and {FRONTEND_URL}/login. MUST be set in production.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+# How long an activation link stays valid.
+ACTIVATION_TOKEN_TTL_HOURS = int(os.getenv("ACTIVATION_TOKEN_TTL_HOURS", "48"))
+# Optional. Lets admins type a 10-digit mobile number without the country code
+# (e.g. "91" for India). Leave empty to always require the country code.
+ACTIVATION_DEFAULT_COUNTRY_CODE = os.getenv("ACTIVATION_DEFAULT_COUNTRY_CODE", "").strip().lstrip("+")
 
 # ---------------------------------------------------------------------------
 # Channels / Redis

@@ -124,6 +124,10 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
   );
 }
 
+// A student who has not yet chosen a password through the activation link shows as "Pending".
+const statusVariant = (s) => (!s.is_active ? "danger" : s.must_set_password ? "warning" : "success");
+const statusLabel = (s) => (!s.is_active ? "Inactive" : s.must_set_password ? "Pending" : "Active");
+
 export default function AdminStudentsPage() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("");
@@ -299,8 +303,8 @@ export default function AdminStudentsPage() {
                         <span className="truncate">{s.institution?.name || "—"}</span>
                       </div>
 
-                      <Badge variant={s.is_active ? "success" : "danger"} dot>
-                        {s.is_active ? "Active" : "Inactive"}
+                      <Badge variant={statusVariant(s)} dot>
+                        {statusLabel(s)}
                       </Badge>
 
                       <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-400">
@@ -337,8 +341,8 @@ export default function AdminStudentsPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                        <Badge variant={s.is_active ? "success" : "danger"} dot>
-                          {s.is_active ? "Active" : "Inactive"}
+                        <Badge variant={statusVariant(s)} dot>
+                          {statusLabel(s)}
                         </Badge>
                         <span className="flex items-center gap-1.5">
                           <Building2 size={11} className="text-slate-300" />

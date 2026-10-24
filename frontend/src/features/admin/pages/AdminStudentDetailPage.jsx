@@ -1,12 +1,14 @@
 ﻿// frontend/src/features/admin/pages/AdminStudentDetailPage.jsx
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft, Mail, GraduationCap, Building2, Calendar, Clock,
-  MapPin, ClipboardCheck, BookOpen, UserX,
+  MapPin, ClipboardCheck, BookOpen, UserX, Send,
 } from "lucide-react";
 
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
+import Button from "../../../components/ui/Button";
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import {
@@ -14,6 +16,7 @@ import {
   useGetAdminUserEnrollmentsQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
+import ResendInviteModal from "../components/ResendInviteModal";
 
 const ENROLLMENT_STATUS_VARIANT = {
   active: "success",
@@ -36,6 +39,7 @@ function formatDateTime(iso) {
 export default function AdminStudentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [resendOpen, setResendOpen] = useState(false);
 
   const { data: student, isLoading, isError, error, refetch } = useGetAdminUserQuery(id);
   const { data: enrollmentsData, isLoading: enrollmentsLoading } = useGetAdminUserEnrollmentsQuery(id, { skip: !student });
@@ -115,11 +119,26 @@ export default function AdminStudentDetailPage() {
               <p className="mt-0.5 truncate text-sm text-slate-500">
                 {student.email}
               </p>
+              {student.must_set_password && student.is_active && (
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-amber-100 bg-amber-50 px-3.5 py-2.5">
+                  <p className="min-w-0 flex-1 text-xs text-amber-800">
+                    This student has not chosen a password yet. They cannot log in until they open
+                    their activation link.
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={() => setResendOpen(true)}>
+                    <Send size={13} aria-hidden="true" />
+                    Resend activation link
+                  </Button>
+                </div>
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge variant="neutral">student</Badge>
                 <Badge variant={student.is_active ? "success" : "danger"} dot>
                   {student.is_active ? "Active" : "Inactive"}
                 </Badge>
+                {student.must_set_password && (
+                  <Badge variant="warning" dot>Pending activation</Badge>
+                )}
                 {student.institution?.name && (
                   <span className="text-xs font-semibold text-slate-400">
                     {student.institution.name}
@@ -240,6 +259,12 @@ export default function AdminStudentDetailPage() {
           </ul>
         )}
       </section>
+
+      <ResendInviteModal
+        open={resendOpen}
+        onClose={() => setResendOpen(false)}
+        student={student}
+      />
     </div>
   );
 }

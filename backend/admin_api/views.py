@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.activation import invalidate_activation_tokens, invite_student
 from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
 from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from institutions.models import Institution
@@ -25,6 +26,7 @@ from .serializers import (
     AdminUserSerializer,
     AdminUserToggleActiveSerializer,
     AdminUserUpdateSerializer,
+    InviteDeliverySerializer,
     LeaveReviewSerializer,
     LiveClassReadSerializer,
     LiveClassWriteSerializer,
@@ -305,7 +307,9 @@ class AdminUserViewSet(viewsets.GenericViewSet):
     # ------------------------------------------------------------------ write
 
     def create(self, request):
-        serializer = AdminUserCreateSerializer(data=request.data)
+        # `context` is required: the serializer's grade / class checks use it to keep an
+        # admin inside their own institution. (It used to be omitted, so they never ran.)
+        serializer = AdminUserCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         user = request.user
@@ -326,13 +330,19 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
         grade_obj = serializer.validated_data.get("grade_id")
 
+        # Students never get an admin-chosen password: they have none (unusable) until
+        # they open the one-time activation link and choose their own. Teachers keep the
+        # existing behaviour (the admin sets their password).
+        is_student = serializer.validated_data["role"] == User.ROLE_STUDENT
+
         new_user = User.objects.create_user(
             email=serializer.validated_data["email"],
-            password=serializer.validated_data["password"],
+            password=None if is_student else serializer.validated_data["password"],
             first_name=serializer.validated_data.get("first_name", ""),
             last_name=serializer.validated_data.get("last_name", ""),
             role=serializer.validated_data["role"],
             institution=institution,
+            must_set_password=is_student,
         )
 
         # Apply grade (only meaningful for students) and trigger auto-enroll
@@ -386,12 +396,20 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                         },
                     )
 
-        return Response(
-            AdminUserSerializer(new_user).data,
-            status=status.HTTP_201_CREATED,
-        )
+        data = AdminUserSerializer(new_user).data
 
-        return Response(AdminUserSerializer(new_user).data, status=status.HTTP_201_CREATED)
+        # Student: mint the one-time activation link and deliver it. The student account
+        # is kept even if delivery fails - the response says what happened and the admin
+        # can copy the link or use "Resend". The plaintext link is returned ONLY here.
+        if is_student:
+            data["invitation"] = invite_student(
+                new_user,
+                issued_by=request.user,
+                send_email=serializer.validated_data["send_email"],
+                whatsapp_number=serializer.validated_data["whatsapp_number"],
+            )
+
+        return Response(data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
         user = self.get_object()
@@ -402,6 +420,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         )
         serializer.is_valid(raise_exception=True)
 
+        old_email = user.email
         update_fields = ["updated_at"]
         for field in ("first_name", "last_name", "email"):
             if field in serializer.validated_data:
@@ -415,6 +434,11 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         new_grade = serializer.validated_data.get("grade_id", None)
 
         user.save(update_fields=update_fields)
+
+        # The e-mail of a student who has not activated yet was just corrected: any link
+        # already sent to the OLD address (a typo, or someone else's inbox) must die.
+        if user.must_set_password and user.email != old_email:
+            invalidate_activation_tokens(user)
 
         if grade_was_set and user.role == User.ROLE_STUDENT:
             self._sync_student_grade_enrollments_with_grade(user, new_grade)
@@ -570,6 +594,41 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             "exists": True,
             "last_login_at": creds.last_login_at,
         })
+
+    @action(detail=True, methods=["post"], url_path="resend-invite")
+    def resend_invite(self, request, pk=None):
+        """
+        Send a fresh activation link to a student who has not set a password yet.
+        Every older link stops working.
+
+        Body (all optional): { "send_via": ["email", "whatsapp"], "phone": "+91..." }
+        Response:            { "invitation": { activation_url, whatsapp_url, email_sent, ... } }
+        """
+        user = self.get_object()
+
+        def refuse(detail, code=None):
+            body = {"detail": detail, "status_code": 400}
+            if code:
+                body["code"] = code
+            return Response({"error": body}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.role != User.ROLE_STUDENT:
+            return refuse("Only students use activation links.")
+        if not user.must_set_password:
+            return refuse("This student has already set a password.", "already_activated")
+        if not user.is_active:
+            return refuse("Reactivate this account before sending a new link.", "account_inactive")
+
+        delivery = InviteDeliverySerializer(data=request.data)
+        delivery.is_valid(raise_exception=True)
+
+        invitation = invite_student(
+            user,
+            issued_by=request.user,
+            send_email=delivery.validated_data["send_email"],
+            whatsapp_number=delivery.validated_data["whatsapp_number"],
+        )
+        return Response({"invitation": invitation}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="toggle-active")
     def toggle_active(self, request, pk=None):

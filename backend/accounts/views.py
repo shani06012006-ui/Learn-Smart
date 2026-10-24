@@ -53,6 +53,20 @@ def _user_agent(request):
     return request.META.get("HTTP_USER_AGENT", "") or ""
 
 
+def _password_setup_required():
+    """403 for an account that still has to choose its password (see accounts/activation.py)."""
+    return Response(
+        {
+            "error": {
+                "detail": "Please set your password with the activation link we sent you before logging in.",
+                "status_code": 403,
+                "code": "password_setup_required",
+            }
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
+
 class LoginView(APIView):
     """
     Email + password -> JWT access + opaque stateful refresh.
@@ -89,6 +103,11 @@ class LoginView(APIView):
                 {"error": {"detail": "This account has been deactivated.", "status_code": 403}},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # A student who has not finished the activation flow must not get a session.
+        # (They have no usable password, so this is a backstop, not the main defence.)
+        if user.must_set_password:
+            return _password_setup_required()
 
         # Update last_login (Django's built-in field).
         user.last_login = timezone.now()
@@ -637,6 +656,10 @@ class VerifyOTPView(APIView):
                 {"error": {"detail": "Invalid or expired code.", "status_code": 401}},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        # An e-mailed code must not be a way around the mandatory password setup.
+        if user.must_set_password:
+            return _password_setup_required()
 
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])

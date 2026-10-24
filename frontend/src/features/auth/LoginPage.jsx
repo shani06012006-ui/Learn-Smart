@@ -206,6 +206,9 @@ export default function LoginPage() {
           <span className="flex-1">Are you a student? Sign in with your student code</span>
           <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
         </Link>
+        <p className="mt-3 text-center text-xs text-ink-400">
+          First time here? Open the activation link your school sent you to choose your password.
+        </p>
       </div>
 
       <OtpLoginModal open={otpOpen} onClose={() => setOtpOpen(false)} />

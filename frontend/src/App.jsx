@@ -12,6 +12,7 @@ import StudentMaterialsPage from "./features/student/pages/StudentMaterialsPage"
 import StudentTimetablePage from "./features/student/pages/StudentTimetablePage";
 import StudentChatPage from "./features/student/pages/StudentChatPage";
 import RegisterPage from "./features/auth/RegisterPage";
+import ActivateAccountPage from "./features/auth/ActivateAccountPage";
 import RootRoute from "./routes/RootRoute";
 import StudentJoinClassPage from "./features/student/pages/StudentJoinClassPage";
 import StudentLiveClassesPage from "./features/student/pages/StudentLiveClassesPage";
@@ -70,6 +71,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      {/* Student account activation: the one-time link e-mailed/WhatsApped after an admin creates a student */}
+      <Route path="/activate" element={<ActivateAccountPage />} />
 
       {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>

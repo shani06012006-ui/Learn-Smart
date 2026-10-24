@@ -16,6 +16,9 @@ import {
   useGetGradesQuery,
   useGetAdminUsersQuery,
 } from "../../../store/api/realApi";
+import ActivationInviteResult from "./ActivationInviteResult";
+import InviteDeliveryFields from "./InviteDeliveryFields";
+import { DEFAULT_DELIVERY, deliveryToPayload } from "./inviteDelivery";
 
 const INITIAL = {
   email: "",
@@ -27,6 +30,8 @@ const INITIAL = {
   grade_id: "",
   grade_ids: [],
   teacher_ids: [],
+  // Students only: how the one-time activation link is delivered.
+  delivery: DEFAULT_DELIVERY,
 };
 
 /* ------------------------------------------------------------------ */
@@ -147,6 +152,8 @@ export default function CreateUserModal({
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [teacherSearch, setTeacherSearch] = useState("");
+  // Set after a student is created: holds the response incl. the one-time activation link.
+  const [created, setCreated] = useState(null);
 
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -181,6 +188,7 @@ export default function CreateUserModal({
     setErrors({});
     setFormError(null);
     setTeacherSearch("");
+    setCreated(null);
     onClose();
   };
 
@@ -210,10 +218,16 @@ export default function CreateUserModal({
     if (!form.first_name.trim()) errs.first_name = ["Required"];
     if (!form.last_name.trim()) errs.last_name = ["Required"];
     if (!form.email.trim()) errs.email = ["Required"];
-    if (!form.password || form.password.length < 8)
-      errs.password = ["At least 8 characters"];
-    if (form.password !== form.confirm_password)
-      errs.confirm_password = ["Passwords do not match"];
+    // Teachers get an admin-chosen password. Students never do: they choose their own
+    // through the one-time activation link that is sent to them.
+    if (form.role === "teacher") {
+      if (!form.password || form.password.length < 8)
+        errs.password = ["At least 8 characters"];
+      if (form.password !== form.confirm_password)
+        errs.confirm_password = ["Passwords do not match"];
+    }
+    if (form.role === "student" && form.delivery.whatsapp && !form.delivery.phone.trim())
+      errs.phone = ["Enter the WhatsApp number"];
     if (form.role === "student" && !form.grade_id)
       errs.grade_id = ["Please pick a grade"];
     if (form.role === "teacher" && form.grade_ids.length === 0)
@@ -226,7 +240,6 @@ export default function CreateUserModal({
 
     const payload = {
       email: form.email.trim().toLowerCase(),
-      password: form.password,
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       role: form.role,
@@ -235,14 +248,19 @@ export default function CreateUserModal({
       payload.grade_id = form.grade_id;
       payload.teacher_ids = form.teacher_ids;
       payload.class_ids = [];
+      Object.assign(payload, deliveryToPayload(form.delivery)); // { send_via, phone? }
     } else {
+      payload.password = form.password;
       payload.grade_ids = form.grade_ids;
       payload.class_ids = [];
     }
 
     try {
-      await createUser(payload).unwrap();
-      handleClose();
+      const data = await createUser(payload).unwrap();
+      // A student comes back with the one-time activation link. Show it (and whether the
+      // e-mail went out) instead of closing: this is the only time the link is visible.
+      if (data?.invitation) setCreated(data);
+      else handleClose();
     } catch (err) {
       const detail = err?.data?.error?.detail;
       if (detail && typeof detail === "object" && !Array.isArray(detail)) {
@@ -256,7 +274,44 @@ export default function CreateUserModal({
   };
 
   const isStudent = form.role === "student";
-  const submitLabel = isStudent ? "Create Student" : "Create Teacher";
+  const sendsLink = form.delivery.email || form.delivery.whatsapp;
+  const submitLabel = isStudent
+    ? sendsLink
+      ? "Create & send link"
+      : "Create Student"
+    : "Create Teacher";
+
+  if (created) {
+    return (
+      <SplitModal
+        open={open}
+        onClose={handleClose}
+        title="Student created"
+        subtitle={`${created.full_name || created.email} can now set their own password.`}
+        leftPanel={{
+          heading: "Almost there.",
+          subheading:
+            "The student opens the link, chooses a password and lands on their dashboard.",
+          bullets: [
+            "The link works once",
+            "It expires automatically",
+            "Lost it? Use Resend on the student's page",
+          ],
+        }}
+        footer={
+          <button
+            type="button"
+            onClick={handleClose}
+            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 hover:shadow-md"
+          >
+            Done
+          </button>
+        }
+      >
+        <ActivationInviteResult email={created.email} invitation={created.invitation} />
+      </SplitModal>
+    );
+  }
 
   return (
     <SplitModal
@@ -269,13 +324,13 @@ export default function CreateUserModal({
           ? "Welcome a new student."
           : "Invite a new teacher.",
         subheading: isStudent
-          ? "Assign a grade and pick their teachers to get started."
+          ? "Assign a grade. We send a one-time link so they can choose their own password."
           : "Assign grades and set credentials — they can sign in right away.",
         bullets: isStudent
           ? [
               "Fill in name & email",
-              "Choose a grade",
-              "Optionally pick teachers",
+              "Choose a grade & teachers",
+              "We send a link to set their password",
             ]
           : [
               "Fill in name & email",
@@ -369,31 +424,21 @@ export default function CreateUserModal({
               required
             />
 
-            <div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field
-                  icon={Lock}
-                  label="Password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange("password")}
-                  error={errors.password?.[0]}
-                  placeholder="At least 8 characters"
-                  required
-                />
-                <Field
-                  icon={ShieldCheck}
-                  label="Confirm Password"
-                  type="password"
-                  value={form.confirm_password}
-                  onChange={handleChange("confirm_password")}
-                  error={errors.confirm_password?.[0]}
-                  placeholder="Repeat password"
-                  required
-                />
-              </div>
-              <PasswordStrength password={form.password} />
-            </div>
+            <InviteDeliveryFields
+              value={form.delivery}
+              onChange={(delivery) => {
+                setForm((f) => ({ ...f, delivery }));
+                if (errors.phone) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.phone;
+                    return next;
+                  });
+                }
+              }}
+              phoneError={errors.phone?.[0]}
+              disabled={isLoading}
+            />
 
             <div>
               <label className="block text-xs font-bold text-slate-700">

@@ -19,7 +19,11 @@ def get_user_from_token(token):
         user_id = access.get("user_id")
         if not user_id:
             return AnonymousUser()
-        return User.objects.get(id=user_id)
+        user = User.objects.get(id=user_id)
+        # A student who has not finished account activation gets no WebSocket either.
+        if user.must_set_password:
+            return AnonymousUser()
+        return user
     except Exception as exc:
         logger.warning("JWT auth failed: %s", exc)
         return AnonymousUser()

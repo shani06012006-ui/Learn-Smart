@@ -75,6 +75,15 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
 
     tokens_valid_after = models.DateTimeField(null=True, blank=True)
 
+    must_set_password = models.BooleanField(
+        default=False,
+        help_text=(
+            "True for a student created by an admin who has not yet chosen a password "
+            "through the one-time activation link. While True the account cannot sign "
+            "in (password, PIN or OTP) and cannot call the API."
+        ),
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"
@@ -154,9 +163,25 @@ class RefreshToken(models.Model):
 
 
 class PasswordResetToken(models.Model):
+    """
+    One-time, expiring, hashed token that lets its holder choose a password.
+
+    `purpose` keeps the two uses apart: an account-activation token (see
+    accounts/activation.py) can never be accepted by a reset flow, or vice versa.
+    """
+
+    PURPOSE_RESET = "reset"
+    PURPOSE_ACTIVATION = "activation"
+    PURPOSE_CHOICES = [
+        (PURPOSE_RESET, "Password reset"),
+        (PURPOSE_ACTIVATION, "Account activation"),
+    ]
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="password_reset_tokens"
+    )
+    purpose = models.CharField(
+        max_length=20, choices=PURPOSE_CHOICES, default=PURPOSE_RESET
     )
     token_hash = models.CharField(max_length=64, unique=True, db_index=True)
     issued_at = models.DateTimeField(auto_now_add=True)

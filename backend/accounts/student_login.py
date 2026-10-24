@@ -79,6 +79,24 @@ class StudentLoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # A student created through the activation flow must choose a password first;
+        # a PIN must not be a way around that. (Checked before register_success so a
+        # refused sign-in is not recorded as a login.)
+        if student.must_set_password:
+            return Response(
+                {
+                    "error": {
+                        "detail": (
+                            "Your account isn't set up yet. Open the activation link "
+                            "your school sent you to choose a password first."
+                        ),
+                        "status_code": 403,
+                        "code": "password_setup_required",
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         # Success — issue tokens with the student's identity
         creds.register_success()
 

@@ -1,5 +1,10 @@
 from django.urls import path
 
+from .activation_views import (
+    ActivationCompleteView,
+    ActivationRequestView,
+    ActivationValidateView,
+)
 from .registration_views import (
     RegisterResendView,
     RegisterVerifyView,
@@ -32,4 +37,8 @@ urlpatterns = [
     path("students/create/", TeacherStudentCreateView.as_view(), name="auth-students-create"),
     path("request-otp/", RequestOTPView.as_view(), name="auth-request-otp"),
     path("verify-otp/", VerifyOTPView.as_view(), name="auth-verify-otp"),
+    # Student account activation (one-time link sent after an admin creates a student)
+    path("activation/validate/", ActivationValidateView.as_view(), name="auth-activation-validate"),
+    path("activation/complete/", ActivationCompleteView.as_view(), name="auth-activation-complete"),
+    path("activation/request/", ActivationRequestView.as_view(), name="auth-activation-request"),
 ]
