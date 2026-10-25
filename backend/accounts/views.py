@@ -1,25 +1,6 @@
-"""
-Authentication endpoints.
-
-These are the endpoints the React admin (and, later, the teacher/student
-apps once they migrate off the mock auth) talk to over HTTP.
-
-Endpoints:
-    POST /api/v1/auth/login/            email + password -> access + refresh
-    POST /api/v1/auth/google/           Google ID token -> access + refresh
-    POST /api/v1/auth/refresh/          rotate refresh -> new pair
-    GET  /api/v1/auth/me/               Authorization -> user
-    POST /api/v1/auth/logout/           revoke the supplied refresh token
-    POST /api/v1/auth/ws-ticket/        mint a single-use WebSocket ticket
-
-Refresh tokens are stateful (see accounts/token_service.py). Access
-tokens are JWTs, validated by accounts/jwt_auth.py which also enforces
-`tokens_valid_after`.
-"""
 from django.contrib.auth import authenticate
 from django.utils import timezone
 from rest_framework import permissions, status
-from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -39,10 +20,13 @@ from .ws_tickets import mint_ticket
 from .services import generate_login_otp, verify_login_otp
 
 from .google_auth import (
-       GoogleAuthNotConfigured,
-       GoogleTokenError,
-       GoogleUnavailable,
-       verify_google_credential, )
+    GoogleAuthNotConfigured,
+    GoogleTokenError,
+    GoogleUnavailable,
+    verify_google_credential,
+)
+
+# Removed the broken `from .utils import send_student_invitation` import
 
 
 def _client_ip(request):
@@ -70,11 +54,6 @@ def _password_setup_required():
 class LoginView(APIView):
     """
     Email + password -> JWT access + opaque stateful refresh.
-
-    On success:
-      - user.last_login is updated
-      - a RefreshToken row is created (new family)
-      - an audit event is written
     """
 
     permission_classes = [AllowAny]
@@ -105,7 +84,6 @@ class LoginView(APIView):
             )
 
         # A student who has not finished the activation flow must not get a session.
-        # (They have no usable password, so this is a backstop, not the main defence.)
         if user.must_set_password:
             return _password_setup_required()
 
@@ -140,20 +118,6 @@ class LoginView(APIView):
 class GoogleLoginView(APIView):
     """
     POST /api/v1/auth/google/   body: { credential, remember_me? }
-
-    "Sign in with Google" for teachers and admins.
-
-    `credential` is the Google ID token the browser got from Google Identity
-    Services. We verify it server-side (see accounts/google_auth.py) and then
-    sign in the EXISTING, active user whose e-mail matches the verified Google
-    e-mail. Google sign-in never creates accounts: a school admin adds people
-    first, so a stranger with a Google account cannot get into a school.
-
-    Student accounts are refused here - children sign in with their PIN.
-
-    Success returns the same { access, refresh, user, remember_me } shape as
-    LoginView. Failures use 400 / 403 / 503 (never 401) so the frontend's
-    token-refresh logic is not triggered by a failed Google attempt.
     """
 
     permission_classes = [AllowAny]
@@ -214,7 +178,6 @@ class GoogleLoginView(APIView):
                 "student_use_pin",
             )
 
-        # Fill in a missing name from the Google profile (never overwrite one we already have).
         update_fields = ["last_login"]
         if not user.first_name and claims.get("given_name"):
             user.first_name = claims["given_name"][:150]
@@ -244,12 +207,6 @@ class GoogleLoginView(APIView):
 
 
 class RefreshView(APIView):
-    """
-    Exchange a refresh token for a new pair. Rotation is atomic (row lock
-    in token_service.rotate_refresh_token). Reuse of a rotated token kills
-    the whole family and returns 401.
-    """
-
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -267,7 +224,7 @@ class RefreshView(APIView):
                 ip_address=_client_ip(request),
                 user_agent=_user_agent(request),
             )
-        except RefreshTokenError as e:
+        except RefreshTokenError:
             return Response(
                 {"error": {"detail": "Invalid or expired refresh token.", "status_code": 401}},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -280,8 +237,6 @@ class RefreshView(APIView):
 
 
 class MeView(APIView):
-    """Return the currently authenticated user. Requires a valid access token."""
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -289,12 +244,6 @@ class MeView(APIView):
 
 
 class LogoutView(APIView):
-    """
-    Revoke the supplied refresh token. Idempotent. Access tokens issued
-    before logout remain valid until their natural expiry — see the
-    architecture doc for the reasoning.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -306,17 +255,6 @@ class LogoutView(APIView):
 
 
 class WsTicketView(APIView):
-    """
-    Mint a short-lived, single-use ticket for opening a WebSocket.
-
-    The client presents its access JWT in the Authorization header (as
-    with any authenticated request). The response body contains an opaque
-    ticket string that is valid for 30 seconds and can be consumed once.
-
-    This avoids putting the long-lived access JWT in the WebSocket URL,
-    which would leak it into proxy and server logs.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -329,40 +267,6 @@ _ = User
 
 
 class StudentListView(APIView):
-    """
-    GET /api/v1/teacher/students/
-
-    Cross-class student directory for teachers.
-
-    Query params:
-      class_course / class_id / klass -- filter to a ClassCourse UUID
-      grade                            -- filter by Grade UUID
-      scope                            -- "mine" | "all" (default "all")
-      q                                -- search email / first / last name
-
-    Response:
-      {
-        "count": N,
-        "grades": [{id, name}, ...],       # for the filter dropdown
-        "results": [
-          {
-            "id": <student_uuid>,
-            "enrollment_id": <enrollment_uuid>,
-            "full_name": "...",
-            "email": "...",
-            "roll_number": "",
-            "class_id": <class_uuid or null>,
-            "class_name": "...",
-            "class_teacher_id": <teacher_uuid or null>,
-            "class_teacher_name": "...",
-            "attendance_pct": <float 0-100>
-          }, ...
-        ]
-      }
-
-    All teachers in the same institution can see each other's students
-    (cross-teacher read). Scope is enforced by institution.
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -387,7 +291,6 @@ class StudentListView(APIView):
         scope = (request.query_params.get("scope") or "all").lower()
         q_str = (request.query_params.get("q") or "").strip()
 
-        # Enrollments
         enroll_qs = (
             StudentEnrollment.objects
             .filter(status=StudentEnrollment.STATUS_ACTIVE)
@@ -400,17 +303,14 @@ class StudentListView(APIView):
             )
         )
 
-        # Institution scope
         if user.institution_id:
             enroll_qs = enroll_qs.filter(
                 class_course__institution_id=user.institution_id
             )
 
-        # Optional scope=mine
         if scope == "mine":
             enroll_qs = enroll_qs.filter(class_course__teacher=user)
 
-        # Filters
         if class_course_id:
             enroll_qs = enroll_qs.filter(class_course_id=class_course_id)
         if grade_id:
@@ -423,7 +323,6 @@ class StudentListView(APIView):
                 | Q(student__email__icontains=q_str)
             )
 
-        # Attendance lookup: (student_id, class_id) -> {total, present}
         attendance_map = {}
         student_ids = list({str(e.student_id) for e in enroll_qs})
         class_ids = list({
@@ -447,7 +346,6 @@ class StudentListView(APIView):
                     counts[key]["present"] += 1
             attendance_map = dict(counts)
 
-        # Build result rows
         results = []
         seen = set()
         for e in enroll_qs:
@@ -459,14 +357,12 @@ class StudentListView(APIView):
                 continue
             seen.add(dedupe_key)
 
-            # Attendance %
             pct = 0.0
             if cls:
                 agg = attendance_map.get((str(s.id), str(cls.id)))
                 if agg and agg["total"] > 0:
                     pct = round((agg["present"] / agg["total"]) * 100, 1)
 
-            # Names
             full_name = (
                 f"{s.first_name or ''} {s.last_name or ''}".strip()
             ) or s.email
@@ -491,7 +387,6 @@ class StudentListView(APIView):
 
         results.sort(key=lambda r: r["full_name"].lower())
 
-        # Grades list for the filter dropdown
         grades_qs = Grade.objects.all()
         if user.institution_id:
             grades_qs = grades_qs.filter(institution_id=user.institution_id)
@@ -503,15 +398,8 @@ class StudentListView(APIView):
             "results": results,
         })
 
+
 class TeacherStudentCreateView(APIView):
-    """
-    POST /api/v1/auth/students/create/
-
-    Teachers create a student directly (with an optional grade).
-    The student is auto-enrolled into every class of that grade.
-
-    Body: { email, first_name, last_name, grade_id (optional) }
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -543,7 +431,6 @@ class TeacherStudentCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Validate grade belongs to teacher's institution
         grade = None
         if grade_id:
             try:
@@ -557,10 +444,8 @@ class TeacherStudentCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Refuse if the user already exists
         existing = User.objects.filter(email=email).first()
         if existing is not None:
-            # Reuse — do not change password/role; just enrol if needed
             if existing.role != User.ROLE_STUDENT:
                 return Response(
                     {"detail": "A non-student user already uses this email."},
@@ -574,7 +459,7 @@ class TeacherStudentCreateView(APIView):
         else:
             student = User.objects.create_user(
                 email=email,
-                password=None,  # unusable until they set one
+                password=None,
                 first_name=first_name,
                 last_name=last_name,
                 role=User.ROLE_STUDENT,
@@ -606,16 +491,7 @@ class TeacherStudentCreateView(APIView):
         )
 
 
-# ═══════════════════════════════════════════════════════════════
-# Passwordless email OTP
-# ═══════════════════════════════════════════════════════════════
-
 class RequestOTPView(APIView):
-    """
-    POST /api/v1/auth/request-otp/   body: { email }
-    Generates a 6-digit code, prints to console (dev mode).
-    Returns 200 always to avoid email enumeration.
-    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -633,10 +509,6 @@ class RequestOTPView(APIView):
 
 
 class VerifyOTPView(APIView):
-    """
-    POST /api/v1/auth/verify-otp/   body: { email, code }
-    Returns the same { access, refresh, user } shape as LoginView.
-    """
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -657,7 +529,6 @@ class VerifyOTPView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # An e-mailed code must not be a way around the mandatory password setup.
         if user.must_set_password:
             return _password_setup_required()
 
@@ -681,13 +552,6 @@ class VerifyOTPView(APIView):
 
 
 class TeacherColleaguesView(APIView):
-    """
-    GET /api/v1/teacher/teachers/
-
-    Returns teachers in the requesting teacher's institution for
-    building filter dropdowns (e.g. timetable, student directory).
-    Read-only, no PII beyond name/email/id.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -721,3 +585,4 @@ class TeacherColleaguesView(APIView):
             })
 
         return Response({"count": len(results), "results": results})
+

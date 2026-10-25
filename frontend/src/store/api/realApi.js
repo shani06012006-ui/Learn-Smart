@@ -95,8 +95,15 @@ export const realApi = createApi({
       query: () => "/notifications/",
       providesTags: ["Notifications"],
     }),
-    markNotificationsRead: builder.mutation({
+    markAllNotificationsRead: builder.mutation({
       query: () => ({ url: "/notifications/", method: "POST" }),
+      invalidatesTags: ["Notifications"],
+    }),
+    markSingleNotificationRead: builder.mutation({
+      query: (id) => ({
+        url: `/notifications/${id}/read/`,
+        method: "PATCH",
+      }),
       invalidatesTags: ["Notifications"],
     }),
 
@@ -1574,5 +1581,7 @@ export const {
   useDeleteChatThreadMutation,
   
   useGetNotificationsQuery,
-  useMarkNotificationsReadMutation,
+  useMarkAllNotificationsReadMutation, 
+  useMarkSingleNotificationReadMutation,
+
 } = realApi;

@@ -44,8 +44,12 @@ urlpatterns = [
     # ============================================================
     # Auth
     # ============================================================
-    path("api/v1/auth/", include("accounts.urls")),
-    path("api/v1/auth/student-login/", StudentLoginView.as_view(), name="student-pin-login"),
+    
+    path("api/v1/accounts/", include("accounts.urls")),
+    path("api/v1/chat/", include("chat.urls")),
+    path("api/v1/leaves/", include("leaves.urls")),
+    path("api/v1/quizzes/", include("quizzes.urls")),
+    path("api/v1/notifications/", include("notifications.urls")),
 
     # ============================================================
     # Teacher-scoped endpoints
@@ -119,3 +123,4 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

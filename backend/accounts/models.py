@@ -1,3 +1,6 @@
+from django.utils import timezone
+from datetime import timedelta
+import secrets
 import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
@@ -6,75 +9,33 @@ from django.db import models
 from institutions.models import Institution
 from core.models import TimeStampedModel
 
+from django.contrib.auth.hashers import make_password
 
-class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError("The email field is required.")
+from django.contrib.auth.hashers import check_password
 
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
+from .managers import UserManager
 
-        if password:
-            user.set_password(password)
-        else:
-            user.set_unusable_password()
-
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-        extra_fields.setdefault("is_active", True)
-        extra_fields.setdefault("role", User.ROLE_ADMIN)
-
-        return self.create_user(email, password, **extra_fields)
-
-
-class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
+class User(AbstractBaseUser, PermissionsMixin):
     ROLE_ADMIN = "admin"
     ROLE_TEACHER = "teacher"
     ROLE_STUDENT = "student"
-
-    ROLE_CHOICES = [
+    ROLE_CHOICES = (
         (ROLE_ADMIN, "Admin"),
         (ROLE_TEACHER, "Teacher"),
         (ROLE_STUDENT, "Student"),
-    ]
+    )
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(unique=True, max_length=254)
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
-    institution = models.ForeignKey(
-        Institution,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="users",
-    )
-
-    grade = models.ForeignKey(
-        "institutions.Grade",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="students",
-        help_text=(
-            "Only meaningful for role='student'. "
-            "Determines which subject-classes auto-enroll the student."
-        ),
-    )
-
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_STUDENT)
+    
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    date_joined = models.DateTimeField(default=timezone.now)
 
-    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
-
-    tokens_valid_after = models.DateTimeField(null=True, blank=True)
-
+    # Activation & Password fields
     must_set_password = models.BooleanField(
         default=False,
         help_text=(
@@ -82,6 +43,11 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
             "through the one-time activation link. While True the account cannot sign "
             "in (password, PIN or OTP) and cannot call the API."
         ),
+    )
+    temp_password_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Expiration timestamp for the temporary password if one was issued.",
     )
 
     objects = UserManager()
@@ -96,18 +62,46 @@ class User(AbstractBaseUser, PermissionsMixin, TimeStampedModel):
         return f"{self.first_name} {self.last_name}".strip()
 
     def get_short_name(self):
-        return self.first_name or self.email
+        return self.first_name
 
 
-class StudentProfile(TimeStampedModel):
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="student_profile",
+class StudentProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="student_profile")
+    phone = models.CharField(max_length=20, blank=True)
+    must_set_password = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="created_students"
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Student Profile - {self.user.get_full_name()}"
+        return self.user.get_full_name() or self.user.username
+
+
+class PasswordActivation(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="password_activation")
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    temporary_password = models.CharField(max_length=128)  # hashed, not plaintext
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    def is_valid(self):
+        return self.used_at is None and timezone.now() < self.expires_at
+
+    @classmethod
+    def create_for_user(cls, user, validity_hours=24):
+        token = secrets.token_urlsafe(48)
+        temp_password = User.objects.make_random_password(length=12)
+        obj, _ = cls.objects.update_or_create(
+            user=user,
+            defaults={
+                "token": token,
+                "temporary_password": temp_password,  # replace with hashing below
+                "expires_at": timezone.now() + timedelta(hours=validity_hours),
+                "used_at": None,
+            },
+        )
+        return obj, temp_password
 
 
 class OnlineStatus(TimeStampedModel):
@@ -251,12 +245,6 @@ class TeacherAttendance(TimeStampedModel):
     duration_seconds = models.PositiveIntegerField(default=0)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["teacher", "date"],
-                name="unique_teacher_attendance_per_day",
-            )
-        ]
         indexes = [
             models.Index(fields=["institution", "date"]),
         ]
@@ -348,18 +336,6 @@ class StudentAttendance(TimeStampedModel):
     note = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["student", "class_course", "date"],
-                name="unique_student_attendance_per_class_per_day",
-                condition=models.Q(class_course__isnull=False),
-            ),
-            models.UniqueConstraint(
-                fields=["student", "grade", "date"],
-                name="unique_student_attendance_per_grade_per_day",
-                condition=models.Q(grade__isnull=False),
-            ),
-        ]
         indexes = [
             models.Index(fields=["institution", "date"]),
             models.Index(fields=["class_course", "date"]),
