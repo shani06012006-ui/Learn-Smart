@@ -1,11 +1,17 @@
 from django.contrib.auth import authenticate
 from django.utils import timezone
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from rest_framework import permissions, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import User
+from .models import User, OnlineStatus, StudentProfile
 from .serializers import UserSerializer
 from .token_service import (
     REMEMBER_ME_LIFETIME,
@@ -16,9 +22,7 @@ from .token_service import (
     rotate_refresh_token,
 )
 from .ws_tickets import mint_ticket
-
 from .services import generate_login_otp, verify_login_otp
-
 from .google_auth import (
     GoogleAuthNotConfigured,
     GoogleTokenError,
@@ -26,19 +30,14 @@ from .google_auth import (
     verify_google_credential,
 )
 
-# Removed the broken `from .utils import send_student_invitation` import
-
-
 def _client_ip(request):
     return request.META.get("REMOTE_ADDR") or None
-
 
 def _user_agent(request):
     return request.META.get("HTTP_USER_AGENT", "") or ""
 
-
 def _password_setup_required():
-    """403 for an account that still has to choose its password (see accounts/activation.py)."""
+    """403 for an account that still has to choose its password."""
     return Response(
         {
             "error": {
@@ -52,10 +51,6 @@ def _password_setup_required():
 
 
 class LoginView(APIView):
-    """
-    Email + password -> JWT access + opaque stateful refresh.
-    """
-
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -83,19 +78,15 @@ class LoginView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # A student who has not finished the activation flow must not get a session.
         if user.must_set_password:
             return _password_setup_required()
 
-        # Update last_login (Django's built-in field).
         user.last_login = timezone.now()
         user.save(update_fields=["last_login"])
 
-        # Remember-me? Extended refresh TTL (30 days) vs default (7 days).
         remember_me = bool(request.data.get("remember_me"))
         lifetime = REMEMBER_ME_LIFETIME if remember_me else None
 
-        # Issue our own stateful refresh token (new family).
         raw_refresh, _row = issue_refresh_token(
             user,
             ip_address=_client_ip(request),
@@ -116,10 +107,6 @@ class LoginView(APIView):
 
 
 class GoogleLoginView(APIView):
-    """
-    POST /api/v1/auth/google/   body: { credential, remember_me? }
-    """
-
     permission_classes = [AllowAny]
     authentication_classes = []
 
@@ -262,10 +249,6 @@ class WsTicketView(APIView):
         return Response({"ticket": ticket}, status=status.HTTP_200_OK)
 
 
-# Keep a reference so `from .views import User` doesn't break.
-_ = User
-
-
 class StudentListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -302,11 +285,6 @@ class StudentListView(APIView):
                 "class_course__institution",
             )
         )
-
-        if user.institution_id:
-            enroll_qs = enroll_qs.filter(
-                class_course__institution_id=user.institution_id
-            )
 
         if scope == "mine":
             enroll_qs = enroll_qs.filter(class_course__teacher=user)
@@ -388,8 +366,6 @@ class StudentListView(APIView):
         results.sort(key=lambda r: r["full_name"].lower())
 
         grades_qs = Grade.objects.all()
-        if user.institution_id:
-            grades_qs = grades_qs.filter(institution_id=user.institution_id)
         grades = [{"id": str(g.id), "name": g.name} for g in grades_qs.order_by("level", "name")]
 
         return Response({
@@ -408,11 +384,6 @@ class TeacherStudentCreateView(APIView):
         if user.role != "teacher":
             return Response(
                 {"detail": "Only teachers can create students here."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        if user.institution_id is None:
-            return Response(
-                {"detail": "Your account has no institution."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -436,11 +407,10 @@ class TeacherStudentCreateView(APIView):
             try:
                 grade = Grade.objects.get(
                     id=grade_id,
-                    institution_id=user.institution_id,
                 )
             except Grade.DoesNotExist:
                 return Response(
-                    {"detail": "Unknown grade for your institution."},
+                    {"detail": "Unknown grade."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -452,9 +422,8 @@ class TeacherStudentCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             student = existing
-            if grade is not None and student.grade_id != grade.id:
-                student.grade = grade
-                student.save(update_fields=["grade", "updated_at"])
+            if grade is not None:
+                student.save(update_fields=["updated_at"])
             created = False
         else:
             student = User.objects.create_user(
@@ -463,8 +432,6 @@ class TeacherStudentCreateView(APIView):
                 first_name=first_name,
                 last_name=last_name,
                 role=User.ROLE_STUDENT,
-                institution=user.institution,
-                grade=grade,
             )
             StudentProfile.objects.create(user=student)
             OnlineStatus.objects.create(user=student)
@@ -569,12 +536,9 @@ class TeacherColleaguesView(APIView):
             is_active=True,
         ).order_by("first_name", "last_name", "email")
 
-        if user.institution_id:
-            qs = qs.filter(institution_id=user.institution_id)
-
         results = []
         for u in qs:
-            full_name = (f"{u.first_name or ''} {u.last_name or ''}").strip() or u.email
+            full_name = (f"{u.first_name or ''} {u.last_name or ''}".strip()) or u.email
             results.append({
                 "id": str(u.id),
                 "email": u.email,
@@ -586,3 +550,80 @@ class TeacherColleaguesView(APIView):
 
         return Response({"count": len(results), "results": results})
 
+
+# ==========================================
+# NEW SECURE SETUP & ADMIN CREATION VIEWS
+# ==========================================
+
+class SetupPasswordView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        uidb64 = request.data.get("uid")
+        token = request.data.get("token")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not all([uidb64, token, new_password, confirm_password]):
+            return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({"error": "Invalid activation link."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Token is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as e:
+            return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.must_set_password = False
+        user.is_active = True
+        user.save()
+
+        return Response({"message": "Password set successfully. You can now log in."}, status=status.HTTP_200_OK)
+
+
+class AdminCreateStudentView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        first_name = request.data.get("first_name", "")
+        last_name = request.data.get("last_name", "")
+
+        if User.objects.filter(email=email).exists():
+            return Response({"error": "User with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_user(
+            email=email,
+            password=None,
+            first_name=first_name,
+            last_name=last_name,
+            role=User.ROLE_STUDENT,
+            must_set_password=True
+        )
+        user.set_unusable_password()
+        user.save()
+
+        StudentProfile.objects.create(user=user)
+        OnlineStatus.objects.create(user=user)
+
+        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        
+        setup_url = f"http://localhost:5173/auth/setup-password?uid={uidb64}&token={token}"
+
+        return Response({
+            "message": "Student created successfully.",
+            "setup_url": setup_url,
+            "uid": uidb64,
+            "token": token
+        }, status=status.HTTP_201_CREATED)

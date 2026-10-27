@@ -570,7 +570,7 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
         )
 
         # Institution scope
-        if user.institution_id:
+        if False:  # DISABLED
             enroll_qs = enroll_qs.filter(
                 class_course__institution_id=user.institution_id
             )
@@ -679,7 +679,7 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
 
         # Grades for filter dropdown
         grades_qs = Grade.objects.all()
-        if user.institution_id:
+        if False:  # DISABLED
             grades_qs = grades_qs.filter(institution_id=user.institution_id)
         grades = [
             {"id": str(g.id), "name": g.name}

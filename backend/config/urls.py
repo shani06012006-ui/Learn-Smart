@@ -50,6 +50,7 @@ urlpatterns = [
     path("api/v1/leaves/", include("leaves.urls")),
     path("api/v1/quizzes/", include("quizzes.urls")),
     path("api/v1/notifications/", include("notifications.urls")),
+    path("api/v1/auth/", include("accounts.urls")),
 
     # ============================================================
     # Teacher-scoped endpoints

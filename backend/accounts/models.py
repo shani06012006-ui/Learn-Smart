@@ -34,6 +34,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
+    institution = models.ForeignKey("institutions.Institution", null=True, blank=True, on_delete=models.SET_NULL, related_name="users")
+
 
     # Activation & Password fields
     must_set_password = models.BooleanField(

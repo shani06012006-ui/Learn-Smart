@@ -6,7 +6,7 @@ import {
 } from "../slices/adminAuthSlice";
 
 const rawBaseQuery = fetchBaseQuery({
-  baseUrl: "/api/v1",
+  baseUrl: "http://127.0.0.1:8000/api/v1",
   prepareHeaders: (headers, { getState }) => {
     const state = getState();
     const token =
