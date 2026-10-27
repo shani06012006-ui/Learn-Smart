@@ -43,11 +43,6 @@ class IsTeacherOnly(IsAuthenticated):
 # ═══════════════════════════════════════════════════════════════
 
 def _resolve_target(request):
-    """
-    Parse ?grade=<uuid> or ?klass=<uuid>.
-    Returns (grade_obj, class_obj) — one is None, one is set.
-    Raises Response on error.
-    """
     grade_id = request.query_params.get("grade")
     klass_id = (
         request.query_params.get("klass")
@@ -79,7 +74,22 @@ def _resolve_target(request):
         )
 
 
-def _students_for_grade(grade):
+def _students_for_grade(grade, section=None):
+    if section:
+        # ✅ Find students via enrollment in a class linked to this section
+        from classes.models import StudentEnrollment
+        enrollments = StudentEnrollment.objects.filter(
+            class_course__grade=grade,
+            class_course__section=section,
+            status=StudentEnrollment.STATUS_ACTIVE
+        ).select_related("student")
+        
+        # Return a unique list of students
+        students = [e.student for e in enrollments]
+        unique_students = list({s.id: s for s in students}.values())
+        return sorted(unique_students, key=lambda u: (u.first_name, u.last_name))
+
+    # Fallback if no section is selected
     return User.objects.filter(
         role=getattr(User, "ROLE_STUDENT", "student"),
         is_active=True,
@@ -97,13 +107,12 @@ def _students_for_class(klass):
 
 
 def _full_name(u):
-    return (f"{u.first_name or ''} {u.last_name or ''}").strip() or u.email
+    return (f"{u.first_name or ''} {u.last_name or ''}".strip()) or u.email
 
 
-def _roster_rows(grade, klass, date_str):
-    """Return roster with existing statuses. Used by teacher view."""
+def _roster_rows(grade, klass, date_str, section=None):
     if grade:
-        students = list(_students_for_grade(grade))
+        students = list(_students_for_grade(grade, section=section))
         existing = {
             a.student_id: a
             for a in StudentAttendance.objects.filter(grade=grade, date=date_str)
@@ -130,7 +139,6 @@ def _roster_rows(grade, klass, date_str):
 
 
 def _roll_number_for(student, klass):
-    """Return the student's roll_number for a given class enrollment, or ''."""
     if not klass:
         return ""
     try:
@@ -141,7 +149,6 @@ def _roll_number_for(student, klass):
 
 
 def _record_rows(grade, klass, date_str):
-    """Return ONLY saved records. Used by admin view."""
     if grade:
         qs = StudentAttendance.objects.filter(grade=grade, date=date_str)
     else:
@@ -171,10 +178,6 @@ def _record_rows(grade, klass, date_str):
 
 
 def _submitted_meta(grade, klass, date_str):
-    """
-    Return {teacher_name, teacher_id, submitted_at} for the given target+date,
-    based on the most recent marked_by on any record. None if no records.
-    """
     if grade:
         qs = StudentAttendance.objects.filter(grade=grade, date=date_str)
     elif klass:
@@ -298,7 +301,6 @@ class AttendanceViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"], url_path="bulk-save")
     def bulk_save(self, request):
-        """Alias for `mark` — spec-friendly URL."""
         return self.mark(request)
 
     @action(detail=False, methods=["post"], url_path="mark")
@@ -396,12 +398,14 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
                 {"error": {"detail": "date is required.", "status_code": 400}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
+        section_id = request.query_params.get("section") 
+        
         grade, klass, err = _resolve_target(request)
         if err:
             return err
 
-        rows = _roster_rows(grade, klass, date_str)
+        rows = _roster_rows(grade, klass, date_str, section=section_id)
         return Response({
             "grade": str(grade.id) if grade else None,
             "grade_name": grade.name if grade else None,
@@ -444,7 +448,6 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
         from_str = request.query_params.get("from")
         to_str = request.query_params.get("to")
 
-        # Teacher stats: limit to their own classes or all grades
         klass_id = request.query_params.get("klass")
         grade_id = request.query_params.get("grade")
 
@@ -502,39 +505,6 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
 # ═══════════════════════════════════════════════════════════════
 
 class TeacherStudentsViewSet(viewsets.ViewSet):
-    """
-    GET /api/v1/teacher/students/
-
-    Institution-wide student directory for teachers.
-
-    Query params:
-      class_course / class_id / klass -- filter to a ClassCourse UUID
-      grade                            -- filter by Grade UUID
-      scope                            -- "mine" | "all" (default "all")
-      q                                -- search email / first / last name
-
-    Response:
-      {
-        "count": N,
-        "grades": [{id, name}, ...],
-        "results": [
-          {
-            "id": <student_uuid>,
-            "enrollment_id": <enrollment_uuid>,
-            "full_name": "...",
-            "email": "...",
-            "roll_number": "",
-            "class_id": <class_uuid or null>,
-            "class_name": "...",
-            "class_teacher_id": <teacher_uuid or null>,
-            "class_teacher_name": "...",
-            "attendance_pct": <float 0-100>
-          }, ...
-        ]
-      }
-
-    Cross-teacher read is allowed within the same institution.
-    """
     permission_classes = [IsTeacherOnly]
 
     def list(self, request):
@@ -554,8 +524,6 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
         grade_id = request.query_params.get("grade")
         scope = (request.query_params.get("scope") or "all").lower()
         q_str = (request.query_params.get("q") or "").strip()
-        
-        
 
         enroll_qs = (
             StudentEnrollment.objects
@@ -569,17 +537,9 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
             )
         )
 
-        # Institution scope
-        if False:  # DISABLED
-            enroll_qs = enroll_qs.filter(
-                class_course__institution_id=user.institution_id
-            )
-
-        # Optional scope=mine
         if scope == "mine":
             enroll_qs = enroll_qs.filter(class_course__teacher=user)
 
-        # Filters
         if class_course_id:
             enroll_qs = enroll_qs.filter(class_course_id=class_course_id)
         if grade_id:
@@ -591,7 +551,6 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
                 | Q(student__email__icontains=q_str)
             )
 
-        # Pre-fetch attendance: (student_id, class_id) -> {total, present}
         attendance_map = {}
         student_ids = list({str(e.student_id) for e in enroll_qs})
         class_ids = list({
@@ -615,7 +574,6 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
                     counts[key]["present"] += 1
             attendance_map = dict(counts)
 
-        # Prefetch student PINs (login codes) for this page of students
         from accounts.models import StudentCredentials
         pin_map = {}
         pin_active_map = {}
@@ -633,7 +591,6 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
             enroll_qs = enroll_qs.filter(section_id=section_id)
         
 
-        # Build rows
         results = []
         seen = set()
         for e in enroll_qs:
@@ -677,10 +634,7 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
 
         results.sort(key=lambda r: r["full_name"].lower())
 
-        # Grades for filter dropdown
         grades_qs = Grade.objects.all()
-        if False:  # DISABLED
-            grades_qs = grades_qs.filter(institution_id=user.institution_id)
         grades = [
             {"id": str(g.id), "name": g.name}
             for g in grades_qs.order_by("level", "name")

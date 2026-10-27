@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageSquare, Send, Loader2, Users } from "lucide-react";
+import { MessageSquare, Send, Loader2, Users, Paperclip, Smile, Trash2 } from "lucide-react";
 
 import {
   useGetTeacherGroupThreadQuery,
@@ -8,14 +8,15 @@ import {
   useGetTeacherGroupMembersQuery,
   useSendTeacherGroupMessageMutation,
   useToggleMessageReactionMutation,
+  useDeleteChatMessageMutation, // ✅ Import delete mutation
 } from "../../../store/api/realApi";
 import useChatSocket from "../../../hooks/useChatSocket";
 import Avatar from "../../../components/ui/Avatar";
 import Badge from "../../../components/ui/Badge";
 import Drawer from "../../../components/ui/Drawer";
-import ReactionBar from "../../../components/ui/ReactionBar";
 
 const EMOJIS = ["👍", "❤️", "✅", "🎉", "👀"];
+const EMOJI_PICKER_LIST = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😊", "🙌", "💡", "✅", "📚", "✨"];
 const MAX_AVATARS_IN_STRIP = 5;
 
 function initialsOf(name) {
@@ -166,7 +167,7 @@ function MembersDrawer({ open, onClose, members, loading }) {
 export default function AdminMessagesPage() {
   const { data: thread, isLoading: threadLoading } =
     useGetTeacherGroupThreadQuery();
-  const { data: messagesData, isLoading: msgsLoading } =
+  const { data: messagesData, isLoading: msgsLoading, refetch: refetchMessages } =
     useGetTeacherGroupMessagesQuery({});
   const { data: membersData, isLoading: membersLoading } =
     useGetTeacherGroupMembersQuery();
@@ -174,11 +175,15 @@ export default function AdminMessagesPage() {
   const [sendMessage, { isLoading: sending }] =
     useSendTeacherGroupMessageMutation();
   const [toggleReaction] = useToggleMessageReactionMutation();
+  const [deleteMessage] = useDeleteChatMessageMutation(); // ✅ Hook for deletion
 
   const [draft, setDraft] = useState("");
   const [liveMessages, setLiveMessages] = useState([]);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   const serverMessages = messagesData?.results ?? [];
   const members = membersData?.results ?? [];
@@ -206,24 +211,74 @@ export default function AdminMessagesPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
+  // Click outside to close emoji picker
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   async function handleSend(e) {
     e.preventDefault();
     const body = draft.trim();
     if (!body) return;
     setDraft("");
+    setShowEmojiPicker(false);
     try {
-      await sendMessage(body).unwrap();
+      await sendMessage({ body }).unwrap();
+      refetchMessages();
     } catch (err) {
       console.error("send failed", err);
       setDraft(body);
     }
   }
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64String = event.target.result;
+      const bodyText = `![${file.name}](${base64String})`;
+
+      try {
+        await sendMessage({ body: bodyText }).unwrap();
+        refetchMessages();
+      } catch (err) {
+        console.error("Image upload failed", err);
+        alert(`Upload failed: ${JSON.stringify(err?.data)}`);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = null;
+  };
+
+  const addEmoji = (emoji) => {
+    setDraft((d) => d + emoji);
+  };
+
   async function handleReact(messageId, emoji) {
     try {
       await toggleReaction({ messageId, emoji }).unwrap();
     } catch (err) {
       console.error("reaction failed", err);
+    }
+  }
+
+  // ✅ Handle Message Deletion
+  async function handleDelete(messageId) {
+    if (!window.confirm("Delete this message? This cannot be undone.")) return;
+    try {
+      await deleteMessage(messageId).unwrap();
+      refetchMessages();
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to delete message.");
     }
   }
 
@@ -305,64 +360,87 @@ export default function AdminMessagesPage() {
           )}
 
           <ul className="flex flex-col gap-4">
-            {messages.map((m) => (
-              <li key={m.id} className="flex gap-3">
-                <Avatar
-                  userId={m.sender?.id}
-                  initials={m.sender?.initials || initialsOf(m.sender?.full_name)}
-                  size="sm"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-sm font-semibold text-navy-950">
-                      {m.sender?.full_name || m.sender?.email}
-                    </p>
-                    {m.sender?.role === "admin" && (
-                      <Badge variant="brand">Admin</Badge>
-                    )}
-                    <span className="text-[11px] text-slate-400">
-                      {fmtTime(m.created_at)}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-700">
-                    {m.body}
-                  </p>
+            {messages.map((m) => {
+              const isImage = m.body.startsWith("![") && m.body.includes("](");
+              let imgSrc = "";
+              if (isImage) {
+                imgSrc = m.body.substring(m.body.indexOf("](") + 2, m.body.length - 1);
+              }
 
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {m.reactions?.map((r) => (
-                      <button
-                        key={r.emoji}
-                        type="button"
-                        onClick={() => handleReact(m.id, r.emoji)}
-                        className={
-                          "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition " +
-                          (r.reacted_by_me
-                            ? "border-purple-300 bg-purple-50 text-purple-700"
-                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")
-                        }
-                        title={r.users.map((u) => u.full_name).join(", ")}
-                      >
-                        <span>{r.emoji}</span>
-                        <span className="font-semibold">{r.count}</span>
-                      </button>
-                    ))}
-                    {EMOJIS.filter(
-                      (e) => !m.reactions?.some((r) => r.emoji === e)
-                    ).map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => handleReact(m.id, emoji)}
-                        className="rounded-full border border-dashed border-slate-200 px-2 py-0.5 text-xs text-slate-400 opacity-60 transition hover:border-slate-300 hover:opacity-100"
-                        title={`React ${emoji}`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
+              return (
+                <li key={m.id} className="group flex gap-3 relative">
+                  <Avatar
+                    userId={m.sender?.id}
+                    initials={m.sender?.initials || initialsOf(m.sender?.full_name)}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-sm font-semibold text-navy-950">
+                        {m.sender?.full_name || m.sender?.email}
+                      </p>
+                      {m.sender?.role === "admin" && (
+                        <Badge variant="brand">Admin</Badge>
+                      )}
+                      <span className="text-[11px] text-slate-400">
+                        {fmtTime(m.created_at)}
+                      </span>
+                    </div>
+                    
+                    {isImage ? (
+                      <img src={imgSrc} alt="attachment" className="mt-1 max-w-sm rounded-xl border border-slate-200 shadow-sm" />
+                    ) : (
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-700">
+                        {m.body}
+                      </p>
+                    )}
+
+                    {/* Reactions & Delete Row */}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {m.reactions?.map((r) => (
+                        <button
+                          key={r.emoji}
+                          type="button"
+                          onClick={() => handleReact(m.id, r.emoji)}
+                          className={
+                            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition " +
+                            (r.reacted_by_me
+                              ? "border-purple-300 bg-purple-50 text-purple-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50")
+                          }
+                          title={r.users.map((u) => u.full_name).join(", ")}
+                        >
+                          <span>{r.emoji}</span>
+                          <span className="font-semibold">{r.count}</span>
+                        </button>
+                      ))}
+                      {EMOJIS.filter(
+                        (e) => !m.reactions?.some((r) => r.emoji === e)
+                      ).map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReact(m.id, emoji)}
+                          className="rounded-full border border-dashed border-slate-200 px-2 py-0.5 text-xs text-slate-400 opacity-60 transition hover:border-slate-300 hover:opacity-100"
+                          title={`React ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
+
+                  {/* ✅ DELETE BUTTON (Only visible on hover) */}
+                  <button
+                    onClick={() => handleDelete(m.id)}
+                    title="Delete message"
+                    className="absolute right-2 top-0 p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg hover:bg-rose-50"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           <div ref={bottomRef} />
         </div>
@@ -372,6 +450,12 @@ export default function AdminMessagesPage() {
           onSubmit={handleSend}
           className="flex items-center gap-2 border-t border-slate-100 px-5 py-3"
         >
+          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
+          
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-purple-600">
+            <Paperclip size={18} />
+          </button>
+
           <input
             type="text"
             value={draft}
@@ -380,16 +464,28 @@ export default function AdminMessagesPage() {
             className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 focus:bg-white"
             disabled={sending}
           />
+
+          <div className="relative" ref={emojiPickerRef}>
+            <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 text-slate-400 hover:text-purple-600">
+              <Smile size={18} />
+            </button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-12 right-0 z-10 flex w-64 flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                {EMOJI_PICKER_LIST.map((emoji) => (
+                  <button key={emoji} type="button" onClick={() => addEmoji(emoji)} className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100">
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={sending || !draft.trim()}
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500 text-white transition hover:bg-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {sending ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
+            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>
         </form>
       </div>

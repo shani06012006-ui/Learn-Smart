@@ -50,6 +50,7 @@ router.register(
     AdminTeacherLeaveViewSet,
     basename="admin-teacher-leave",
 )
+router.register(r"admin/live-classes", AdminLiveClassViewSet, basename="admin-live-classes")
 
 urlpatterns = [
     path("", include(router.urls)),

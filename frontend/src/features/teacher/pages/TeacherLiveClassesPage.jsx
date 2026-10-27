@@ -10,10 +10,12 @@ import {
   Video,
   Users,
   Play,
+  Plus, // ✅ Added Plus icon for the button
 } from "lucide-react";
 
 import { useGetStudentLiveClassesQuery } from "../../../store/api/realApi";
 import { getRoleConfig } from "../../../config/roleConfig";
+import CreateLiveClassModal from "../components/CreateLiveClassModal"; // ✅ Import the new modal
 
 function formatDateTime(iso) {
   if (!iso) return "";
@@ -50,6 +52,7 @@ function canHost(session) {
 export default function TeacherLiveClassesPage() {
   const R = getRoleConfig("teacher");
   const { data, isLoading, isError, refetch } = useGetStudentLiveClassesQuery();
+  const [isModalOpen, setIsModalOpen] = useState(false); // ✅ Modal State
 
   const sessions = useMemo(() => {
     if (!data) return [];
@@ -94,13 +97,22 @@ export default function TeacherLiveClassesPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <header>
-        <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-          Live Classes
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Host your scheduled sessions and interact with your students.
-        </p>
+      {/* ✅ Header with Create Button */}
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
+            Live Classes
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Host your scheduled sessions and interact with your students.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-purple-500/30 transition hover:-translate-y-0.5 hover:bg-purple-700"
+        >
+          <Plus size={16} /> Create Live Class
+        </button>
       </header>
 
       {isLoading && (
@@ -155,7 +167,7 @@ export default function TeacherLiveClassesPage() {
               No upcoming sessions
             </p>
             <p className="mt-0.5 text-xs text-slate-400">
-              Your schedule will reflect here once generated.
+              Click "Create Live Class" to schedule one.
             </p>
           </div>
         ) : (
@@ -180,6 +192,12 @@ export default function TeacherLiveClassesPage() {
           </div>
         </section>
       )}
+
+      {/* ✅ Render Modal */}
+      <CreateLiveClassModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </div>
   );
 }

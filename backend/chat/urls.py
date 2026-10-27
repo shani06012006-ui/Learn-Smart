@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    MessageDeleteView, 
     MessageReactionView,
     TeacherGroupMembersView,
     TeacherGroupMessagesView,
@@ -50,4 +51,5 @@ urlpatterns = [
         name="thread-available-members",
     ),
     path("threads/<uuid:thread_id>/", ThreadDeleteView.as_view(), name="thread-delete"), 
+    path("messages/<uuid:msg_id>/",MessageDeleteView.as_view(),name="message-delete" ),
 ]

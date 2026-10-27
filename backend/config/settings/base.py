@@ -261,3 +261,6 @@ CACHES = {
 # ---------------------------------------------------------------- live classes
 
 LIVE_CLASS_HORIZON_WEEKS = 4
+# Allow large base64 images
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024 
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  

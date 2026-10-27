@@ -66,15 +66,11 @@ class ClassCourse(SoftDeleteModel, TimeStampedModel):
         return f"{self.name} ({self.teacher.get_full_name()})"
 
 class ClassSection(TimeStampedModel):
-    """
-    A section within a Grade — e.g. "5-A", "5-B", "5-C".
-    Students can be tagged with a section for filtering.
-    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     grade = models.ForeignKey(
         "institutions.Grade",
         on_delete=models.CASCADE,
-        related_name="sections",
+        related_name="sections", # ✅ This is what makes grade.sections work
     )
     name = models.CharField(max_length=50, help_text="Short label — e.g. 'A', 'B', '5-A'.")
     capacity = models.PositiveIntegerField(default=40)
@@ -271,12 +267,11 @@ class TimetableEntry(TimeStampedModel):
     )
 
     section = models.ForeignKey(
-        "ClassSection",
-        on_delete=models.CASCADE,
+        "classes.ClassSection",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="timetable_entries",
-        help_text="Which section of the grade this period belongs to.",
     )
     period_number = models.PositiveIntegerField(
         default=1,
@@ -345,7 +340,9 @@ class LiveClass(TimeStampedModel):
         TimetableEntry,
         on_delete=models.CASCADE,
         related_name="live_classes",
-        help_text="Recurring slot this session was materialized from.",
+        null=True,
+        blank=True,
+        help_text="Recurring slot this session was materialized from (optional).",
     )
     class_course = models.ForeignKey(
         ClassCourse,

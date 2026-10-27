@@ -1,14 +1,11 @@
 from rest_framework import permissions, viewsets
-
 from .models import Institution
 from .serializers import InstitutionSerializer, GradeSerializer
 
 
 class InstitutionViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Read-only for now — any authenticated user can look up institution
-    names (e.g. to show on a profile page). Full CRUD + admin-only write
-    permissions land with Module J (Institution Management).
+    Read-only for now — any authenticated user can look up institution names.
     """
     queryset = Institution.objects.all()
     serializer_class = InstitutionSerializer
@@ -18,10 +15,6 @@ class InstitutionViewSet(viewsets.ReadOnlyModelViewSet):
 class GradeViewSet(viewsets.ModelViewSet):
     """
     CRUD for institution grades (with nested sections).
-
-    - List/retrieve: any authenticated user in the institution
-    - Create/update/delete: institution admin only
-    - All operations are institution-scoped (superusers see everything)
     """
     serializer_class = GradeSerializer
 
@@ -34,14 +27,18 @@ class GradeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         from .models import Grade
         user = self.request.user
-        qs = Grade.objects.all().select_related("institution").prefetch_related("sections")
-        if not user.is_superuser:
+        
+        # ✅ Use distinct() to prevent duplicate grades
+        qs = Grade.objects.all().distinct().select_related("institution").prefetch_related("sections")
+        
+        if not user.is_superuser and getattr(user, "institution_id", None):
             qs = qs.filter(institution_id=user.institution_id)
+            
         return qs.order_by("level")
 
     def perform_create(self, serializer):
         user = self.request.user
-        institution = user.institution
+        institution = getattr(user, "institution", None)
         if institution is None:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Your account has no institution.")

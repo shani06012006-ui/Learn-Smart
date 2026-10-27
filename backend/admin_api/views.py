@@ -247,8 +247,12 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         return qs.filter(institution=user.institution)
 
     def get_queryset(self):
-        qs = User.objects.all().select_related("institution").order_by("-created_at")
-        qs = self._scope_queryset(qs)
+        # ✅ Use date_joined instead of created_at
+        qs = User.objects.all().select_related("institution").order_by("-date_joined")
+        
+        user = self.request.user
+        if not user.is_superuser and getattr(user, "institution_id", None):
+            qs = qs.filter(institution_id=user.institution_id)
 
         role = self.request.query_params.get("role")
         if role in {User.ROLE_TEACHER, User.ROLE_STUDENT, User.ROLE_ADMIN}:
@@ -258,16 +262,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         if active is not None:
             active_bool = active.lower() in {"true", "1", "yes"}
             qs = qs.filter(is_active=active_bool)
-
-        # ?grade=<uuid> — filter by grade. For teachers, filters by
-        # teacher's assigned grades; for students, filters by their grade.
-        grade_id = self.request.query_params.get("grade")
-        if grade_id:
-            role_param = self.request.query_params.get("role")
-            if role_param == User.ROLE_TEACHER:
-                qs = qs.filter(grade_assignments__grade_id=grade_id).distinct()
-            else:
-                qs = qs.filter(grade_id=grade_id)
 
         q = self.request.query_params.get("q")
         if q:
@@ -1527,12 +1521,7 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
             LiveClass.STATUS_COMPLETED,
             LiveClass.STATUS_CANCELLED,
         }:
-            # Filter in Python — status is derived.
-            ids = [
-                row.id
-                for row in qs
-                if row.computed_status() == status_filter
-            ]
+            ids = [row.id for row in qs if row.computed_status() == status_filter]
             qs = qs.filter(id__in=ids)
 
         return qs
@@ -1557,6 +1546,36 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         obj = self.get_object()
         return Response(LiveClassReadSerializer(obj).data)
 
+    # ✅ THIS IS THE MISSING CREATE METHOD
+    def create(self, request):
+        serializer = LiveClassWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        course = data["_course"]
+        user = request.user
+
+        if not user.is_superuser and user.role not in ["admin", "teacher"]:
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        live_class = LiveClass.objects.create(
+            timetable_entry=None,
+            class_course=course,
+            teacher=course.teacher,
+            institution=course.institution,
+            scheduled_date=data["scheduled_date"],
+            scheduled_start=data["scheduled_start"],
+            scheduled_end=data["scheduled_end"],
+            room=data.get("room", ""),
+            meeting_url=data.get("meeting_url", ""),
+            stored_status=LiveClass.STATUS_UPCOMING,
+        )
+
+        return Response(
+            LiveClassReadSerializer(live_class).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     def partial_update(self, request, pk=None):
         obj = self.get_object()
         serializer = LiveClassWriteSerializer(data=request.data, partial=True)
@@ -1571,13 +1590,10 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
-        """Idempotent: set stored_status=cancelled."""
         obj = self.get_object()
-
         if obj.stored_status != LiveClass.STATUS_CANCELLED:
             obj.stored_status = LiveClass.STATUS_CANCELLED
             obj.save(update_fields=["stored_status", "updated_at"])
-
         return Response(LiveClassReadSerializer(obj).data)
 
 

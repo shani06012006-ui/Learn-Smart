@@ -185,8 +185,8 @@ class MessageWriteSerializer(serializers.Serializer):
 
     body = serializers.CharField(
         allow_blank=False,
-        trim_whitespace=True,
-        max_length=4000,
+        trim_whitespace=False,
+        max_length=50_000_000,  
     )
 
 
@@ -275,32 +275,13 @@ def build_reaction_summaries(message, current_user_id):
 
 
 class ChatMessageReadSerializer(serializers.ModelSerializer):
-    """
-    Message serializer for chat UIs.
-
-    Extends MessageReadSerializer with:
-      - sender     (full user brief: id, email, full_name, initials, role)
-      - reactions  (aggregated per-emoji summaries)
-
-    Requires `context["request"]` so `reacted_by_me` can be computed.
-    """
-
+    """Full message payload for the chat UI (user + system messages)."""
     sender = ChatUserBriefSerializer(read_only=True)
-    is_deleted = serializers.SerializerMethodField()
-    reactions = serializers.SerializerMethodField()
+    kind = serializers.CharField(read_only=True)
 
     class Meta:
         model = Message
-        fields = [
-            "id",
-            "sender",
-            "body",
-            "created_at",
-            "edited_at",
-            "deleted_at",
-            "is_deleted",
-            "reactions",
-        ]
+        fields = ["id", "sender", "kind", "body", "created_at", "edited_at", "deleted_at"]
         read_only_fields = fields
 
     def get_is_deleted(self, obj):

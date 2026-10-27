@@ -144,7 +144,13 @@ export const realApi = createApi({
         "AdminSections",
       ],
     }),
-
+    deleteChatMessage: builder.mutation({
+      query: (messageId) => ({
+        url: `/chat/messages/${messageId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
     // ---- AI Timetable Generator ----
     generateTimetable: builder.mutation({
       query: (body) => ({ url: "/admin/timetable/generate/", method: "POST", body }),
@@ -266,6 +272,14 @@ export const realApi = createApi({
       query: () => "/live-classes/",
       providesTags: ["StudentLiveClasses"],
     }),
+    createLiveClass: builder.mutation({
+      query: (body) => ({
+        url: "/admin/live-classes/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["StudentLiveClasses", "TeacherLiveClasses"],
+    }),    
     getStudentAnnouncements: builder.query({
       query: () => "/student/announcements/",
       providesTags: ["StudentAnnouncements"],
@@ -469,6 +483,18 @@ export const realApi = createApi({
         method: "POST",
         body: { body },
       }),
+        // ---- Admin Chat ----
+    sendAdminChatMessage: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `/admin/chat/rooms/${id}/send/`,
+        method: "POST",
+        body: { body },
+      }),
+      invalidatesTags: (r, e, { id }) => [
+        { type: "AdminChat", id: `msgs-${id}` },
+        "AdminChat",
+      ],
+    }),  
       invalidatesTags: (r, e, { id }) => [
         { type: "TeacherChat", id: `msgs-${id}` },
         "TeacherChat",
@@ -1173,7 +1199,7 @@ export const realApi = createApi({
       query: (body) => ({
         url: `/chat/teacher-group/messages/`,
         method: "POST",
-        body: { body },
+        body,
       }),
       invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
     }),
@@ -1440,6 +1466,7 @@ export const {
   useGetAdminAttendanceAuditQuery,
   useUnpublishQuizMutation,
   useGetStudentLiveClassesQuery,
+  useCreateLiveClassMutation, 
   useGetStudentAnnouncementsQuery,
   useGetStudentQuizzesQuery,
   useGetQuizzesQuery,
@@ -1579,7 +1606,7 @@ export const {
   useGetMyOrdersQuery,
   useGetMyOrderQuery,
   useDeleteChatThreadMutation,
-  
+  useDeleteChatMessageMutation,
   useGetNotificationsQuery,
   useMarkAllNotificationsReadMutation, 
   useMarkSingleNotificationReadMutation,

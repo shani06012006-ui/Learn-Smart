@@ -18,6 +18,7 @@ Rules:
 """
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone  
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -252,7 +253,41 @@ class TeacherGroupMessagesView(APIView):
         except Exception:
             pass
 
+class MessageDeleteView(APIView):
+    """
+    DELETE /api/v1/chat/messages/<uuid:msg_id>/
+    Allows an admin to delete a message. Soft-deletes the message.
+    """
+    permission_classes = [IsAuthenticated]
 
+    def delete(self, request, msg_id):
+        # Only admins can delete messages
+        if getattr(request.user, "role", None) != "admin":
+            return Response(
+                {"detail": "Only admins can delete messages."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            message = Message.objects.get(pk=msg_id)
+        except Message.DoesNotExist:
+            return Response(
+                {"detail": "Message not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Institution check
+        if not request.user.is_superuser and message.thread.institution_id != request.user.institution_id:
+            return Response(
+                {"detail": "Not allowed."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        message.deleted_at = timezone.now()
+        message.save(update_fields=["deleted_at"])
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
 # ─────────────────────────────────────────────────────────
 # Members
 # ─────────────────────────────────────────────────────────

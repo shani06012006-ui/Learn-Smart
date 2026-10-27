@@ -1,13 +1,11 @@
 // frontend/src/features/teacher/pages/TeacherAttendancePage.jsx
 import { useMemo, useState } from "react";
 import {
-  Calendar as CalendarIcon, Check, X, Clock, AlertCircle,
-  Save, Eraser, GraduationCap, Lock, CheckCircle2,
+  Check, X, Clock, AlertCircle, Save, Eraser, GraduationCap, Lock, CheckCircle2,
 } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
-import ErrorState from "../../../components/feedback/ErrorState";
-import { classLabel, classShortLabel } from "../components/classLabel";
+import { classShortLabel } from "../components/classLabel";
 import {
   useGetGradesQuery,
   useGetClassesQuery,
@@ -47,21 +45,33 @@ export default function TeacherAttendancePage() {
   const { user } = useAuth();
   const [mode, setMode] = useState("class"); // "class" | "grade"
   const [gradeId, setGradeId] = useState("");
+  const [sectionId, setSectionId] = useState(""); // ✅ Section State
   const [classCourseId, setClassCourseId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [draft, setDraft] = useState({});
   const [notice, setNotice] = useState(null);
 
   const { data: gradesData } = useGetGradesQuery();
-  const grades = gradesData?.results || gradesData || [];
+  const rawGrades = gradesData?.results || gradesData || [];
+  
+  // ✅ Deduplicate grades by level to prevent duplicates
+  const grades = rawGrades.filter((v, i, a) => a.findIndex(t => t.level === v.level) === i);
+  
+  // ✅ Extract sections from the selected grade
+  const selectedGradeObj = grades.find(g => g.id === gradeId);
+  const sections = selectedGradeObj?.sections || [];
+
   const { data: classesData } = useGetClassesQuery();
   const classes = classesData?.results || classesData || [];
 
+  // The target needs to be active if we have a grade OR a class
   const target = mode === "class" ? classCourseId : gradeId;
 
+  // ✅ Pass the section to the attendance query
   const { data, isFetching, refetch } = useGetTeacherAttendanceQuery(
     {
       grade: mode === "grade" ? gradeId : undefined,
+      section: mode === "grade" ? (sectionId || undefined) : undefined, 
       klass: mode === "class" ? classCourseId : undefined,
       date,
     },
@@ -118,8 +128,12 @@ export default function TeacherAttendancePage() {
 
     try {
       const payload = { date, records };
-      if (mode === "class") payload.klass = classCourseId;
-      else payload.grade = gradeId;
+      if (mode === "class") {
+        payload.klass = classCourseId;
+      } else {
+        payload.grade = gradeId;
+        if (sectionId) payload.section = sectionId; // ✅ Pass section
+      }
 
       const res = await markAttendance(payload).unwrap();
       setDraft({});
@@ -189,21 +203,43 @@ export default function TeacherAttendancePage() {
               </select>
             </div>
           ) : (
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Grade
-              </label>
-              <select
-                value={gradeId}
-                onChange={(e) => { setGradeId(e.target.value); setDraft({}); }}
-                className="h-10 min-w-[240px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
-              >
-                <option value="">— Select grade —</option>
-                {grades.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </div>
+            <>
+              {/* Grade Selector */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Grade
+                </label>
+                <select
+                  value={gradeId}
+                  onChange={(e) => { setGradeId(e.target.value); setSectionId(""); setDraft({}); }}
+                  className="h-10 min-w-[200px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
+                >
+                  <option value="">— Select grade —</option>
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ✅ NEW: Section Selector (Only appears when a grade is selected) */}
+              {gradeId && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Section
+                  </label>
+                  <select
+                    value={sectionId}
+                    onChange={(e) => { setSectionId(e.target.value); setDraft({}); }}
+                    className="h-10 min-w-[150px] rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 outline-none focus:border-purple-400"
+                  >
+                    <option value="">— All Sections —</option>
+                    {sections.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </>
           )}
 
           <div className="flex flex-col gap-1">
@@ -313,7 +349,7 @@ export default function TeacherAttendancePage() {
 
       {!isFetching && target && merged.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400">
-          No students enrolled in this class yet.
+          No students enrolled in this selection yet.
         </div>
       )}
 

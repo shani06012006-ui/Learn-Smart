@@ -67,7 +67,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "is_superuser",
-            "created_at",
+            "date_joined",
             "updated_at",
             "grade_ids",
             "grade_names",
@@ -586,7 +586,7 @@ class StudentAttendanceSerializer(serializers.ModelSerializer):
 class TimetableEntryReadSerializer(serializers.ModelSerializer):
     teacher = AdminCourseTeacherBriefSerializer(read_only=True)
     class_course = AdminEnrollmentClassBriefSerializer(read_only=True)
-    section_name = serializers.SerializerMethodField()
+    section_name = serializers.CharField(source="section.name", read_only=True)
     day_label = serializers.SerializerMethodField()
 
     class Meta:
@@ -606,6 +606,7 @@ class TimetableEntryReadSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
             "updated_at",
+            "section", "section_name"
         ]
         read_only_fields = fields
 
@@ -771,21 +772,25 @@ class LiveClassReadSerializer(serializers.ModelSerializer):
 
 
 class LiveClassWriteSerializer(serializers.Serializer):
-    """
-    Update payload for live-class rows.
+    class_course_id = serializers.UUIDField(required=True)
+    scheduled_date = serializers.DateField(required=True)
+    scheduled_start = serializers.DateTimeField(required=True)
+    scheduled_end = serializers.DateTimeField(required=True)
+    room = serializers.CharField(max_length=100, allow_blank=True, required=False, default="")
+    meeting_url = serializers.URLField(allow_blank=True, required=False, default="")
 
-    Admin can change room / meeting_url / recording_url. Cancellation is
-    a one-way status flip â€” only `cancelled` is accepted here.
-    """
+    def validate(self, attrs):
+        if attrs["scheduled_end"] <= attrs["scheduled_start"]:
+            raise serializers.ValidationError({"scheduled_end": "End time must be after start time."})
 
-    room = serializers.CharField(max_length=100, allow_blank=True, required=False)
-    meeting_url = serializers.URLField(allow_blank=True, required=False)
-    recording_url = serializers.URLField(allow_blank=True, required=False)
-    stored_status = serializers.ChoiceField(
-        choices=[LiveClass.STATUS_CANCELLED],
-        required=False,
-    )                
-    
+        from classes.models import ClassCourse
+        try:
+            course = ClassCourse.objects.get(id=attrs["class_course_id"])
+        except ClassCourse.DoesNotExist:
+            raise serializers.ValidationError({"class_course_id": "Class not found."})
+
+        attrs["_course"] = course
+        return attrs
 
 
 # ---------------------------------------------------------------- leaves
