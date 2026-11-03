@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, Outlet } from "react-router-dom";
 
 // Auth
 import LoginPage from "./features/auth/LoginPage";
@@ -20,6 +20,8 @@ import StudentAnnouncementsPage from "./features/student/pages/StudentAnnounceme
 import StudentQuizzesPage from "./features/student/pages/StudentQuizzesPage";
 import StudentTakeQuizPage from "./features/student/pages/StudentTakeQuizPage";
 import StudentQuizResultPage from "./features/student/pages/StudentQuizResultPage";
+import SetupPasswordPage from "./features/auth/SetupPasswordPage";
+import { useAuth } from "./hooks/useAuth";
 
 // Admin
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
@@ -63,6 +65,15 @@ import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesP
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 
+// ✅ Inline Route Guard: Forces password setup if `must_set_password` is true
+function RequirePasswordSetup() {
+  const { user } = useAuth();
+  if (user && user.must_set_password) {
+    return <Navigate to="/auth/setup-password?force=true" replace />;
+  }
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -71,26 +82,29 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      {/* Student account activation: the one-time link e-mailed/WhatsApped after an admin creates a student */}
       <Route path="/activate" element={<ActivateAccountPage />} />
+      <Route path="/auth/setup-password" element={<SetupPasswordPage />} />
 
       {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["student"]} />}>
-          <Route path="/student" element={<StudentLayout />}>
-            <Route index element={<StudentProgressPage />} />
-            <Route path="progress" element={<StudentProgressPage />} />
-            <Route path="classes" element={<StudentMyClassesPage />} />
-            <Route path="performance" element={<StudentPerformancePage />} />
-            <Route path="timetable" element={<StudentTimetablePage />} />
-            <Route path="join-class" element={<StudentJoinClassPage />} />
-            <Route path="materials" element={<StudentMaterialsPage />} />
-            <Route path="announcements" element={<StudentAnnouncementsPage />} />
-            <Route path="live-classes" element={<StudentLiveClassesPage />} />
-            <Route path="chat" element={<StudentChatPage />} />
-            <Route path="quizzes" element={<StudentQuizzesPage />} />
-            <Route path="quizzes/:quizId" element={<StudentTakeQuizPage />} />
-            <Route path="quiz-attempts/:attemptId" element={<StudentQuizResultPage />} />
+          {/* ✅ The guard wraps the entire student layout */}
+          <Route element={<RequirePasswordSetup />}>
+            <Route path="/student" element={<StudentLayout />}>
+              <Route index element={<StudentProgressPage />} />
+              <Route path="progress" element={<StudentProgressPage />} />
+              <Route path="classes" element={<StudentMyClassesPage />} />
+              <Route path="performance" element={<StudentPerformancePage />} />
+              <Route path="timetable" element={<StudentTimetablePage />} />
+              <Route path="join-class" element={<StudentJoinClassPage />} />
+              <Route path="materials" element={<StudentMaterialsPage />} />
+              <Route path="announcements" element={<StudentAnnouncementsPage />} />
+              <Route path="live-classes" element={<StudentLiveClassesPage />} />
+              <Route path="chat" element={<StudentChatPage />} />
+              <Route path="quizzes" element={<StudentQuizzesPage />} />
+              <Route path="quizzes/:quizId" element={<StudentTakeQuizPage />} />
+              <Route path="quiz-attempts/:attemptId" element={<StudentQuizResultPage />} />
+            </Route>
           </Route>
         </Route>
       </Route>

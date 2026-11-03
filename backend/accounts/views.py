@@ -560,37 +560,30 @@ class SetupPasswordView(APIView):
     authentication_classes = []
 
     def post(self, request):
-        uidb64 = request.data.get("uid")
         token = request.data.get("token")
         new_password = request.data.get("new_password")
         confirm_password = request.data.get("confirm_password")
 
-        if not all([uidb64, token, new_password, confirm_password]):
+        if not all([token, new_password, confirm_password]):
             return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
 
         if new_password != confirm_password:
             return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            uid = force_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(pk=uid)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-            return Response({"error": "Invalid activation link."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if not default_token_generator.check_token(user, token):
-            return Response({"error": "Token is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            validate_password(new_password, user=user)
-        except DjangoValidationError as e:
-            return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
-
-        user.set_password(new_password)
-        user.must_set_password = False
-        user.is_active = True
-        user.save()
-
-        return Response({"message": "Password set successfully. You can now log in."}, status=status.HTTP_200_OK)
+            # ✅ Use the correct custom activation logic
+            from .activation import complete_activation
+            user = complete_activation(token, new_password)
+            
+            return Response(
+                {"message": "Password set successfully. You can now log in."},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            from .activation import ActivationError
+            if isinstance(e, ActivationError):
+                return Response({"error": e.detail}, status=e.http_status)
+            return Response({"error": "An unexpected error occurred."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AdminCreateStudentView(APIView):
