@@ -1,6 +1,14 @@
 // frontend/src/features/admin/components/ActivationInviteResult.jsx
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Info } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Info,
+  KeyRound,
+} from "lucide-react";
 
 function formatExpiry(iso) {
   if (!iso) return "";
@@ -21,48 +29,81 @@ function StatusRow({ tone, icon: Icon, children }) {
     info: "border-slate-200 bg-slate-50 text-slate-600",
   };
   return (
-    <div className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${tones[tone]}`}>
+    <div
+      className={`flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm ${tones[tone]}`}
+    >
       <Icon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }
 
-/*
-  Shown right after an admin creates a student (or resends a link).
-  `invitation` is the object the backend returns — the ONLY time the link is visible.
-*/
 export default function ActivationInviteResult({ email, invitation }) {
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(null);
   const inputRef = useRef(null);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const copy = async () => {
+  const copy = async (text, key) => {
     try {
-      await navigator.clipboard.writeText(invitation.activation_url);
-      setCopied(true);
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
       clearTimeout(timer.current);
-      timer.current = setTimeout(() => setCopied(false), 2000);
+      timer.current = setTimeout(() => setCopied(null), 2000);
     } catch {
-      // Clipboard API unavailable (e.g. insecure origin): select the text so Ctrl+C works.
       inputRef.current?.select();
     }
   };
 
   const expires = formatExpiry(invitation.expires_at);
+  const pin = invitation.student_pin;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 text-sm font-semibold text-navy-950">
         <CheckCircle2 size={18} className="text-emerald-600" aria-hidden="true" />
-        The activation link is ready
+        Student account created
       </div>
 
+      {/* PIN CARD — new */}
+      {pin && (
+        <div className="rounded-2xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100 p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <KeyRound size={18} className="text-purple-700" />
+            <p className="text-xs font-bold uppercase tracking-wider text-purple-700">
+              Student Login PIN
+            </p>
+          </div>
+          <p className="font-mono text-4xl font-extrabold tracking-[0.4em] text-purple-900 text-center my-3">
+            {pin}
+          </p>
+          <p className="text-xs text-purple-700 text-center">
+            Share this 6-digit code with the student. They'll use it at{" "}
+            <span className="font-mono font-bold">/student-login</span>.
+          </p>
+          <button
+            type="button"
+            onClick={() => copy(pin, "pin")}
+            className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-bold text-white hover:bg-purple-700"
+          >
+            {copied === "pin" ? (
+              <>
+                <Check size={14} /> Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={14} /> Copy PIN
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Status rows */}
       <div className="flex flex-col gap-2">
         {invitation.email_sent ? (
           <StatusRow tone="ok" icon={Check}>
-            E-mail sent to <strong className="break-all">{email}</strong>.
+            Invitation email sent to <strong className="break-all">{email}</strong>.
           </StatusRow>
         ) : invitation.email_error ? (
           <StatusRow tone="warn" icon={AlertTriangle}>
@@ -77,8 +118,9 @@ export default function ActivationInviteResult({ email, invitation }) {
         {invitation.whatsapp_url && (
           <StatusRow tone="info" icon={Info}>
             <p>
-              WhatsApp message to <strong>{invitation.whatsapp_to}</strong> is ready. Check that this is
-              the right number, then press <em>Send</em> in WhatsApp.
+              WhatsApp message to <strong>{invitation.whatsapp_to}</strong> is
+              ready. Check that this is the right number, then press{" "}
+              <em>Send</em> in WhatsApp.
             </p>
             <a
               href={invitation.whatsapp_url}
@@ -93,9 +135,13 @@ export default function ActivationInviteResult({ email, invitation }) {
         )}
       </div>
 
+      {/* Activation link */}
       <div>
-        <label htmlFor="activation-link" className="block text-xs font-bold text-slate-700">
-          One-time activation link
+        <label
+          htmlFor="activation-link"
+          className="block text-xs font-bold text-slate-700"
+        >
+          One-time activation link (for password setup)
         </label>
         <div className="mt-1.5 flex gap-2">
           <input
@@ -108,16 +154,21 @@ export default function ActivationInviteResult({ email, invitation }) {
           />
           <button
             type="button"
-            onClick={copy}
+            onClick={() => copy(invitation.activation_url, "url")}
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-            {copied ? "Copied" : "Copy"}
+            {copied === "url" ? (
+              <Check size={14} className="text-emerald-600" />
+            ) : (
+              <Copy size={14} />
+            )}
+            {copied === "url" ? "Copied" : "Copy"}
           </button>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
-          Valid for {invitation.expires_in_hours} hours{expires ? ` (until ${expires})` : ""} and works
-          once. This is the only time the link is shown. If it is lost, use{" "}
+          Valid for {invitation.expires_in_hours} hours
+          {expires ? ` (until ${expires})` : ""} and works once. This is the
+          only time the link is shown. If it is lost, use{" "}
           <em>Resend activation link</em> on the student&apos;s page.
         </p>
       </div>

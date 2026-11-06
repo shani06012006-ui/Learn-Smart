@@ -1,5 +1,6 @@
 import logging
-
+import secrets
+from .models import StudentCredentials
 from django.db import transaction
 from django.utils import timezone
 
@@ -166,28 +167,15 @@ def touch_student_attendance(student_id) -> None:
 
 
 def generate_student_pin(student):
-    """
-    Create or rotate a unique 6-digit PIN for the given student.
-    Returns the StudentCredentials instance.
-    """
-    import secrets
-    from .models import StudentCredentials
-
     for _ in range(50):
         pin = "".join(str(secrets.randbelow(10)) for _ in range(6))
         if not StudentCredentials.objects.filter(pin=pin).exists():
             break
     else:
         raise RuntimeError("Could not generate a unique PIN after 50 tries.")
-
     creds, _ = StudentCredentials.objects.update_or_create(
         student=student,
-        defaults={
-            "pin": pin,
-            "is_active": True,
-            "failed_attempts": 0,
-            "locked_until": None,
-        },
+        defaults={"pin": pin, "is_active": True, "failed_attempts": 0, "locked_until": None},
     )
     return creds
 

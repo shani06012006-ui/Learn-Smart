@@ -345,11 +345,6 @@ export default function TeacherChatPage() {
           )}
         </div>
         
-        <div className="p-4 shrink-0">
-          <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/30 transition hover:-translate-y-0.5 hover:bg-purple-700">
-            <Plus size={16} /> New Message
-          </button>
-        </div>
       </aside>
 
       {/* 2. Active Chat */}
@@ -372,8 +367,8 @@ export default function TeacherChatPage() {
               </div>
             </div>
             <div className="flex items-center gap-1 md:gap-2">
-              <button onClick={() => startCall("audio")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><Phone size={18} /></button>
-              <button onClick={() => startCall("video")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"><Video size={18} /></button>
+              {/* <button onClick={() => startCall("audio")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><Phone size={18} /></button> */}
+              {/* <button onClick={() => startCall("video")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"><Video size={18} /></button> */}
               <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><MoreVertical size={18} /></button>
             </div>
           </header>

@@ -620,3 +620,78 @@ class AdminCreateStudentView(APIView):
             "uid": uidb64,
             "token": token
         }, status=status.HTTP_201_CREATED)
+        
+class StudentPinLoginView(APIView):
+    """
+    POST /api/v1/auth/student-login/   body: { pin: "123456" }
+    Logs in a student using their 6-digit PIN.
+    Returns the same { access, refresh, user } shape as LoginView.
+    """
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        from .models import StudentCredentials
+        
+        pin = (request.data.get("pin") or "").strip()
+
+        if not pin or len(pin) != 6 or not pin.isdigit():
+            return Response(
+                {"error": {"detail": "Enter your 6-digit code.", "code": "invalid_pin"}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            creds = StudentCredentials.objects.select_related("student").get(
+                pin=pin, is_active=True
+            )
+        except StudentCredentials.DoesNotExist:
+            return Response(
+                {"error": {"detail": "That code didn't work. Try again.", "code": "invalid_pin"}},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if creds.is_locked():
+            return Response(
+                {"error": {"detail": "Too many attempts. Try again in 15 minutes.", "code": "locked"}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user = creds.student
+
+        if not user.is_active:
+            return Response(
+                {"error": {"detail": "This account has been deactivated.", "code": "inactive"}},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if user.must_set_password:
+            return Response(
+                {
+                    "error": {
+                        "detail": "Please set your password first with the activation link we sent you.",
+                        "code": "password_setup_required",
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
+        creds.register_success()
+
+        raw_refresh, _row = issue_refresh_token(
+            user,
+            ip_address=_client_ip(request),
+            user_agent=_user_agent(request),
+        )
+        access = issue_access_token(user)
+
+        return Response(
+            {
+                "access": access,
+                "refresh": raw_refresh,
+                "user": UserSerializer(user).data,
+            },
+            status=status.HTTP_200_OK,
+        )        

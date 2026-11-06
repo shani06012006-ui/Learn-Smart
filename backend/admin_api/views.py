@@ -333,12 +333,22 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         data = AdminUserSerializer(new_user).data
 
         if is_student:
+            from accounts.services import generate_student_pin
+            try:
+                creds = generate_student_pin(new_user)
+                pin_value = creds.pin
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception("PIN generation failed: %s", e)
+                pin_value = None
+
             data["invitation"] = invite_student(
                 new_user,
                 issued_by=request.user,
                 send_email=serializer.validated_data["send_email"],
                 whatsapp_number=serializer.validated_data["whatsapp_number"],
             )
+            data["student_pin"] = pin_value
 
         return Response(data, status=status.HTTP_201_CREATED)
 

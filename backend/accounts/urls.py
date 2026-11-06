@@ -21,9 +21,11 @@ from .views import (
     WsTicketView,
     RequestOTPView,
     VerifyOTPView,
-    SetupPasswordView,        # <-- ADDED
-    AdminCreateStudentView,   # <-- ADDED
+    SetupPasswordView, 
+    AdminCreateStudentView,
+    StudentPinLoginView ,
 )
+
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),
@@ -43,7 +45,7 @@ urlpatterns = [
     path("activation/complete/", ActivationCompleteView.as_view(), name="auth-activation-complete"),
     path("activation/request/", ActivationRequestView.as_view(), name="auth-activation-request"),
     
-    # ✅ NEW: Secure Setup Routes
     path("setup-password/", SetupPasswordView.as_view(), name="auth-setup-password"),
+    path("student-login/", StudentPinLoginView.as_view(), name="auth-student-login"),
     path("admin/create-student/", AdminCreateStudentView.as_view(), name="admin-create-student"),
 ]

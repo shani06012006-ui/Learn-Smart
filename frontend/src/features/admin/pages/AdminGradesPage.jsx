@@ -9,6 +9,7 @@ import {
   BookOpen,
   ChevronDown,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
@@ -26,6 +27,7 @@ import {
   useGetAdminSectionsQuery,
   useCreateAdminSectionMutation,
   useDeleteAdminSectionMutation,
+  useGetSectionStudentsQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -48,6 +50,64 @@ function cleanSectionName(rawName, gradeName) {
     }
   }
   return n || rawName;
+}
+
+
+/* ── Add-section mini modal ────────────────────────────── */
+function ViewStudentsModal({ open, onClose, section }) {
+  const { data, isLoading } = useGetSectionStudentsQuery(section?.id, {
+    skip: !open || !section?.id,
+  });
+
+  const students = data?.assigned ?? [];
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Students in ${section?.name}`}
+      footer={
+        <Button variant="ghost" onClick={onClose}>
+          Close
+        </Button>
+      }
+    >
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+        </div>
+      ) : students.length === 0 ? (
+        <div className="py-8 text-center text-sm text-slate-500">
+          No students assigned to this section yet.
+        </div>
+      ) : (
+        <div className="max-h-[60vh] overflow-y-auto pr-2">
+          <ul className="divide-y divide-slate-100">
+            {students.map((s) => (
+              <li key={s.enrollment_id} className="flex items-center gap-3 py-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-[10px] font-bold text-purple-700">
+                  {(s.full_name || s.email || "?")
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-navy-950">
+                    {s.full_name}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {s.email}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 
@@ -277,7 +337,7 @@ function GradeFormModal({ open, onClose, grade }) {
 
 
 /* ── Section Row (nested inside expanded grade) ────────── */
-function SectionRow({ section, grade, onEdit, onManage, onDelete }) {
+function SectionRow({ section, grade, onEdit, onManage, onDelete, onViewStudents }) {
   const displayName = cleanSectionName(section.name, grade.name);
 
   return (
@@ -289,9 +349,15 @@ function SectionRow({ section, grade, onEdit, onManage, onDelete }) {
         </span>
 
         {/* Middle: metadata */}
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+        <div
+          className="group flex min-w-0 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 transition hover:text-purple-600"
+          onClick={() => onViewStudents(section)}
+          title="Click to view students"
+        >
           <span className="whitespace-nowrap">
-            <strong className="text-navy-950">{section.student_count ?? 0}</strong>{" "}
+            <strong className="text-navy-950 transition-colors group-hover:text-purple-700">
+              {section.student_count ?? 0}
+            </strong>{" "}
             student{(section.student_count ?? 0) === 1 ? "" : "s"}
           </span>
           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -307,6 +373,14 @@ function SectionRow({ section, grade, onEdit, onManage, onDelete }) {
 
       {/* Right: actions */}
       <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onViewStudents(section)}
+          className="rounded-md p-1.5 text-slate-400 transition hover:bg-purple-50 hover:text-purple-600"
+          title="Quick view students"
+        >
+          <Eye size={14} />
+        </button>
         <button
           type="button"
           onClick={() => onEdit(section)}
@@ -341,6 +415,7 @@ export default function AdminGradesPage() {
   const [editing, setEditing] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [addSectionFor, setAddSectionFor] = useState(null);
+  const [viewStudentsFor, setViewStudentsFor] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
 
   const navigate = useNavigate();
@@ -576,6 +651,7 @@ export default function AdminGradesPage() {
                                 navigate(`/admin/grades/${g.id}/sections/${sec.id}`)
                               }
                               onDelete={(sec) => promptDeleteSection(sec, g)}
+                              onViewStudents={(sec) => setViewStudentsFor(sec)}
                             />
                           ))}
                         </ul>
@@ -609,6 +685,12 @@ export default function AdminGradesPage() {
         onClose={() => setAddSectionFor(null)}
         grade={addSectionFor}
         onCreated={() => refetchSections()}
+      />
+
+      <ViewStudentsModal
+        open={!!viewStudentsFor}
+        onClose={() => setViewStudentsFor(null)}
+        section={viewStudentsFor}
       />
 
       <ConfirmDialog
