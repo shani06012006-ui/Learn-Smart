@@ -269,7 +269,14 @@ export const realApi = createApi({
       providesTags: ["StudentQuizzes"],
     }),
     getStudentLiveClasses: builder.query({
-      query: () => "/live-classes/",
+      query: (params = {}) => {
+        const s = new URLSearchParams();
+        if (params.class_id) s.set("class_id", params.class_id);
+        if (params.from) s.set("from", params.from);
+        if (params.to) s.set("to", params.to);
+        const qs = s.toString();
+        return qs ? `/live-classes/?${qs}` : "/live-classes/";
+      },
       providesTags: ["StudentLiveClasses"],
     }),
     createLiveClass: builder.mutation({

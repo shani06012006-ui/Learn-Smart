@@ -13,6 +13,7 @@ import ClassFiltersBar from "../components/ClassFiltersBar";
 import ClassRosterModal from "../components/ClassRosterModal";
 import {
   useGetClassesQuery,
+  useGetTimetableQuery,
   useUpdateClassMutation,
   useDeleteClassMutation,
 } from "../../../store/api/realApi";
@@ -40,7 +41,30 @@ export default function TeacherClassesPage() {
   const [updateClass, { isLoading: updating }] = useUpdateClassMutation();
   const [deleteClass, { isLoading: deleting }] = useDeleteClassMutation();
 
+  // One bulk call for the whole timetable; grouped by class below so every
+  // card can show its weekly slots without an N+1 request per class.
+  const { data: timetableData } = useGetTimetableQuery({ mine: 1 });
+
   const classes = classesData?.results ?? classesData ?? [];
+
+  const scheduleByClass = useMemo(() => {
+    const entries = timetableData?.results ?? timetableData ?? [];
+    const map = new Map();
+    for (const e of entries) {
+      const cid = e.class_course?.id;
+      if (!cid) continue;
+      if (!map.has(cid)) map.set(cid, []);
+      map.get(cid).push(e);
+    }
+    for (const list of map.values()) {
+      list.sort(
+        (a, b) =>
+          (a.day_of_week ?? 0) - (b.day_of_week ?? 0) ||
+          String(a.start_time || "").localeCompare(String(b.start_time || "")),
+      );
+    }
+    return map;
+  }, [timetableData]);
 
   // ---------------- Derived filter options ----------------
   const gradeOptions = useMemo(() => {
@@ -265,6 +289,7 @@ export default function TeacherClassesPage() {
                   <ClassCard
                     key={c.id}
                     klass={c}
+                    schedule={scheduleByClass.get(c.id) || []}
                     onEdit={handleEdit}
                     onArchiveToggle={handleArchiveToggle}
                     onDelete={promptDelete}
@@ -290,6 +315,7 @@ export default function TeacherClassesPage() {
                   <ClassCard
                     key={c.id}
                     klass={c}
+                    schedule={scheduleByClass.get(c.id) || []}
                     onEdit={handleEdit}
                     onArchiveToggle={handleArchiveToggle}
                     onDelete={promptDelete}

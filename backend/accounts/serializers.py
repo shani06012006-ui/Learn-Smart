@@ -32,6 +32,9 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+    initials = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
@@ -39,9 +42,21 @@ class UserPublicSerializer(serializers.ModelSerializer):
             "email",
             "first_name",
             "last_name",
+            "full_name",
+            "initials",
             "role",
         ]
         read_only_fields = fields
+
+    def get_full_name(self, obj):
+        return obj.get_full_name()
+
+    def get_initials(self, obj):
+        name = obj.get_full_name() or obj.email
+        parts = [p for p in (name or "").split() if p]
+        if not parts:
+            return "?"
+        return "".join(p[0] for p in parts[:2]).upper()
 
 
 class GradeBriefForStudentSerializer(serializers.Serializer):

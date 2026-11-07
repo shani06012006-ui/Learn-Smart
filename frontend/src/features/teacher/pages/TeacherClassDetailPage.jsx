@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowRight,
   Users,
   FileText,
   Download,
   Calendar,
+  CalendarClock,
+  Clock,
   GraduationCap,
   Loader2,
   Plus,
@@ -34,6 +37,8 @@ import {
   useGetClassQuery,
   useGetClassStudentsQuery,
   useGetClassMaterialsQuery,
+  useGetTimetableQuery,
+  useGetStudentLiveClassesQuery,
   useUpdateEnrollmentStatusMutation,
   useDeleteMaterialMutation,
 } from "../../../store/api/realApi";
@@ -56,6 +61,25 @@ function fmtDate(iso) {
     day: "numeric",
   });
 }
+
+/** Handles both "09:00:00" (TimeField) and full ISO datetimes (LiveClass). */
+function fmtTime(value) {
+  if (!value) return "";
+  if (String(value).includes("T")) {
+    return new Date(value).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return String(value).slice(0, 5);
+}
+
+const SESSION_TONE = {
+  upcoming: "brand",
+  live: "success",
+  completed: "neutral",
+  cancelled: "danger",
+};
 
 const STATUS_TONE = {
   active: "success",
@@ -190,12 +214,39 @@ export default function TeacherClassDetailPage() {
     { skip: tab !== "materials" },
   );
 
+  // Class time — recurring weekly slots + the dated sessions generated from them.
+  const { data: timetableData, isLoading: timetableLoading } = useGetTimetableQuery({
+    class_id: id,
+  });
+  // Stable "now" (memoised) so the query arg keeps the same identity across renders.
+  const sessionsFrom = useMemo(() => new Date().toISOString(), [id]);
+  const { data: liveClassesData, isLoading: sessionsLoading } =
+    useGetStudentLiveClassesQuery({ class_id: id, from: sessionsFrom });
+
   const [updateStatus, { isLoading: statusBusy }] = useUpdateEnrollmentStatusMutation();
   const [deleteMaterial, { isLoading: deleteBusy }] = useDeleteMaterialMutation();
 
   // Derived lists — safe to compute even when data isn't loaded yet
   const students = studentsData?.results ?? studentsData ?? [];
   const materials = materialsData?.results ?? materialsData ?? [];
+
+  const schedule = useMemo(() => {
+    const rows = timetableData?.results ?? timetableData ?? [];
+    return [...rows].sort(
+      (a, b) =>
+        (a.day_of_week ?? 0) - (b.day_of_week ?? 0) ||
+        String(a.start_time || "").localeCompare(String(b.start_time || "")),
+    );
+  }, [timetableData]);
+
+  const upcomingSessions = useMemo(() => {
+    const rows = liveClassesData?.results ?? liveClassesData ?? [];
+    return [...rows]
+      .sort((a, b) =>
+        String(a.scheduled_start || "").localeCompare(String(b.scheduled_start || "")),
+      )
+      .slice(0, 5);
+  }, [liveClassesData]);
 
   // useMemo hooks — MUST be before any early return
   const filteredStudents = useMemo(() => {
@@ -219,6 +270,9 @@ export default function TeacherClassDetailPage() {
     );
   }
   if (!klass) return null;
+
+  const teacherName =
+    klass.teacher?.full_name || klass.teacher?.email || "Unassigned";
 
   // Handlers
   async function handleStatusChange(enrollmentId, status) {
@@ -269,6 +323,21 @@ export default function TeacherClassDetailPage() {
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
               {klass.description || "No description provided."}
             </p>
+
+            {/* Assigned teacher */}
+            <div className="mt-4 flex items-center gap-2.5">
+              <Avatar
+                userId={klass.teacher?.id}
+                initials={klass.teacher?.initials || "?"}
+                size="sm"
+              />
+              <div className="leading-tight">
+                <p className="text-xs font-bold text-navy-950">{teacherName}</p>
+                <p className="text-[11px] text-slate-400">
+                  {klass.teacher?.role === "teacher" ? "Class teacher" : "Teacher"}
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
@@ -285,6 +354,112 @@ export default function TeacherClassDetailPage() {
             </span>
             {klass.is_archived && <Badge variant="neutral">Archived</Badge>}
           </div>
+        </div>
+      </section>
+
+      {/* Class time — weekly slots + dated sessions */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Weekly schedule */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+              Weekly schedule
+            </h2>
+            <Link
+              to="/teacher/timetable"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
+            >
+              Full timetable
+              <ArrowRight size={11} />
+            </Link>
+          </div>
+
+          {timetableLoading ? (
+            <div className="space-y-2">
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+          ) : schedule.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No timetable slots for this class yet.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {schedule.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <Clock size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-navy-950">
+                      {e.day_label || "Day"}
+                      {e.period_number ? ` · Period ${e.period_number}` : ""}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {fmtTime(e.start_time)} — {fmtTime(e.end_time)}
+                      {e.room ? ` · ${e.room}` : ""}
+                      {e.section_name ? ` · ${e.section_name}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Upcoming sessions */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+              Upcoming sessions
+            </h2>
+            <Link
+              to="/teacher/live-classes"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
+            >
+              All sessions
+              <ArrowRight size={11} />
+            </Link>
+          </div>
+
+          {sessionsLoading ? (
+            <div className="space-y-2">
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+          ) : upcomingSessions.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No upcoming sessions scheduled.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {upcomingSessions.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <CalendarClock size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-navy-950">
+                      {fmtDate(s.scheduled_date)}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {fmtTime(s.scheduled_start)} — {fmtTime(s.scheduled_end)}
+                      {s.room ? ` · ${s.room}` : ""}
+                    </p>
+                  </div>
+                  <Badge variant={SESSION_TONE[s.status] || "neutral"}>
+                    {s.status}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

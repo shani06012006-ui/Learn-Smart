@@ -2,8 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Archive, ArchiveRestore, CalendarCheck,
-  MoreVertical, Pencil, Trash2, Users,
+  ArrowRight, Archive, ArchiveRestore, CalendarCheck, Clock,
+  MoreVertical, Pencil, Trash2, User, Users,
 } from "lucide-react";
 
 function RowMenu({ items }) {
@@ -54,11 +54,23 @@ function RowMenu({ items }) {
   );
 }
 
-export default function ClassCard({ klass, onEdit, onArchiveToggle, onDelete, onViewStudents }) {
+/** "Monday" -> "Mon"; tolerates missing labels. */
+function shortDay(label) {
+  return label ? String(label).slice(0, 3) : "";
+}
+
+/** "09:00:00" -> "09:00" (timetable TimeFields). */
+function fmtTime(value) {
+  if (!value) return "";
+  return String(value).slice(0, 5);
+}
+
+export default function ClassCard({ klass, schedule = [], onEdit, onArchiveToggle, onDelete, onViewStudents }) {
   const gradeName = klass.grade?.name || "No grade";
   const sectionName = klass.section?.name || null;
   const subtitle = sectionName ? `${gradeName} · Section ${sectionName}` : gradeName;
   const isArchived = klass.is_archived;
+  const teacherName = klass.teacher?.full_name || klass.teacher?.email || null;
 
   return (
     <div className="group relative flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
@@ -87,6 +99,35 @@ export default function ClassCard({ klass, onEdit, onArchiveToggle, onDelete, on
           <p className="mt-1 text-[11px] text-slate-400 line-clamp-2">{klass.description}</p>
         )}
       </Link>
+
+      {/* Assigned teacher + weekly class time */}
+      {(teacherName || schedule.length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          {teacherName && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+              <User size={12} className="text-slate-400" />
+              {teacherName}
+            </span>
+          )}
+
+          {schedule.slice(0, 2).map((e) => (
+            <span
+              key={e.id}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-600 ring-1 ring-slate-200"
+              title={`${e.day_label || ""} ${fmtTime(e.start_time)}–${fmtTime(e.end_time)}${e.room ? ` · ${e.room}` : ""}`}
+            >
+              <Clock size={10} />
+              {shortDay(e.day_label)} {fmtTime(e.start_time)}–{fmtTime(e.end_time)}
+            </span>
+          ))}
+
+          {schedule.length > 2 && (
+            <span className="text-[10px] font-bold text-slate-400">
+              +{schedule.length - 2} more
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between border-t border-gray-100 pt-3">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
