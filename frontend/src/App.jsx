@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, Outlet } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 // Auth
 import LoginPage from "./features/auth/LoginPage";
@@ -20,8 +20,7 @@ import StudentAnnouncementsPage from "./features/student/pages/StudentAnnounceme
 import StudentQuizzesPage from "./features/student/pages/StudentQuizzesPage";
 import StudentTakeQuizPage from "./features/student/pages/StudentTakeQuizPage";
 import StudentQuizResultPage from "./features/student/pages/StudentQuizResultPage";
-import SetupPasswordPage from "./features/auth/SetupPasswordPage";
-import { useAuth } from "./hooks/useAuth";
+import RequirePasswordSetup from "./features/auth/RequirePasswordSetup";
 
 // Admin
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
@@ -65,15 +64,6 @@ import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesP
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 
-// ✅ Inline Route Guard: Forces password setup if `must_set_password` is true
-function RequirePasswordSetup() {
-  const { user } = useAuth();
-  if (user && user.must_set_password) {
-    return <Navigate to="/auth/setup-password?force=true" replace />;
-  }
-  return <Outlet />;
-}
-
 export default function App() {
   return (
     <Routes>
@@ -83,7 +73,6 @@ export default function App() {
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/activate" element={<ActivateAccountPage />} />
-      <Route path="/auth/setup-password" element={<SetupPasswordPage />} />
 
       {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>

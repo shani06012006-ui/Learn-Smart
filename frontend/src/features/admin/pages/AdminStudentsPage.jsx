@@ -1,9 +1,9 @@
 ﻿// frontend/src/features/admin/pages/AdminStudentsPage.jsx
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Search, GraduationCap, Plus, Shield, ShieldOff, MoreVertical,
-  Eye, Pencil, Building2, Calendar, X, Copy, Check,
+  Eye, Pencil, Building2, Calendar, X, Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -15,6 +15,7 @@ import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import CreateUserModal from "../components/CreateUserModal";
 import EditUserModal from "../components/EditUserModal";
+import ResendInviteModal from "../components/ResendInviteModal";
 import {
   useGetAdminUsersQuery,
   useToggleAdminUserActiveMutation,
@@ -39,9 +40,8 @@ function formatDate(iso) {
 }
 
 /* Row dropdown menu */
-function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
+function RowMenu({ student, onView, onEdit, onToggle, onResend, isToggling }) {
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -52,14 +52,6 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
-
-  const handleCopyLink = (e) => {
-    e.stopPropagation();
-    if (!student.activation_link) return;
-    navigator.clipboard.writeText(student.activation_link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div ref={ref} className="relative">
@@ -109,14 +101,18 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
               Edit details
             </button>
 
-            {student.must_set_password && student.activation_link && (
+            {student.must_set_password && student.is_active && (
               <button
                 type="button"
-                onClick={handleCopyLink}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpen(false);
+                  onResend();
+                }}
                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-purple-600 transition-colors hover:bg-purple-50"
               >
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-                {copied ? "Copied!" : "Copy Activation Link"}
+                <Send size={13} />
+                Resend invite
               </button>
             )}
 
@@ -156,6 +152,7 @@ export default function AdminStudentsPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState(null);
+  const [inviteUser, setInviteUser] = useState(null);
 
   const [toggleActive, { isLoading: isToggling }] = useToggleAdminUserActiveMutation();
   const [pendingId, setPendingId] = useState(null);
@@ -330,7 +327,7 @@ export default function AdminStudentsPage() {
 
                       <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-slate-400">
                         <Calendar size={12} />
-                        {formatDate(s.created_at)}
+                        {formatDate(s.date_joined)}
                       </span>
 
                       <div className="flex justify-end">
@@ -338,6 +335,7 @@ export default function AdminStudentsPage() {
                           student={s}
                           onView={() => navigate(`/admin/students/${s.id}`)}
                           onEdit={() => setEditUser(s)}
+                          onResend={() => setInviteUser(s)}
                           onToggle={() => handleToggle(s)}
                           isToggling={isPending}
                         />
@@ -356,6 +354,7 @@ export default function AdminStudentsPage() {
                           student={s}
                           onView={() => navigate(`/admin/students/${s.id}`)}
                           onEdit={() => setEditUser(s)}
+                          onResend={() => setInviteUser(s)}
                           onToggle={() => handleToggle(s)}
                           isToggling={isPending}
                         />
@@ -371,7 +370,7 @@ export default function AdminStudentsPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Calendar size={11} className="text-slate-300" />
-                          {formatDate(s.created_at)}
+                          {formatDate(s.date_joined)}
                         </span>
                       </div>
                     </div>
@@ -398,6 +397,12 @@ export default function AdminStudentsPage() {
           setEditUser(null);
           refetch();
         }}
+      />
+
+      <ResendInviteModal
+        open={!!inviteUser}
+        student={inviteUser}
+        onClose={() => setInviteUser(null)}
       />
     </div>
   );

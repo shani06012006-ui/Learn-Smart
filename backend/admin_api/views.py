@@ -348,6 +348,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                 send_email=serializer.validated_data["send_email"],
                 whatsapp_number=serializer.validated_data["whatsapp_number"],
             )
+            data["invitation"]["student_pin"] = pin_value
             data["student_pin"] = pin_value
 
         return Response(data, status=status.HTTP_201_CREATED)

@@ -226,7 +226,16 @@ def generate_temp_password(length=10) -> str:
     secrets.SystemRandom().shuffle(pwd)
     return "".join(pwd)
 
-def invite_student(user, *, issued_by=None, send_email=True, whatsapp_number=None, mode="temporary_password") -> dict:
+def invite_student(user, *, issued_by=None, send_email=True, whatsapp_number=None, mode="activation_link") -> dict:
+    """
+    Issue an invite for a freshly created student.
+
+    `mode="activation_link"` (the default, and what the admin UI uses): the
+    account gets NO usable password and a one-time / expiring link the student
+    follows to choose their own password. `mode="temporary_password"` is the
+    alternative the school can opt into: a generated password is e-mailed and
+    the student still has to replace it via the (also issued) link.
+    """
     ttl_hours = int(token_ttl().total_seconds() // 3600)
     raw, row = _mint_token(user, issued_by=issued_by)
     invalidate_activation_tokens(user, keep=row)
