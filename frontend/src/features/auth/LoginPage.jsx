@@ -39,6 +39,7 @@ export default function LoginPage() {
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [formError, setFormError] = useState(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [otpOpen, setOtpOpen] = useState(false);
 
@@ -66,10 +67,13 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError(null);
+    setSetupRequired(false);
     try {
       const result = await adminLogin({ ...form, remember_me: rememberMe }).unwrap();
       finishLogin(result);
     } catch (err) {
+      // A student who has not chosen a password yet is told to use the activation link.
+      setSetupRequired(err?.data?.error?.code === "password_setup_required");
       setFormError(loginErrorMessage(err, "Invalid email or password."));
     }
   };
@@ -159,12 +163,22 @@ export default function LoginPage() {
         </div>
 
         {formError && (
-          <p
-            role="alert"
-            className="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm font-medium text-coral-700"
-          >
-            {formError}
-          </p>
+          <div className="space-y-3">
+            <p
+              role="alert"
+              className="rounded-2xl border border-coral-200 bg-coral-50 px-4 py-3 text-sm font-medium text-coral-700"
+            >
+              {formError}
+            </p>
+            {setupRequired && (
+              <Link
+                to="/activate"
+                className="block rounded-2xl border border-sage-200 bg-sage-100 px-4 py-3 text-center text-sm font-bold text-ink-800 transition-colors hover:bg-sage-200"
+              >
+                Request a new activation link →
+              </Link>
+            )}
+          </div>
         )}
 
         <button

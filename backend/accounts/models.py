@@ -64,6 +64,34 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text="Expiration timestamp for the temporary password if one was issued.",
     )
 
+    # Timestamps / token epoch. These are written all over the code base
+    # (activation flow, admin API, JWT revocation, WebSocket presence) so the
+    # columns have to exist on the model.
+    updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    tokens_valid_after = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Access JWTs issued before this instant are rejected, so revoking a "
+            "session kills outstanding access tokens too (see accounts/jwt_auth.py)."
+        ),
+    )
+
+    objects = UserManager()
+
+    # Timestamps / token epoch. These are written all over the code base
+    # (activation flow, admin API, JWT revocation, WebSocket presence) so the
+    # columns have to exist on the model.
+    updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    tokens_valid_after = models.DateTimeField(
+    null=True,
+    blank=True,
+    help_text=( "Access JWTs issued before this instant are rejected, so revoking a " 
+               "session kills outstanding access tokens too (see accounts/jwt_auth.py)."), 
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = "email"

@@ -52,6 +52,7 @@ export default function StudentLoginPage() {
 
   const [pin, setPin] = useState("");
   const [error, setError] = useState(null);
+  const [setupRequired, setSetupRequired] = useState(false);
   const [success, setSuccess] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
   const [hop, setHop] = useState(0);
@@ -74,6 +75,7 @@ export default function StudentLoginPage() {
   /* ── Sign in (same API + redirect as before) ─────────────────── */
   const submit = async (fullPin) => {
     setError(null);
+    setSetupRequired(false);
     try {
       const result = await studentPinLogin({ pin: fullPin }).unwrap();
       dispatch(adminCredentialsReceived(result));
@@ -86,11 +88,13 @@ export default function StudentLoginPage() {
         prefs.calm ? 400 : 1400
       );
     } catch (err) {
+      const code = err?.data?.error?.code;
       const msg =
         err?.data?.error?.detail ||
         err?.data?.detail ||
         "Could not sign in with that PIN.";
       setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      setSetupRequired(code === "password_setup_required");
       setShakeKey((k) => k + 1);
       if (prefs.sound) playOops();
       setPin("");
@@ -100,6 +104,7 @@ export default function StudentLoginPage() {
   const press = (key) => {
     if (isLoading || success || sheetOpen) return;
     setError(null);
+    setSetupRequired(false);
     if (key === "clear") {
       setPin("");
       if (prefs.sound) playBack();
@@ -233,6 +238,15 @@ export default function StudentLoginPage() {
             >
               {error}
             </p>
+          )}
+
+          {setupRequired && (
+            <Link
+              to="/activate"
+              className="mt-3 block rounded-2xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-center text-sm font-bold text-purple-700 transition-colors hover:bg-purple-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-purple-300"
+            >
+              Set your password with the activation link →
+            </Link>
           )}
 
           <div className="mt-5">

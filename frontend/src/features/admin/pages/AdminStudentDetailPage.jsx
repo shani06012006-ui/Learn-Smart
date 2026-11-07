@@ -158,7 +158,7 @@ export default function AdminStudentDetailPage() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <Fact icon={Mail} label="Email" value={student.email} />
           <Fact icon={Building2} label="Institution" value={student.institution?.name || "—"} />
-          <Fact icon={Calendar} label="Joined" value={formatDateTime(student.created_at)} />
+          <Fact icon={Calendar} label="Joined" value={formatDateTime(student.date_joined)} />
           <Fact icon={Clock} label="Last seen" value={formatDateTime(student.last_seen_at)} />
         </div>
       </section>

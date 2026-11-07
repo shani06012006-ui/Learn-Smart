@@ -26,7 +26,6 @@ from .views import (
     StudentPinLoginView ,
 )
 
-
 urlpatterns = [
     path("login/", LoginView.as_view(), name="auth-login"),
     path("register/", RegisterView.as_view(), name="auth-register"),
@@ -46,6 +45,6 @@ urlpatterns = [
     path("activation/request/", ActivationRequestView.as_view(), name="auth-activation-request"),
     
     path("setup-password/", SetupPasswordView.as_view(), name="auth-setup-password"),
-    path("student-login/", StudentPinLoginView.as_view(), name="auth-student-login"),
+    path("student-login/", StudentPinLoginView.as_view(), name="student-pin-login"),
     path("admin/create-student/", AdminCreateStudentView.as_view(), name="admin-create-student"),
 ]

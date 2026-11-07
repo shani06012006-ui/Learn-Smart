@@ -47,7 +47,6 @@ LOCAL_APPS = [
     "admin_api",
     "chat",
     "attendance",
-    "shop",
     "quizzes",
     "notifications", 
 ]
@@ -157,6 +156,10 @@ REST_FRAMEWORK = {
     # Per-IP limit for the teacher sign-up endpoints (see accounts/registration.py).
     "DEFAULT_THROTTLE_RATES": {
         "registration": os.getenv("REGISTRATION_THROTTLE_RATE", "20/hour"),
+        # Activation flow (see accounts/activation.py). Both scopes are consumed
+        # while the student is NOT authenticated yet, so they are keyed by IP.
+        "activation": os.getenv("ACTIVATION_THROTTLE_RATE", "30/hour"),
+        "activation_request": os.getenv("ACTIVATION_REQUEST_THROTTLE_RATE", "5/hour"),
     },
 }
 
@@ -189,6 +192,21 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
+
+# ---------------------------------------------------------------------------
+# Student activation flow (see accounts/activation.py)
+# ---------------------------------------------------------------------------
+# Public URL of the React app. Activation / login links embedded in the invite
+# e-mail (or WhatsApp message) are built from this so a student always lands on
+# the right host. In dev the Vite server runs on :5173.
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+# How long a one-time activation link (and the fallback temporary password)
+# stays valid. After this window the invite must be re-sent.
+ACTIVATION_TOKEN_TTL_HOURS = int(os.getenv("ACTIVATION_TOKEN_TTL_HOURS", "48"))
+# Optional E.164 country code (e.g. "+44") prepended to a WhatsApp number that
+# was captured without an international prefix. Leave blank to reject such
+# numbers instead of guessing.
+ACTIVATION_DEFAULT_COUNTRY_CODE = os.getenv("ACTIVATION_DEFAULT_COUNTRY_CODE", "")
 
 # ---------------------------------------------------------------------------
 # E-mail (sign-up verification codes)
@@ -242,7 +260,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # ---------------------------------------------------------------------------
 JOINING_CODE_LENGTH = 6
 JOINING_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O/1/I to avoid ambiguity
-
 
 # ---------------------------------------------------------------------------
 # Cache

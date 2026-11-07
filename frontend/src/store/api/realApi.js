@@ -90,15 +90,6 @@ export const realApi = createApi({
   ],
   endpoints: (builder) => ({
 
-    //------ Password ------
-
-    setupPassword: builder.mutation({
-      query: (body) => ({
-        url: "/auth/setup-password/",
-        method: "POST",
-        body,
-      }),
-    }),
     // ---- Notifications ----
     getNotifications: builder.query({
       query: () => "/notifications/",
@@ -1464,7 +1455,6 @@ export const realApi = createApi({
 });
 
 export const {
-  useSetupPasswordMutation,
   useGetTeacherAnnouncementsQuery,
   useCreateTeacherAnnouncementMutation,
   useUpdateTeacherAnnouncementMutation,

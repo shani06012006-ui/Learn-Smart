@@ -40,7 +40,6 @@ from .serializers import (
     TimetableEntryWriteSerializer,
 )
 
-
 # ═══════════════════════════════════════════════════════════════
 # ATTENDANCE
 # ═══════════════════════════════════════════════════════════════
@@ -83,7 +82,6 @@ class AdminTeacherAttendanceViewSet(viewsets.GenericViewSet):
             serializer = TeacherAttendanceSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(TeacherAttendanceSerializer(qs, many=True).data)
-
 
 class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -136,7 +134,6 @@ class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
             serializer = StudentAttendanceSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(StudentAttendanceSerializer(qs, many=True).data)
-
 
 # ═══════════════════════════════════════════════════════════════
 # ENROLLMENTS
@@ -192,7 +189,6 @@ class AdminEnrollmentViewSet(viewsets.GenericViewSet):
             serializer = AdminEnrollmentSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
         return Response(AdminEnrollmentSerializer(qs, many=True).data)
-
 
 # ═══════════════════════════════════════════════════════════════
 # USERS (Admin)
@@ -348,6 +344,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                 send_email=serializer.validated_data["send_email"],
                 whatsapp_number=serializer.validated_data["whatsapp_number"],
             )
+            data["invitation"]["student_pin"] = pin_value
             data["student_pin"] = pin_value
 
         return Response(data, status=status.HTTP_201_CREATED)
@@ -516,7 +513,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         } for e in qs]
         return Response({"results": data, "count": len(data)})
 
-
 class AdminStatsView(APIView):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -551,7 +547,6 @@ class AdminStatsView(APIView):
             "is_superuser_view": user.is_superuser,
         }
         return Response(AdminStatsSerializer(payload).data)
-
 
 class AdminSessionViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -626,7 +621,6 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
         deleted = qs.count()
         qs.delete()
         return Response({"deleted": deleted}, status=status.HTTP_200_OK)
-
 
 # ═══════════════════════════════════════════════════════════════
 # COURSES (Institution Admin)
@@ -831,7 +825,6 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         enrollment.save(update_fields=["status", "updated_at"])
         return Response({"id": str(enrollment.id), "status": enrollment.status})
 
-
 # ═══════════════════════════════════════════════════════════════
 # TIMETABLE (Admin)
 # ═══════════════════════════════════════════════════════════════
@@ -975,7 +968,6 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             cancel_future_sessions(entry)
         return Response(TimetableEntryReadSerializer(entry).data)
 
-
 class TimetableView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1024,7 +1016,6 @@ class TimetableView(APIView):
 
         qs = qs.order_by("day_of_week", "start_time")
         return Response(TimetableEntryReadSerializer(qs, many=True).data)
-
 
 # ═══════════════════════════════════════════════════════════════
 # LIVE CLASSES
@@ -1142,7 +1133,6 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
             obj.save(update_fields=["stored_status", "updated_at"])
         return Response(LiveClassReadSerializer(obj).data)
 
-
 class RoleAwareLiveClassView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1183,7 +1173,6 @@ class RoleAwareLiveClassView(APIView):
             qs = qs.filter(id__in=ids)
 
         return Response(LiveClassReadSerializer(qs, many=True).data)
-
 
 # ═══════════════════════════════════════════════════════════════
 # LEAVES
@@ -1352,7 +1341,6 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
         return Response(StudentLeaveReadSerializer(leave).data)
 
-
 class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
@@ -1514,7 +1502,6 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
         return Response(TeacherLeaveReadSerializer(leave).data)
 
-
 # ═══════════════════════════════════════════════════════════════
 # PERFORMANCE TREND
 # ═══════════════════════════════════════════════════════════════
@@ -1560,7 +1547,6 @@ def _trend_periods(period, count):
             out.append((start.strftime("%b %Y"), start, end))
 
     return out
-
 
 class PerformanceTrendView(APIView):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -1616,7 +1602,6 @@ class PerformanceTrendView(APIView):
             "current_label": current["label"], "previous_label": previous["label"],
             "timeline": visible,
         })
-
 
 class TeacherPerformanceTrendView(APIView):
     permission_classes = [IsAuthenticated]
