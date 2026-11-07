@@ -16,6 +16,8 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
+let refreshPromise;
+
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await rawBaseQuery(args, api, extraOptions);
 
@@ -24,10 +26,18 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     url.includes("/auth/login/") || url.includes("/auth/refresh/");
 
   if (result.error?.status === 401 && !isAuthEndpoint) {
-    const refreshToken = api.getState().adminAuth.refreshToken;
+    const refreshToken = api.getState().adminAuth?.refreshToken;
 
-    if (refreshToken) {
-      const refreshResult = await rawBaseQuery(
+    if (!refreshToken) {
+      api.dispatch(adminLoggedOut());
+      return result;
+    }
+
+    // Share one refresh request across simultaneous 401s. Refresh-token
+    // rotation treats reuse as a compromise, so parallel refreshes can revoke
+    // an otherwise valid session.
+    if (!refreshPromise) {
+      refreshPromise = rawBaseQuery(
         {
           url: "/auth/refresh/",
           method: "POST",
@@ -35,16 +45,23 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         },
         api,
         extraOptions
-      );
+      )
+        .then((refreshResult) => {
+          if (refreshResult.data) {
+            api.dispatch(adminAccessTokenRotated(refreshResult.data));
+          } else {
+            api.dispatch(adminLoggedOut());
+          }
+          return refreshResult;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+    }
 
-      if (refreshResult.data) {
-        api.dispatch(adminAccessTokenRotated(refreshResult.data));
-        result = await rawBaseQuery(args, api, extraOptions);
-      } else {
-        api.dispatch(adminLoggedOut());
-      }
-    } else {
-      api.dispatch(adminLoggedOut());
+    const refreshResult = await refreshPromise;
+    if (refreshResult?.data) {
+      result = await rawBaseQuery(args, api, extraOptions);
     }
   }
 

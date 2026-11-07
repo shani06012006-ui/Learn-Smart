@@ -196,6 +196,7 @@ function CopyCodeButton({ code }) {
 
 export default function TeacherClassDetailPage() {
   const { id } = useParams();
+  const hasClassId = Boolean(id && id !== "undefined" && id !== "null");
   const [tab, setTab] = useState("roster");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -203,25 +204,32 @@ export default function TeacherClassDetailPage() {
   const [confirm, setConfirm] = useState(null);
 
   // ── ALL HOOKS AT TOP, NO CONDITIONAL RETURNS BEFORE ──
-  const { data: klass, isLoading, isError, error, refetch } = useGetClassQuery(id);
+  const { data: klass, isLoading, isError, error, refetch } = useGetClassQuery(id, {
+    skip: !hasClassId,
+  });
 
   const { data: studentsData, isLoading: studentsLoading } = useGetClassStudentsQuery(
     id,
-    { skip: tab !== "roster" },
+    { skip: !hasClassId || tab !== "roster" },
   );
   const { data: materialsData, isLoading: materialsLoading } = useGetClassMaterialsQuery(
     id,
-    { skip: tab !== "materials" },
+    { skip: !hasClassId || tab !== "materials" },
   );
 
   // Class time — recurring weekly slots + the dated sessions generated from them.
   const { data: timetableData, isLoading: timetableLoading } = useGetTimetableQuery({
     class_id: id,
+  }, {
+    skip: !hasClassId,
   });
   // Stable "now" (memoised) so the query arg keeps the same identity across renders.
   const sessionsFrom = useMemo(() => new Date().toISOString(), [id]);
   const { data: liveClassesData, isLoading: sessionsLoading } =
-    useGetStudentLiveClassesQuery({ class_id: id, from: sessionsFrom });
+    useGetStudentLiveClassesQuery(
+      { class_id: id, from: sessionsFrom },
+      { skip: !hasClassId },
+    );
 
   const [updateStatus, { isLoading: statusBusy }] = useUpdateEnrollmentStatusMutation();
   const [deleteMaterial, { isLoading: deleteBusy }] = useDeleteMaterialMutation();
@@ -263,6 +271,17 @@ export default function TeacherClassDetailPage() {
   }, [students]);
 
   // ── NOW safe to early-return ──
+  if (!hasClassId) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        This class URL is missing its class ID. Return to{" "}
+        <Link to="/teacher/classes" className="font-bold underline">
+          My classes
+        </Link>{" "}
+        and open the class again.
+      </div>
+    );
+  }
   if (isLoading) return <LoadingState label="Loading class..." />;
   if (isError) {
     return (
