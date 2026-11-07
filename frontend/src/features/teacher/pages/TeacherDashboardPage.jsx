@@ -5,7 +5,6 @@ import {
   CalendarDays,
   CalendarX,
   ArrowRight,
-  MessageSquare,
   Clock,
 } from "lucide-react";
 
@@ -13,14 +12,11 @@ import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
 import StatCard from "../../admin/components/StatCard";
 import PerformanceTrendCard from "../../admin/components/PerformanceTrendCard";
-import Avatar from "../../../components/ui/Avatar";
-import Badge from "../../../components/ui/Badge";
 import { useAuth } from "../../../hooks/useAuth";
 import {
   useGetClassesQuery,
   useGetTimetableQuery,
   useGetTeacherLeavesQuery,
-  useGetTeacherGroupMessagesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -62,8 +58,6 @@ export default function TeacherDashboardPage() {
   const { data: leavesData, isLoading: leavesLoading } =
     useGetTeacherLeavesQuery({ status: "pending", page: 1 });
 
-  const { data: messagesData } = useGetTeacherGroupMessagesQuery({});
-
   if (classesLoading) return <LoadingState label="Loading dashboard..." />;
 
   if (classesError) {
@@ -88,8 +82,6 @@ export default function TeacherDashboardPage() {
     .sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
 
   const pendingLeaves = leavesData?.count ?? (leavesData?.results ?? []).length;
-
-  const recentMessages = (messagesData?.results ?? []).slice(-3).reverse();
 
   const displayName =
     user?.first_name?.trim()
@@ -150,112 +142,54 @@ export default function TeacherDashboardPage() {
       {/* Student performance trend — scoped to this teacher's classes */}
       <PerformanceTrendCard scope="teacher" />
 
-      {/* Two-column: today's sessions + recent messages */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Today's sessions */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              Today's sessions
-            </h2>
-            <Link
-              to="/teacher/timetable"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
-            >
-              Full timetable
-              <ArrowRight size={11} />
-            </Link>
-          </div>
-
-          {timetableLoading ? (
-            <div className="space-y-3">
-              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
-              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
-            </div>
-          ) : todaySessions.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              No sessions scheduled for today.
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {todaySessions.slice(0, 5).map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                    <Clock size={16} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-navy-950">
-                      {s.class_course?.name || "Untitled class"}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {fmtTime(s.start_time)} — {fmtTime(s.end_time)}
-                      {s.room ? ` · ${s.room}` : ""}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Recent messages */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
-              Recent messages
-            </h2>
-            <Link
-              to="/teacher/chat"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
-            >
-              Open chat
-              <ArrowRight size={11} />
-            </Link>
-          </div>
-
-          {recentMessages.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              No messages yet.
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {recentMessages.map((m) => (
-                <li key={m.id} className="flex gap-3">
-                  <Avatar
-                    userId={m.sender?.id}
-                    initials={m.sender?.initials || "?"}
-                    size="sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <p className="truncate text-xs font-semibold text-navy-950">
-                        {m.sender?.full_name || m.sender?.email}
-                      </p>
-                      {m.sender?.role === "admin" && (
-                        <Badge variant="brand">Admin</Badge>
-                      )}
-                    </div>
-                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-600">
-                      {m.body}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
+      {/* Today's sessions */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+            Today's sessions
+          </h2>
           <Link
-            to="/teacher/chat"
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+            to="/teacher/timetable"
+            className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
           >
-            <MessageSquare size={14} />
-            Go to messages
+            Full timetable
+            <ArrowRight size={11} />
           </Link>
-        </section>
-      </div>
+        </div>
+
+        {timetableLoading ? (
+          <div className="space-y-3">
+            <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+            <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+          </div>
+        ) : todaySessions.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">
+            No sessions scheduled for today.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {todaySessions.slice(0, 5).map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Clock size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-navy-950">
+                    {s.class_course?.name || "Untitled class"}
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {fmtTime(s.start_time)} — {fmtTime(s.end_time)}
+                    {s.room ? ` · ${s.room}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* My classes */}
       <section>
