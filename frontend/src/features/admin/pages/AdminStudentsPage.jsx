@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Search, GraduationCap, Plus, Shield, ShieldOff, MoreVertical,
-  Eye, Pencil, Building2, Calendar, X,
+  Eye, Pencil, Building2, Calendar, X, Copy, Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -41,6 +41,7 @@ function formatDate(iso) {
 /* Row dropdown menu */
 function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -51,6 +52,14 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
+
+  const handleCopyLink = (e) => {
+    e.stopPropagation();
+    if (!student.activation_link) return;
+    navigator.clipboard.writeText(student.activation_link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -73,7 +82,7 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-10 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg"
+            className="absolute right-0 top-10 z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg"
           >
             <button
               type="button"
@@ -99,6 +108,18 @@ function RowMenu({ student, onView, onEdit, onToggle, isToggling }) {
               <Pencil size={13} />
               Edit details
             </button>
+
+            {student.must_set_password && student.activation_link && (
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-purple-600 transition-colors hover:bg-purple-50"
+              >
+                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {copied ? "Copied!" : "Copy Activation Link"}
+              </button>
+            )}
+
             <div className="my-1 h-px bg-slate-100" />
             <button
               type="button"

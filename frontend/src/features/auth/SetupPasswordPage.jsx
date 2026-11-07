@@ -16,26 +16,56 @@ export default function SetupPasswordPage() {
   
   const [setupPassword, { isLoading }] = useSetupPasswordMutation();
 
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    if (newPassword.length < 8) {
+      return setError("Password must be at least 8 characters long.");
+    }
 
     if (newPassword !== confirmPassword) {
       return setError("Passwords do not match.");
     }
 
     try {
-      await setupPassword({ token, new_password: newPassword, confirm_password: confirmPassword }).unwrap();
+      await setupPassword({ 
+        uid,
+        token, 
+        new_password: newPassword, 
+        confirm_password: confirmPassword 
+      }).unwrap();
       setSuccess(true);
-      setTimeout(() => navigate("/login"), 3000);
+      // Invalidate existing credentials/tokens and redirect to login
+      setTimeout(() => navigate("/login?setup=success"), 3000);
     } catch (err) {
-      setError(err?.data?.error || "Failed to set password. The link may be expired.");
+      setError(err?.data?.error || "Failed to set password. The link may be expired or invalid.");
     }
   };
 
-  if (!uid || !token) {
-    return <div className="text-center text-red-600 mt-20">Invalid setup link.</div>;
+
+    if (!uid || !token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-center">
+        <div className="max-w-md rounded-3xl bg-white p-10 shadow-xl">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+            <Lock size={30} />
+          </div>
+          <h1 className="text-xl font-extrabold text-navy-950">Invalid or Expired Link</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            This password setup link is missing or has expired. Please contact your school administrator to request a new activation link.
+          </p>
+          <button
+            onClick={() => navigate("/login")}
+            className="mt-6 inline-flex items-center font-bold text-purple-600 hover:text-purple-700"
+          >
+            Go to login page →
+          </button>
+        </div>
+      </div>
+    );
   }
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
