@@ -1480,6 +1480,7 @@ export const realApi = createApi({
 
 export const {
   useAdminLoginMutation,
+  useAdminLogoutMutation,
   useGetTeacherAnnouncementsQuery,
   useCreateTeacherAnnouncementMutation,
   useUpdateTeacherAnnouncementMutation,
