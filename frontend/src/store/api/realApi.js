@@ -16,6 +16,8 @@ const rawBaseQuery = fetchBaseQuery({
   },
 });
 
+let refreshPromise;
+
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await rawBaseQuery(args, api, extraOptions);
 
@@ -24,10 +26,18 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     url.includes("/auth/login/") || url.includes("/auth/refresh/");
 
   if (result.error?.status === 401 && !isAuthEndpoint) {
-    const refreshToken = api.getState().adminAuth.refreshToken;
+    const refreshToken = api.getState().adminAuth?.refreshToken;
 
-    if (refreshToken) {
-      const refreshResult = await rawBaseQuery(
+    if (!refreshToken) {
+      api.dispatch(adminLoggedOut());
+      return result;
+    }
+
+    // Share one refresh request across simultaneous 401s. Refresh-token
+    // rotation treats reuse as a compromise, so parallel refreshes can revoke
+    // an otherwise valid session.
+    if (!refreshPromise) {
+      refreshPromise = rawBaseQuery(
         {
           url: "/auth/refresh/",
           method: "POST",
@@ -35,16 +45,23 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
         },
         api,
         extraOptions
-      );
+      )
+        .then((refreshResult) => {
+          if (refreshResult.data) {
+            api.dispatch(adminAccessTokenRotated(refreshResult.data));
+          } else {
+            api.dispatch(adminLoggedOut());
+          }
+          return refreshResult;
+        })
+        .finally(() => {
+          refreshPromise = null;
+        });
+    }
 
-      if (refreshResult.data) {
-        api.dispatch(adminAccessTokenRotated(refreshResult.data));
-        result = await rawBaseQuery(args, api, extraOptions);
-      } else {
-        api.dispatch(adminLoggedOut());
-      }
-    } else {
-      api.dispatch(adminLoggedOut());
+    const refreshResult = await refreshPromise;
+    if (refreshResult?.data) {
+      result = await rawBaseQuery(args, api, extraOptions);
     }
   }
 
@@ -269,7 +286,14 @@ export const realApi = createApi({
       providesTags: ["StudentQuizzes"],
     }),
     getStudentLiveClasses: builder.query({
-      query: () => "/live-classes/",
+      query: (params = {}) => {
+        const s = new URLSearchParams();
+        if (params.class_id) s.set("class_id", params.class_id);
+        if (params.from) s.set("from", params.from);
+        if (params.to) s.set("to", params.to);
+        const qs = s.toString();
+        return qs ? `/live-classes/?${qs}` : "/live-classes/";
+      },
       providesTags: ["StudentLiveClasses"],
     }),
     createLiveClass: builder.mutation({
@@ -1506,109 +1530,8 @@ export const {
   useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
   useGetAttendanceSummaryQuery,
-  useGetTeacherAttendanceQuery,
-  useMarkTeacherAttendanceMutation,
-  useGetTeacherAttendanceStatsQuery,
-  useGetTeacherAttendanceSummaryQuery,
-  useGetAttendanceQuery,
-  useMarkAttendanceMutation,
-  useGetAttendanceStatsQuery,
-  useAdminLoginMutation,
-  useGetAdminCoursesQuery,
-  useGetAdminCourseQuery,
-  useCreateAdminCourseMutation,
-  useUpdateAdminCourseMutation,
-  useDeleteAdminCourseMutation,
-  useAdminMeQuery,
-  useAdminLogoutMutation,
-  useGetAdminUsersQuery,
-  useGetGradesQuery,
-  useGetGradeQuery,
-  useCreateGradeMutation,
-  useUpdateGradeMutation,
-  useDeleteGradeMutation,
-  useGetAdminUserQuery,
-  useCreateAdminUserMutation,
-  useUpdateAdminUserMutation,
-  useToggleAdminUserActiveMutation,
-  useRemoveAdminUserMutation,
-  useGetAdminStatsQuery,
-  useGetAdminUserClassesQuery,
-  useGetAdminUserEnrollmentsQuery,
-  useGetAdminCourseStudentsQuery,
-  useAddAdminCourseStudentMutation,
-  useUpdateAdminCourseStudentStatusMutation,
-  useGetTeacherGroupThreadQuery,
-  useGetTeacherGroupMembersQuery,
-  useGetMyLeavesQuery,
-  useCreateMyLeaveMutation,
-  useCancelMyLeaveMutation,
-  useGetMyLeaveSummaryQuery,
-  useGetStudentsListQuery,
-  useCreateTeacherStudentMutation,
-  useGetTeacherGroupMessagesQuery,
-  useSendTeacherGroupMessageMutation,
-  useToggleMessageReactionMutation,
-  useRemoveMessageReactionMutation,
-  useGetAdminSessionsQuery,
-  useRevokeAdminSessionMutation,
-  useGetAdminEnrollmentsQuery,
-  useGetAdminTeacherAttendanceQuery,
-  useGetAdminStudentAttendanceQuery,
-  useGetAdminTimetableQuery,
-  useGetTimetableQuery,
-  useGetClassesQuery,
-  useGetClassQuery,
-  useGetClassStudentsQuery,
-  useGetClassMaterialsQuery,
-  useCreateClassMutation,
-  useUpdateClassMutation,
-  useDeleteClassMutation,
-  useGetAllMaterialsQuery,
-  useAddClassStudentMutation,
-  useUpdateEnrollmentStatusMutation,
-  useUploadClassMaterialMutation,
-  useDeleteMaterialMutation,
-  useCreateAdminTimetableMutation,
-  useUpdateAdminTimetableMutation,
-  useGetStudentLeavesQuery,
-  useCreateStudentLeaveMutation,
-  useUpdateStudentLeaveMutation,
-  useApproveStudentLeaveMutation,
-  useRejectStudentLeaveMutation,
-  useCancelStudentLeaveMutation,
-  useGetTeacherLeavesQuery,
-  useCreateTeacherLeaveMutation,
-  useUpdateTeacherLeaveMutation,
-  useApproveTeacherLeaveMutation,
-  useRejectTeacherLeaveMutation,
-  useCancelTeacherLeaveMutation,
-  useDeactivateAdminTimetableMutation,
-  useGetAdminSectionsQuery,
-  useCreateAdminSectionMutation,
-  useGetSectionStudentsQuery,
-  useAssignSectionStudentsMutation,
-  useUpdateAdminSectionMutation,
-  useDeleteAdminSectionMutation,
-  useGenerateTimetableMutation,
-  useGetAdminAbsencesQuery,
-  useCreateAdminAbsenceMutation,
-  useSuggestSubstitutesMutation,
-  useAssignSubstituteMutation,
-  useStartQuizAttemptMutation,
-  useSubmitQuizAttemptMutation,
-  useGetQuizAttemptResultQuery,
-  useGetTeacherQuizSubmissionsQuery,
-  usePurgeStaleSessionsMutation,
-  useGetTeacherPerformanceTrendQuery,
-
   useCheckoutMutation,
   useGetMyOrdersQuery,
   useGetMyOrderQuery,
-  useDeleteChatThreadMutation,
-  useDeleteChatMessageMutation,
-  useGetNotificationsQuery,
-  useMarkAllNotificationsReadMutation, 
-  useMarkSingleNotificationReadMutation,
 
 } = realApi;

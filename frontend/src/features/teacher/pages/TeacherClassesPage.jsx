@@ -1,319 +1,727 @@
-// frontend/src/features/teacher/pages/TeacherClassesPage.jsx
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { BookOpen, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Users,
+  FileText,
+  Download,
+  Calendar,
+  CalendarClock,
+  Clock,
+  GraduationCap,
+  Loader2,
+  Plus,
+  MoreVertical,
+  Copy,
+  Check,
+  ShieldOff,
+  ShieldCheck,
+  Trash2,
+  Image as ImageIcon,
+  Video,
+  Music,
+  Archive,
+  File as FileIcon,
+} from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
+import Avatar from "../../../components/ui/Avatar";
+import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import ConfirmDialog from "../../../components/ui/ConfirmDialog";
-import ClassFormModal from "../components/ClassFormModal";
-import ClassCard from "../components/ClassCard";
-import ClassFiltersBar from "../components/ClassFiltersBar";
-import ClassRosterModal from "../components/ClassRosterModal";
+import AddStudentModal from "../components/AddStudentModal";
+import UploadMaterialModal from "../components/UploadMaterialModal";
 import {
-  useGetClassesQuery,
-  useUpdateClassMutation,
-  useDeleteClassMutation,
+  useGetClassQuery,
+  useGetClassStudentsQuery,
+  useGetClassMaterialsQuery,
+  useGetTimetableQuery,
+  useGetStudentLiveClassesQuery,
+  useUpdateEnrollmentStatusMutation,
+  useDeleteMaterialMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
-export default function TeacherClassesPage() {
-  const navigate = useNavigate();
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
+/* ── Helpers ──────────────────────────────────────────────── */
+
+function fmtSize(bytes) {
+  if (!bytes) return "--";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** Handles both "09:00:00" (TimeField) and full ISO datetimes (LiveClass). */
+function fmtTime(value) {
+  if (!value) return "";
+  if (String(value).includes("T")) {
+    return new Date(value).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return String(value).slice(0, 5);
+}
+
+const SESSION_TONE = {
+  upcoming: "brand",
+  live: "success",
+  completed: "neutral",
+  cancelled: "danger",
+};
+
+const STATUS_TONE = {
+  active: "success",
+  pending: "warning",
+  blocked: "danger",
+  removed: "neutral",
+};
+
+const STATUS_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "active", label: "Active" },
+  { id: "pending", label: "Pending" },
+  { id: "blocked", label: "Blocked" },
+  { id: "removed", label: "Removed" },
+];
+
+function pickFileIcon(mime, name) {
+  const m = (mime || "").toLowerCase();
+  const ext = (name || "").split(".").pop()?.toLowerCase() || "";
+  if (m.startsWith("image/") || ["png","jpg","jpeg","gif","webp"].includes(ext))
+    return { Icon: ImageIcon, tone: "text-blue-600 bg-blue-50" };
+  if (m.startsWith("video/") || ["mp4","mov","webm"].includes(ext))
+    return { Icon: Video, tone: "text-purple-600 bg-purple-50" };
+  if (m.startsWith("audio/") || ["mp3","m4a","wav"].includes(ext))
+    return { Icon: Music, tone: "text-emerald-600 bg-emerald-50" };
+  if (ext === "zip")
+    return { Icon: Archive, tone: "text-slate-600 bg-slate-100" };
+  if (ext === "pdf")
+    return { Icon: FileText, tone: "text-coral-600 bg-coral-50" };
+  return { Icon: FileIcon, tone: "text-slate-600 bg-slate-100" };
+}
+
+/* ── Row dropdown menu ─────────────────────────────────────── */
+function RowMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
+      >
+        <MoreVertical size={15} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-elevated-lg">
+          {items.map(({ label, icon: Icon, onClick, tone = "default" }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onClick();
+              }}
+              className={
+                "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition " +
+                (tone === "danger"
+                  ? "text-coral-600 hover:bg-coral-50"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-navy-950")
+              }
+            >
+              {Icon && <Icon size={13} />}
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Copy joining code button ──────────────────────────────── */
+function CopyCodeButton({ code }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-slate-600 transition hover:border-purple-300 hover:bg-purple-50 hover:text-purple-700"
+      title="Copy joining code"
+    >
+      {code}
+      {copied ? (
+        <Check size={11} className="text-emerald-600" />
+      ) : (
+        <Copy size={11} />
+      )}
+    </button>
+  );
+}
+
+/* ── Page ──────────────────────────────────────────────────── */
+
+export default function TeacherClassDetailPage() {
+  const { id } = useParams();
+  const [tab, setTab] = useState("roster");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [addOpen, setAddOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
-  const [rosterFor, setRosterFor] = useState(null);
 
-  const [gradeFilter, setGradeFilter] = useState("");
-  const [sectionFilter, setSectionFilter] = useState("");
-  const [search, setSearch] = useState("");
+  // ── ALL HOOKS AT TOP, NO CONDITIONAL RETURNS BEFORE ──
+  const { data: klass, isLoading, isError, error, refetch } = useGetClassQuery(id);
 
-  const {
-    data: classesData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useGetClassesQuery();
+  const { data: studentsData, isLoading: studentsLoading } = useGetClassStudentsQuery(
+    id,
+    { skip: tab !== "roster" },
+  );
+  const { data: materialsData, isLoading: materialsLoading } = useGetClassMaterialsQuery(
+    id,
+    { skip: tab !== "materials" },
+  );
 
-  const [updateClass, { isLoading: updating }] = useUpdateClassMutation();
-  const [deleteClass, { isLoading: deleting }] = useDeleteClassMutation();
+  // Class time — recurring weekly slots + the dated sessions generated from them.
+  const { data: timetableData, isLoading: timetableLoading } = useGetTimetableQuery({
+    class_id: id,
+  });
+  // Stable "now" (memoised) so the query arg keeps the same identity across renders.
+  const sessionsFrom = useMemo(() => new Date().toISOString(), [id]);
+  const { data: liveClassesData, isLoading: sessionsLoading } =
+    useGetStudentLiveClassesQuery({ class_id: id, from: sessionsFrom });
 
-  const classes = classesData?.results ?? classesData ?? [];
+  const [updateStatus, { isLoading: statusBusy }] = useUpdateEnrollmentStatusMutation();
+  const [deleteMaterial, { isLoading: deleteBusy }] = useDeleteMaterialMutation();
 
-  // ---------------- Derived filter options ----------------
-  const gradeOptions = useMemo(() => {
-    const map = new Map();
-    classes.forEach((c) => {
-      if (c.grade?.id && !map.has(c.grade.id)) {
-        map.set(c.grade.id, {
-          id: c.grade.id,
-          name: c.grade.name,
-          level: c.grade.level ?? 999,
-        });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) => a.level - b.level);
-  }, [classes]);
+  // Derived lists — safe to compute even when data isn't loaded yet
+  const students = studentsData?.results ?? studentsData ?? [];
+  const materials = materialsData?.results ?? materialsData ?? [];
 
-  const sectionOptions = useMemo(() => {
-    const map = new Map();
-    classes.forEach((c) => {
-      if (!c.section?.id) return;
-      // if a grade is chosen, only show sections belonging to that grade
-      if (gradeFilter && c.grade?.id !== gradeFilter) return;
-      if (!map.has(c.section.id)) {
-        map.set(c.section.id, {
-          id: c.section.id,
-          name: c.section.name,
-          gradeId: c.grade?.id,
-        });
-      }
-    });
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
+  const schedule = useMemo(() => {
+    const rows = timetableData?.results ?? timetableData ?? [];
+    return [...rows].sort(
+      (a, b) =>
+        (a.day_of_week ?? 0) - (b.day_of_week ?? 0) ||
+        String(a.start_time || "").localeCompare(String(b.start_time || "")),
     );
-  }, [classes, gradeFilter]);
+  }, [timetableData]);
 
-  // ---------------- Apply filters ----------------
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return classes.filter((c) => {
-      if (gradeFilter && c.grade?.id !== gradeFilter) return false;
-      if (sectionFilter && c.section?.id !== sectionFilter) return false;
-      if (q) {
-        const haystack = [
-          c.name,
-          c.subject,
-          c.description,
-          c.grade?.name,
-          c.section?.name,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [classes, gradeFilter, sectionFilter, search]);
+  const upcomingSessions = useMemo(() => {
+    const rows = liveClassesData?.results ?? liveClassesData ?? [];
+    return [...rows]
+      .sort((a, b) =>
+        String(a.scheduled_start || "").localeCompare(String(b.scheduled_start || "")),
+      )
+      .slice(0, 5);
+  }, [liveClassesData]);
 
-  const activeClasses = filtered.filter((c) => !c.is_archived);
-  const archivedClasses = filtered.filter((c) => c.is_archived);
+  // useMemo hooks — MUST be before any early return
+  const filteredStudents = useMemo(() => {
+    if (statusFilter === "all") return students;
+    return students.filter((s) => s.status === statusFilter);
+  }, [students, statusFilter]);
 
-  // ---------------- Group actives by grade ----------------
-  const groupedActive = useMemo(() => {
-    const byGrade = new Map();
-    for (const c of activeClasses) {
-      const gid = c.grade?.id || "__none__";
-      const gname = c.grade?.name || "No grade assigned";
-      const level = c.grade?.level ?? 999;
-      if (!byGrade.has(gid)) {
-        byGrade.set(gid, { id: gid, name: gname, level, classes: [] });
-      }
-      byGrade.get(gid).classes.push(c);
+  const counts = useMemo(() => {
+    const acc = { all: students.length };
+    for (const s of students) {
+      acc[s.status] = (acc[s.status] || 0) + 1;
     }
-    // Sort each group's classes by section name then class name
-    for (const g of byGrade.values()) {
-      g.classes.sort((a, b) => {
-        const sa = a.section?.name || "";
-        const sb = b.section?.name || "";
-        if (sa && sb) return sa.localeCompare(sb);
-        return (a.name || "").localeCompare(b.name || "");
-      });
-    }
-    return Array.from(byGrade.values()).sort((a, b) => a.level - b.level);
-  }, [activeClasses]);
+    return acc;
+  }, [students]);
 
-  const hasAnyFilter = gradeFilter || sectionFilter || search;
-
-  const clearAllFilters = () => {
-    setGradeFilter("");
-    setSectionFilter("");
-    setSearch("");
-  };
-
-  // ---------------- Handlers ----------------
-  function handleCreate() {
-    setEditing(null);
-    setFormOpen(true);
-  }
-
-  function handleEdit(klass) {
-    setEditing(klass);
-    setFormOpen(true);
-  }
-
-  async function handleArchiveToggle(klass) {
-    try {
-      await updateClass({
-        id: klass.id,
-        is_archived: !klass.is_archived,
-      }).unwrap();
-    } catch (err) {
-      console.error("archive toggle failed", err);
-    }
-  }
-
-  function promptDelete(klass) {
-    setConfirm({
-      title: `Delete "${klass.name}"?`,
-      description:
-        "The class will be hidden from your list. Enrollments, materials, and history stay intact.",
-      confirmLabel: "Delete",
-      onConfirm: async () => {
-        try {
-          await deleteClass(klass.id).unwrap();
-        } catch (err) {
-          console.error("delete failed", err);
-        }
-        setConfirm(null);
-      },
-    });
-  }
-
-  // ---------------- Render ----------------
-  if (isLoading) return <LoadingState label="Loading your classes..." />;
+  // ── NOW safe to early-return ──
+  if (isLoading) return <LoadingState label="Loading class..." />;
   if (isError) {
     return (
       <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />
     );
   }
+  if (!klass) return null;
+
+  const teacherName =
+    klass.teacher?.full_name || klass.teacher?.email || "Unassigned";
+
+  // Handlers
+  async function handleStatusChange(enrollmentId, status) {
+    try {
+      await updateStatus({ classId: id, enrollmentId, status }).unwrap();
+    } catch (err) {
+      console.error("status update failed", err);
+    }
+  }
+
+  async function handleDeleteMaterial(materialId) {
+    try {
+      await deleteMaterial({ materialId }).unwrap();
+      setConfirm(null);
+    } catch (err) {
+      console.error("delete failed", err);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            My classes
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Browse by grade and section, and jump into attendance or the roster.
-          </p>
-        </div>
+      <Link
+        to="/teacher/classes"
+        className="inline-flex w-fit items-center gap-1.5 text-xs font-bold text-slate-500 transition-colors hover:text-purple-600"
+      >
+        <ArrowLeft size={14} />
+        All classes
+      </Link>
 
-        <Button variant="primary" onClick={handleCreate}>
-          <Plus size={16} />
-          New class
-        </Button>
-      </header>
-
-      {classes.length > 0 && (
-        <ClassFiltersBar
-          gradeOptions={gradeOptions}
-          sectionOptions={sectionOptions}
-          gradeFilter={gradeFilter}
-          setGradeFilter={setGradeFilter}
-          sectionFilter={sectionFilter}
-          setSectionFilter={setSectionFilter}
-          search={search}
-          setSearch={setSearch}
-          count={filtered.length}
-          onClearAll={clearAllFilters}
-        />
-      )}
-
-      {/* Empty states */}
-      {classes.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500 ring-1 ring-purple-100">
-            <BookOpen size={26} />
-          </span>
-          <p className="mt-4 text-sm font-semibold text-navy-950">
-            No classes yet
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Create your first class to start teaching.
-          </p>
-          <Button variant="primary" onClick={handleCreate} className="mt-4">
-            <Plus size={14} />
-            Create your first class
-          </Button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50/60 p-12 text-center">
-          <p className="text-sm font-semibold text-navy-950">
-            No classes match your filters
-          </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Try clearing one of the filters above.
-          </p>
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            className="mt-4 rounded-xl bg-purple-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-purple-700"
-          >
-            Clear all filters
-          </button>
-        </div>
-      ) : (
-        <>
-          {groupedActive.map((group) => (
-            <section key={group.id}>
-              <div className="mb-3 flex items-center gap-3">
-                <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  {group.name}
-                </h2>
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
-                  {group.classes.length}{" "}
-                  {group.classes.length === 1 ? "class" : "classes"}
+      {/* Header */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
+                {klass.subject || "Class"}
+              </span>
+              {klass.grade && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-100">
+                  <GraduationCap size={10} />
+                  {klass.grade.name}
                 </span>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {group.classes.map((c) => (
-                  <ClassCard
-                    key={c.id}
-                    klass={c}
-                    onEdit={handleEdit}
-                    onArchiveToggle={handleArchiveToggle}
-                    onDelete={promptDelete}
-                    onViewStudents={setRosterFor}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
+              )}
+            </div>
+            <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-navy-950">
+              {klass.name}
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
+              {klass.description || "No description provided."}
+            </p>
 
-          {archivedClasses.length > 0 && (
-            <section>
-              <div className="mb-3 flex items-center gap-3">
-                <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Archived
-                </h2>
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">
-                  {archivedClasses.length}
-                </span>
+            {/* Assigned teacher */}
+            <div className="mt-4 flex items-center gap-2.5">
+              <Avatar
+                userId={klass.teacher?.id}
+                initials={klass.teacher?.initials || "?"}
+                size="sm"
+              />
+              <div className="leading-tight">
+                <p className="text-xs font-bold text-navy-950">{teacherName}</p>
+                <p className="text-[11px] text-slate-400">
+                  {klass.teacher?.role === "teacher" ? "Class teacher" : "Teacher"}
+                </p>
               </div>
-              <div className="grid grid-cols-1 gap-4 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
-                {archivedClasses.map((c) => (
-                  <ClassCard
-                    key={c.id}
-                    klass={c}
-                    onEdit={handleEdit}
-                    onArchiveToggle={handleArchiveToggle}
-                    onDelete={promptDelete}
-                    onViewStudents={setRosterFor}
-                  />
-                ))}
-              </div>
-            </section>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <Users size={14} />
+              <span className="font-bold text-navy-950">
+                {klass.student_count}
+              </span>{" "}
+              student{klass.student_count === 1 ? "" : "s"}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar size={14} />
+              {fmtDate(klass.created_at)}
+            </span>
+            {klass.is_archived && <Badge variant="neutral">Archived</Badge>}
+          </div>
+        </div>
+      </section>
+
+      {/* Class time — weekly slots + dated sessions */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Weekly schedule */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+              Weekly schedule
+            </h2>
+            <Link
+              to="/teacher/timetable"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
+            >
+              Full timetable
+              <ArrowRight size={11} />
+            </Link>
+          </div>
+
+          {timetableLoading ? (
+            <div className="space-y-2">
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+          ) : schedule.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No timetable slots for this class yet.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {schedule.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <Clock size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-navy-950">
+                      {e.day_label || "Day"}
+                      {e.period_number ? ` · Period ${e.period_number}` : ""}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {fmtTime(e.start_time)} — {fmtTime(e.end_time)}
+                      {e.room ? ` · ${e.room}` : ""}
+                      {e.section_name ? ` · ${e.section_name}` : ""}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
-        </>
+        </div>
+
+        {/* Upcoming sessions */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-sm font-extrabold uppercase tracking-wider text-slate-500">
+              Upcoming sessions
+            </h2>
+            <Link
+              to="/teacher/live-classes"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-purple-500 hover:text-purple-600"
+            >
+              All sessions
+              <ArrowRight size={11} />
+            </Link>
+          </div>
+
+          {sessionsLoading ? (
+            <div className="space-y-2">
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+              <div className="h-14 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+          ) : upcomingSessions.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              No upcoming sessions scheduled.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {upcomingSessions.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                    <CalendarClock size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-navy-950">
+                      {fmtDate(s.scheduled_date)}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {fmtTime(s.scheduled_start)} — {fmtTime(s.scheduled_end)}
+                      {s.room ? ` · ${s.room}` : ""}
+                    </p>
+                  </div>
+                  <Badge variant={SESSION_TONE[s.status] || "neutral"}>
+                    {s.status}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {/* Tabs */}
+      <div className="flex items-center justify-between border-b border-slate-200">
+        <div className="flex gap-2">
+          {[
+            { id: "roster", label: "Roster", icon: Users },
+            { id: "materials", label: "Materials", icon: FileText },
+          ].map(({ id: tid, label, icon: Icon }) => (
+            <button
+              key={tid}
+              type="button"
+              onClick={() => setTab(tid)}
+              className={
+                "flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-semibold transition-colors " +
+                (tab === tid
+                  ? "border-purple-500 text-purple-600"
+                  : "border-transparent text-slate-500 hover:text-navy-950")
+              }
+            >
+              <Icon size={15} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="pb-2">
+          {tab === "roster" && (
+            <Button variant="primary" size="sm" onClick={() => setAddOpen(true)}>
+              <Plus size={14} />
+              Add student
+            </Button>
+          )}
+          {tab === "materials" && (
+            <Button variant="primary" size="sm" onClick={() => setUploadOpen(true)}>
+              <Plus size={14} />
+              Upload material
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Roster */}
+      {tab === "roster" && (
+        <div className="flex flex-col gap-3">
+          {students.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {STATUS_FILTERS.map((f) => {
+                const active = statusFilter === f.id;
+                const count = counts[f.id] ?? 0;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setStatusFilter(f.id)}
+                    className={
+                      "rounded-full px-3 py-1 text-xs font-semibold transition " +
+                      (active
+                        ? "bg-purple-500 text-white shadow-sm"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200")
+                    }
+                  >
+                    {f.label}
+                    <span
+                      className={
+                        "ml-1.5 rounded-full px-1.5 text-[10px] " +
+                        (active ? "bg-white/20" : "bg-white")
+                      }
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-card">
+            {studentsLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="animate-spin text-slate-300" />
+              </div>
+            ) : students.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-16 text-center">
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+                  <Users size={26} />
+                </span>
+                <p className="text-sm font-semibold text-navy-950">
+                  No students enrolled
+                </p>
+                <p className="text-xs text-slate-400">
+                  Add students manually, or share the joining code.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setAddOpen(true)}
+                  className="mt-1"
+                >
+                  <Plus size={14} />
+                  Add your first student
+                </Button>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                No students match this filter.
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {filteredStudents.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/50"
+                  >
+                    <Avatar
+                      userId={s.student?.id}
+                      initials={s.student?.initials || "?"}
+                      size="sm"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-navy-950">
+                        {s.student?.full_name || s.student?.email}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-400">
+                        {s.student?.email} - joined {fmtDate(s.joined_at || s.invited_at)}
+                      </p>
+                    </div>
+                    <div className="hidden sm:block">
+                      <CopyCodeButton code={s.joining_code} />
+                    </div>
+                    <Badge variant={STATUS_TONE[s.status] || "neutral"}>
+                      {s.status}
+                    </Badge>
+                    <RowMenu
+                      items={[
+                        s.status !== "active" && {
+                          label: "Mark active",
+                          icon: ShieldCheck,
+                          onClick: () => handleStatusChange(s.id, "active"),
+                        },
+                        s.status !== "blocked" && {
+                          label: "Block",
+                          icon: ShieldOff,
+                          onClick: () => handleStatusChange(s.id, "blocked"),
+                        },
+                        {
+                          label: "Remove from class",
+                          icon: Trash2,
+                          tone: "danger",
+                          onClick: () => setConfirm({
+                            title: "Remove this student?",
+                            description: `${s.student?.full_name || s.student?.email} will be removed from this class. You can reinstate them later.`,
+                            confirmLabel: "Remove",
+                            onConfirm: () => handleStatusChange(s.id, "removed"),
+                          }),
+                        },
+                      ].filter(Boolean)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
 
-      <ClassFormModal
-        open={formOpen}
-        onClose={() => {
-          setFormOpen(false);
-          setEditing(null);
-        }}
-        klass={editing}
-        onSuccess={(klass, action) => {
-          if (action === "created" && klass?.id) {
-            navigate(`/teacher/classes/${klass.id}`);
-          }
-        }}
+      {/* Materials */}
+      {tab === "materials" && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-card">
+          {materialsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin text-slate-300" />
+            </div>
+          ) : materials.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-16 text-center">
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-50 text-purple-500">
+                <FileText size={26} />
+              </span>
+              <p className="text-sm font-semibold text-navy-950">
+                No materials yet
+              </p>
+              <p className="text-xs text-slate-400">
+                Upload files to share with your students.
+              </p>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setUploadOpen(true)}
+                className="mt-1"
+              >
+                <Plus size={14} />
+                Upload your first material
+              </Button>
+            </div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {materials.map((m) => {
+                const { Icon: FIcon, tone } = pickFileIcon(m.mime_type, m.file_name);
+                return (
+                  <li
+                    key={m.id}
+                    className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50/50"
+                  >
+                    <span
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}
+                    >
+                      <FIcon size={16} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-navy-950">
+                        {m.title}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-400">
+                        {m.file_name} · {fmtSize(m.file_size)}
+                        {m.uploaded_by?.full_name && ` · ${m.uploaded_by.full_name}`}
+                        {" · "}
+                        {fmtDate(m.created_at)}
+                      </p>
+                    </div>
+                    {m.file_url && (
+                      <a
+                        href={m.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg p-2 text-slate-400 transition hover:bg-purple-50 hover:text-purple-600"
+                        title="Download"
+                      >
+                        <Download size={16} />
+                      </a>
+                    )}
+                    <RowMenu
+                      items={[
+                        {
+                          label: "Delete material",
+                          icon: Trash2,
+                          tone: "danger",
+                          onClick: () => setConfirm({
+                            title: "Delete this material?",
+                            description: `"${m.title}" will be removed from this class. This cannot be undone.`,
+                            confirmLabel: "Delete",
+                            onConfirm: () => handleDeleteMaterial(m.id),
+                          }),
+                        },
+                      ]}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      <AddStudentModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        classId={id}
+      />
+
+      <UploadMaterialModal
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        classId={id}
       />
 
       <ConfirmDialog
@@ -323,13 +731,7 @@ export default function TeacherClassesPage() {
         title={confirm?.title}
         description={confirm?.description}
         confirmLabel={confirm?.confirmLabel}
-        loading={deleting || updating}
-      />
-
-      <ClassRosterModal
-        klass={rosterFor}
-        open={!!rosterFor}
-        onClose={() => setRosterFor(null)}
+        loading={statusBusy || deleteBusy}
       />
     </div>
   );

@@ -26,8 +26,9 @@ export default function ClassRosterModal({ klass, open, onClose }) {
     const q = search.trim().toLowerCase();
     if (!q) return students;
     return students.filter((s) => {
-      const name = (s.full_name || s.name || "").toLowerCase();
-      const email = (s.email || "").toLowerCase();
+      const person = s.student || s;
+      const name = (person.full_name || person.name || "").toLowerCase();
+      const email = (person.email || "").toLowerCase();
       return name.includes(q) || email.includes(q);
     });
   }, [students, search]);
@@ -105,17 +106,18 @@ export default function ClassRosterModal({ klass, open, onClose }) {
           ) : (
             <ul className="divide-y divide-gray-100">
               {filtered.map((s) => {
-                const name = s.full_name || s.name || s.email || "Student";
-                const initials = s.initials || initialsOf(name);
+                const person = s.student || s;
+                const name = person.full_name || person.name || person.email || "Student";
+                const initials = person.initials || initialsOf(name);
                 const status = s.status || s.enrollment_status || "active";
                 return (
                   <li key={s.id} className="flex items-center gap-3 py-3">
-                    <Avatar userId={s.id} initials={initials} size="sm" />
+                    <Avatar userId={person.id} initials={initials} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-navy-950">{name}</p>
                       <p className="truncate text-[11px] text-slate-500">
-                        {s.email || "—"}
-                        {s.roll_number && ` · Roll ${s.roll_number}`}
+                        {person.email || "—"}
+                        {s.joining_code && ` · Code ${s.joining_code}`}
                       </p>
                     </div>
                     <span
