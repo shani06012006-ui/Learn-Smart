@@ -1,9 +1,10 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
 import { useMemo, useState } from "react";
-import { Search, GraduationCap, Users, TrendingUp, } from "lucide-react";
+import { Search, GraduationCap, Users, TrendingUp, UserPlus } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
+import AddStudentModal from "../components/AddStudentModal";
 import { classShortLabel, classLabel } from "../components/classLabel";
 import {
   useGetClassesQuery,

@@ -10,14 +10,31 @@ from core.utils import generate_unique_code
 from .models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 
 @transaction.atomic
-def add_student_to_class(class_course, email, first_name, last_name, grade=None):
+def add_student_to_class(
+    class_course,
+    email,
+    first_name,
+    last_name,
+    grade=None,
+    send_email=True,
+    whatsapp_number=None,
+    issued_by=None,
+):
     """
     Create (or fetch) a student and enroll them in the given class.
 
     If `grade` is provided (a Grade instance), it is set on the student
     (for new or existing) and the student is auto-enrolled into every
     matching class of that grade.
+
+    New students are created with `must_set_password=True` and receive a
+    one-time activation link (and an optional WhatsApp link) so they can
+    choose their own password. The returned dict includes `invitation`
+    and `student_pin` so the caller can share them.
     """
+    from accounts.activation import invite_student
+    from accounts.services import generate_student_pin
+    from accounts.models import StudentCredentials
 
     student, student_created = User.objects.get_or_create(
         email=email.lower().strip(),
@@ -27,6 +44,8 @@ def add_student_to_class(class_course, email, first_name, last_name, grade=None)
             "role": User.ROLE_STUDENT,
             "institution": class_course.institution,
             "grade": grade,
+            # New students must choose a password before they can sign in.
+            "must_set_password": True,
         },
     )
 
@@ -63,18 +82,36 @@ def add_student_to_class(class_course, email, first_name, last_name, grade=None)
             )
 
     # Ensure the student has a PIN credential for the quick-login page.
+    pin_value = None
     try:
-        from accounts.services import generate_student_pin
-        from accounts.models import StudentCredentials
         if not StudentCredentials.objects.filter(student=student).exists():
-            generate_student_pin(student)
+            pin_value = generate_student_pin(student).pin
+        else:
+            pin_value = StudentCredentials.objects.filter(student=student).first().pin
     except Exception:
         import logging
         logging.getLogger(__name__).exception(
             "PIN generation failed for student %s", student.id
         )
 
-    return enrollment, enrollment_created
+    # Issue a one-time activation invite so the student can set a password.
+    invitation = None
+    if student_created or student.must_set_password:
+        try:
+            invitation = invite_student(
+                student,
+                issued_by=issued_by,
+                send_email=send_email,
+                whatsapp_number=whatsapp_number,
+            )
+            invitation["student_pin"] = pin_value
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "activation invite failed for student %s", student.id
+            )
+
+    return enrollment, enrollment_created, invitation, pin_value
 
 
 @transaction.atomic

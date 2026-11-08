@@ -1157,7 +1157,7 @@ export const realApi = createApi({
       providesTags: [{ type: "MaterialList", id: "ALL" }],
     }),
     addClassStudent: builder.mutation({
-      query: ({ classId, email, first_name, last_name, grade_id }) => ({
+      query: ({ classId, email, first_name, last_name, grade_id, send_via, phone }) => ({
         url: `/classes/${classId}/students/`,
         method: "POST",
         body: {
@@ -1165,12 +1165,15 @@ export const realApi = createApi({
           first_name,
           last_name,
           ...(grade_id ? { grade_id } : {}),
+          ...(send_via ? { send_via } : {}),
+          ...(phone ? { phone } : {}),
         },
       }),
       invalidatesTags: (result, error, { classId }) => [
         { type: "ClassRoster", id: classId },
         { type: "Class", id: "LIST" },
         { type: "ClassDetail", id: classId },
+        { type: "TeacherStudents" },
       ],
     }),
     updateEnrollmentStatus: builder.mutation({
@@ -1295,6 +1298,7 @@ export const realApi = createApi({
         { type: "AdminUser", id: "STUDENT_LIST" },
         { type: "Class", id: "LIST" },
         { type: "ClassRoster", id: "LIST" },
+        { type: "TeacherStudents" },
       ],
     }),
     getAdminCourseStudents: builder.query({

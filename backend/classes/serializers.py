@@ -170,7 +170,7 @@ class ClassCourseDetailSerializer(ClassCourseSerializer):
 
 
 class AddStudentSerializer(serializers.Serializer):
-    """Input serializer for POST /classes/{id}/students/ â€” not a ModelSerializer
+    """Input serializer for POST /classes/{id}/students/ — not a ModelSerializer
     since it drives classes.services.add_student_to_class rather than a
     direct model create (the student User and the enrollment are two
     separate, conditionally-created objects)."""
@@ -179,6 +179,13 @@ class AddStudentSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=100)
     last_name = serializers.CharField(max_length=100)
     grade_id = serializers.UUIDField(required=False, allow_null=True)
+    # How the one-time activation link is delivered. `send_via` missing -> email only.
+    send_via = serializers.ListField(
+        child=serializers.ChoiceField(choices=("email", "whatsapp")),
+        required=False,
+        allow_empty=True,
+    )
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
 
     def validate_grade_id(self, value):
         """Ensure the grade belongs to the teacher's institution."""
@@ -195,6 +202,21 @@ class AddStudentSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 "Unknown grade for your institution."
             )
+
+    def validate(self, attrs):
+        channels = attrs.get("send_via")
+        channels = ["email"] if channels is None else list(dict.fromkeys(channels))
+        attrs["send_email"] = "email" in channels
+        attrs["whatsapp_number"] = None
+        if "whatsapp" in channels:
+            from accounts.activation import normalise_whatsapp_number
+            number = normalise_whatsapp_number(attrs.get("phone"))
+            if number is None:
+                raise serializers.ValidationError(
+                    {"phone": ["Enter a valid mobile number with country code, e.g. +91 98765 43210."]}
+                )
+            attrs["whatsapp_number"] = number
+        return attrs
 
 
 class StudentEnrollmentSerializer(serializers.ModelSerializer):

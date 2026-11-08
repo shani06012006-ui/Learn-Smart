@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { UserPlus, GraduationCap } from "lucide-react";
+import { UserPlus, GraduationCap, CheckCircle2 } from "lucide-react";
 
 import Modal from "../../../components/ui/Modal";
 import Button from "../../../components/ui/Button";
+import ActivationInviteResult from "../../admin/components/ActivationInviteResult";
+import InviteDeliveryFields from "../../admin/components/InviteDeliveryFields";
+import { DEFAULT_DELIVERY, deliveryToPayload } from "../../admin/components/inviteDelivery";
 import {
   useAddClassStudentMutation,
+  useCreateTeacherStudentMutation,
   useGetGradesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
@@ -14,12 +18,18 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [gradeId, setGradeId] = useState("");
+  const [delivery, setDelivery] = useState(DEFAULT_DELIVERY);
   const [error, setError] = useState("");
+  // Set after a student is created: holds the response incl. the one-time
+  // activation link so we can show it (the only time it is visible).
+  const [created, setCreated] = useState(null);
 
   const { data: gradesData } = useGetGradesQuery();
   const grades = gradesData?.results ?? gradesData ?? [];
 
-  const [addStudent, { isLoading }] = useAddClassStudentMutation();
+  const [addClassStudent, { isLoading: addingToClass }] = useAddClassStudentMutation();
+  const [createTeacherStudent, { isLoading: creating }] = useCreateTeacherStudentMutation();
+  const isLoading = addingToClass || creating;
 
   useEffect(() => {
     if (!open) {
@@ -27,7 +37,9 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
       setFirstName("");
       setLastName("");
       setGradeId("");
+      setDelivery(DEFAULT_DELIVERY);
       setError("");
+      setCreated(null);
     }
   }, [open]);
 
@@ -43,20 +55,62 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
       setError("Email, first name, and last name are required.");
       return;
     }
+    if (delivery.whatsapp && !delivery.phone.trim()) {
+      setError("Enter the WhatsApp number.");
+      return;
+    }
+
+    const payload = {
+      email: trimEmail,
+      first_name: trimFirst,
+      last_name: trimLast,
+      ...deliveryToPayload(delivery),
+    };
 
     try {
-      const res = await addStudent({
-        classId,
-        email: trimEmail,
-        first_name: trimFirst,
-        last_name: trimLast,
-        grade_id: gradeId || undefined,
-      }).unwrap();
-      onSuccess?.(res);
-      onClose();
+      let res;
+      if (classId) {
+        // Adding a student to a specific class (from the Class Detail page).
+        res = await addClassStudent({
+          classId,
+          ...payload,
+          ...(gradeId ? { grade_id: gradeId } : {}),
+        }).unwrap();
+      } else {
+        // Adding a student from the Students directory (grade-scoped).
+        res = await createTeacherStudent({
+          ...payload,
+          ...(gradeId ? { grade_id: gradeId } : {}),
+        }).unwrap();
+      }
+      if (res?.invitation) {
+        setCreated(res);
+      } else {
+        onSuccess?.(res);
+        onClose();
+      }
     } catch (err) {
       setError(extractErrorMessage(err));
     }
+  }
+
+  const createdEmail = created?.student?.email || created?.student?.email || email;
+
+  if (created) {
+    return (
+      <Modal
+        open={open}
+        onClose={onClose}
+        title="Student created"
+        footer={
+          <Button variant="primary" onClick={onClose}>
+            Done
+          </Button>
+        }
+      >
+        <ActivationInviteResult email={createdEmail} invitation={created.invitation} />
+      </Modal>
+    );
   }
 
   return (
@@ -75,7 +129,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
             form="add-student-form"
             loading={isLoading}
           >
-            Add student
+            {delivery.email || delivery.whatsapp ? "Create & send link" : "Add student"}
           </Button>
         </>
       }
@@ -86,8 +140,8 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
             <UserPlus size={16} />
           </span>
           <p className="text-xs text-purple-700">
-            The student is added to this class. If you pick a grade, they are
-            automatically enrolled in every class of that grade.
+            The student gets a one-time activation link to choose their own
+            password. {classId ? "They are added to this class." : "Pick a grade to enroll them in matching classes."}
           </p>
         </div>
 
@@ -136,7 +190,7 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
         <label className="flex flex-col gap-1.5">
           <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
             <GraduationCap size={12} />
-            Grade (optional)
+            Grade {classId ? "(optional)" : "(optional)"}
           </span>
           <select
             value={gradeId}
@@ -154,6 +208,12 @@ export default function AddStudentModal({ open, onClose, classId, onSuccess }) {
             Pick a grade to auto-enroll the student in every matching class.
           </span>
         </label>
+
+        <InviteDeliveryFields
+          value={delivery}
+          onChange={setDelivery}
+          disabled={isLoading}
+        />
 
         {error && (
           <p className="rounded-xl border border-coral-200 bg-coral-50 px-3 py-2 text-xs font-medium text-coral-700">

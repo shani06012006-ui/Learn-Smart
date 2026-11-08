@@ -796,17 +796,23 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
             if not request.user.is_superuser and grade.institution_id != request.user.institution_id:
                 return Response({"detail": "Grade not in your institution."}, status=status.HTTP_400_BAD_REQUEST)
 
-        enrollment, created = add_student_to_class(
+        enrollment, created, invitation, pin_value = add_student_to_class(
             class_course=course, email=email, first_name=first_name, last_name=last_name, grade=grade,
+            issued_by=request.user,
         )
-        return Response({
+        resp = {
             "id": str(enrollment.id), "status": enrollment.status,
             "joining_code": enrollment.joining_code, "created": created,
             "student": {
                 "id": str(enrollment.student.id), "full_name": enrollment.student.get_full_name(),
                 "email": enrollment.student.email, "is_active": enrollment.student.is_active,
             },
-        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        }
+        if invitation is not None:
+            resp["invitation"] = invitation
+        if pin_value is not None:
+            resp["student_pin"] = pin_value
+        return Response(resp, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     @action(detail=True, methods=["patch"], url_path=r"students/(?P<enrollment_id>[^/.]+)")
     def student_status(self, request, pk=None, enrollment_id=None):

@@ -135,15 +135,24 @@ class ClassStudentsView(APIView):
         # `grade_id` in the serializer validates to a Grade instance
         validated = input_serializer.validated_data
         grade = validated.pop("grade_id", None)
+        send_email = validated.pop("send_email", True)
+        whatsapp_number = validated.pop("whatsapp_number", None)
 
-        enrollment, created = services.add_student_to_class(
+        enrollment, created, invitation, pin_value = services.add_student_to_class(
             class_course=class_course,
             grade=grade,
+            send_email=send_email,
+            whatsapp_number=whatsapp_number,
+            issued_by=request.user,
             **validated,
         )
-        output = StudentEnrollmentSerializer(enrollment)
+        output = StudentEnrollmentSerializer(enrollment).data
+        if invitation is not None:
+            output["invitation"] = invitation
+        if pin_value is not None:
+            output["student_pin"] = pin_value
         return Response(
-            output.data,
+            output,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 

@@ -388,6 +388,8 @@ class TeacherStudentCreateView(APIView):
             )
 
         from accounts.models import OnlineStatus, StudentProfile, User
+        from accounts.activation import invite_student, normalise_whatsapp_number
+        from accounts.services import generate_student_pin
         from institutions.models import Grade
         from classes.services import auto_enroll_student_into_grade
 
@@ -395,6 +397,21 @@ class TeacherStudentCreateView(APIView):
         first_name = (request.data.get("first_name") or "").strip()
         last_name = (request.data.get("last_name") or "").strip()
         grade_id = request.data.get("grade_id")
+
+        # Resolve delivery channels (default: email only)
+        send_via = request.data.get("send_via")
+        if send_via is None:
+            send_via = ["email"]
+        send_via = list(dict.fromkeys(send_via))
+        send_email = "email" in send_via
+        whatsapp_number = None
+        if "whatsapp" in send_via:
+            whatsapp_number = normalise_whatsapp_number(request.data.get("phone"))
+            if whatsapp_number is None:
+                return Response(
+                    {"detail": "Enter a valid mobile number with country code, e.g. +91 98765 43210."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if not email:
             return Response(
@@ -432,7 +449,13 @@ class TeacherStudentCreateView(APIView):
                 first_name=first_name,
                 last_name=last_name,
                 role=User.ROLE_STUDENT,
+                institution=user.institution,
+                grade=grade,
+                # New students must choose a password before they can sign in.
+                must_set_password=True,
             )
+            student.set_unusable_password()
+            student.save(update_fields=["password"])
             StudentProfile.objects.create(user=student)
             OnlineStatus.objects.create(user=student)
             created = True
@@ -447,13 +470,47 @@ class TeacherStudentCreateView(APIView):
                     "auto-enroll failed for student %s", student.id
                 )
 
+        # Generate a PIN for the quick-login page.
+        pin_value = None
+        try:
+            from accounts.models import StudentCredentials
+            if not StudentCredentials.objects.filter(student=student).exists():
+                pin_value = generate_student_pin(student).pin
+            else:
+                pin_value = StudentCredentials.objects.filter(student=student).first().pin
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("PIN generation failed for student %s", student.id)
+
+        # Issue a one-time activation invite so the student can set a password.
+        invitation = None
+        if created or student.must_set_password:
+            try:
+                invitation = invite_student(
+                    student,
+                    issued_by=user,
+                    send_email=send_email,
+                    whatsapp_number=whatsapp_number,
+                )
+                invitation["student_pin"] = pin_value
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "activation invite failed for student %s", student.id
+                )
+
         from .serializers import StudentBriefSerializer
+        resp = {
+            "created": created,
+            "auto_enrolled_count": enrolled_count,
+            "student": StudentBriefSerializer(student).data,
+        }
+        if invitation is not None:
+            resp["invitation"] = invitation
+        if pin_value is not None:
+            resp["student_pin"] = pin_value
         return Response(
-            {
-                "created": created,
-                "auto_enrolled_count": enrolled_count,
-                "student": StudentBriefSerializer(student).data,
-            },
+            resp,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
