@@ -215,13 +215,13 @@ ACTIVATION_DEFAULT_COUNTRY_CODE = os.getenv("ACTIVATION_DEFAULT_COUNTRY_CODE", "
 # For real delivery set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 # plus the EMAIL_HOST* variables below (see SIGNUP_SETUP.md).
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_HOST_USER = "reach.shaniyas@gmail.com"
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("1", "true", "yes")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Learn Smart <no-reply@learnsmart.local>")
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = "Learn Smart <itzshaniya06@gmail.com>"
 
 # ---------------------------------------------------------------------------
 # Channels / Redis

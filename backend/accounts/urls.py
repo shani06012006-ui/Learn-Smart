@@ -22,7 +22,6 @@ from .views import (
     RequestOTPView,
     VerifyOTPView,
     SetupPasswordView, 
-    AdminCreateStudentView,
     StudentPinLoginView ,
 )
 
@@ -46,5 +45,4 @@ urlpatterns = [
     
     path("setup-password/", SetupPasswordView.as_view(), name="auth-setup-password"),
     path("student-login/", StudentPinLoginView.as_view(), name="student-pin-login"),
-    path("admin/create-student/", AdminCreateStudentView.as_view(), name="admin-create-student"),
 ]

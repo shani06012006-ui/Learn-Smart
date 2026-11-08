@@ -1,6 +1,6 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
 import { useMemo, useState } from "react";
-import { Search, GraduationCap, Users, TrendingUp, } from "lucide-react";
+import { Search, GraduationCap, Users, TrendingUp, Plus } from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -10,6 +10,7 @@ import {
   useGetTeacherStudentsDirectoryQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
+import CreateStudentModal from "../components/CreateStudentModal";
 
 function MetricCard({ icon: Icon, label, value, tone = "purple" }) {
   const tones = {
@@ -43,6 +44,7 @@ function initialsOf(name) {
 export default function TeacherStudentsPage() {
   const [classId, setClassId] = useState("");
   const [search, setSearch] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
 
   const { data: classesData } = useGetClassesQuery();
   const classes = classesData?.results ?? classesData ?? [];
@@ -57,11 +59,6 @@ export default function TeacherStudentsPage() {
   const { data, isLoading, isError, error, refetch } =
     useGetTeacherStudentsDirectoryQuery(queryArgs);
 
-  // HARDENED extraction — data may be:
-  //   - undefined (loading)
-  //   - { results: [...] } (paginated)
-  //   - [...] (unpaginated)
-  //   - an error object (403/500) with no results
   const students = useMemo(() => {
     if (!data) return [];
     if (Array.isArray(data)) return data;
@@ -94,6 +91,13 @@ export default function TeacherStudentsPage() {
             Class-wise student directory with attendance overview.
           </p>
         </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-purple-200 transition hover:bg-purple-700"
+        >
+          <Plus size={16} />
+          Add student
+        </button>
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -137,12 +141,7 @@ export default function TeacherStudentsPage() {
 
       {isLoading && <LoadingState label="Loading students…" />}
 
-      {isError && (
-        <ErrorState
-          message={extractErrorMessage(error)}
-          onRetry={refetch}
-        />
-      )}
+      {isError && <ErrorState message={extractErrorMessage(error)} onRetry={refetch} />}
 
       {!isLoading && !isError && students.length === 0 && (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-slate-200 bg-white p-14 text-center">
@@ -163,24 +162,12 @@ export default function TeacherStudentsPage() {
           <table className="w-full">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Student
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Roll #
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Student PIN
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Class
-                </th>
-                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Class Teacher
-                </th>
-                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Attendance
-                </th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Student</th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Roll #</th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Student PIN</th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Class</th>
+                <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Class Teacher</th>
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Attendance</th>
               </tr>
             </thead>
             <tbody>
@@ -200,40 +187,28 @@ export default function TeacherStudentsPage() {
                           {initialsOf(s.full_name || s.email)}
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-navy-950">
-                            {s.full_name || "Unnamed"}
-                          </p>
+                          <p className="truncate text-sm font-semibold text-navy-950">{s.full_name || "Unnamed"}</p>
                           <p className="truncate text-[11px] text-slate-500">{s.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {s.roll_number || <span className="text-slate-300">—</span>}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{s.roll_number || <span className="text-slate-300">—</span>}</td>
                     <td className="px-4 py-3">
                       {s.student_pin ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-1 font-mono text-xs font-bold text-purple-700 ring-1 ring-purple-100">
                           {s.student_pin}
                           {s.student_pin_active === false && (
-                            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">
-                              inactive
-                            </span>
+                            <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">inactive</span>
                           )}
                         </span>
                       ) : (
                         <span className="text-xs text-slate-300">No PIN</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {s.class_name || <span className="text-slate-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      {s.class_teacher_name || <span className="text-slate-300">—</span>}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{s.class_name || <span className="text-slate-300">—</span>}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{s.class_teacher_name || <span className="text-slate-300">—</span>}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-bold " + tone}>
-                        {pct}%
-                      </span>
+                      <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-bold " + tone}>{pct}%</span>
                     </td>
                   </tr>
                 );
@@ -242,6 +217,15 @@ export default function TeacherStudentsPage() {
           </table>
         </div>
       )}
+
+      <CreateStudentModal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        onCreated={() => {
+          setShowCreate(false);
+          refetch();
+        }}
+      />
     </div>
   );
 }
