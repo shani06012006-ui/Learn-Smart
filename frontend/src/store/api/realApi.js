@@ -331,12 +331,11 @@ export const realApi = createApi({
     }),
     generateQuizFromPdf: builder.mutation({
       query: (formData) => ({
-        url: "/quizzes/generate-from-pdf/",
-        method: "POST",
-        body: formData,
-        formData: true,
-      }),
-    }),
+    url: "quizzes/generate-from-pdf/",
+    method: "POST",
+    body: formData,
+  }),
+}),
     publishQuiz: builder.mutation({
       query: (id) => ({
         url: `/quizzes/${id}/publish/`,

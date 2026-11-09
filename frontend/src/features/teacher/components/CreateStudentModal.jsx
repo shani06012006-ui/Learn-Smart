@@ -199,14 +199,6 @@ export default function CreateQuizModal({ open, onClose, onCreated }) {
           <button className={`w-full py-2 rounded-lg font-bold ${creationType === "ai" ? "bg-purple-600 text-white" : "bg-slate-800 text-slate-300"}`}>Select</button>
         </div>
 
-        <div onClick={() => { setCreationType("bank"); }}
-          className={`cursor-pointer rounded-2xl border-2 p-6 flex flex-col items-center text-center transition ${creationType === "bank" ? "border-purple-500 bg-purple-500/10" : "border-slate-700 hover:border-slate-500"}`}>
-          <div className="text-5xl mb-4">🗂️</div>
-          <h3 className="font-bold text-lg mb-2 text-white">Select from Bank</h3>
-          <p className="text-xs text-slate-400 mb-6 flex-1">Search and import questions from your previously created quizzes.</p>
-          <button className={`w-full py-2 rounded-lg font-bold ${creationType === "bank" ? "bg-purple-600 text-white" : "bg-slate-800 text-slate-300"}`}>Select</button>
-        </div>
-
         <div onClick={() => { setCreationType("manual"); }}
           className={`cursor-pointer rounded-2xl border-2 p-6 flex flex-col items-center text-center transition ${creationType === "manual" ? "border-purple-500 bg-purple-500/10" : "border-slate-700 hover:border-slate-500"}`}>
           <div className="text-5xl mb-4">✍️</div>

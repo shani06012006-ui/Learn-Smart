@@ -12,7 +12,7 @@ from django.db import transaction
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
-from .ai_service import extract_pdf_text, generate_quiz_from_text
+from .ai_service import AIServiceError, extract_pdf_text, generate_quiz_from_text
 from .models import AttemptAnswer, Choice, Question, Quiz, QuizAttempt
 from .serializers import (
     GenerateFromPdfSerializer,
@@ -136,55 +136,51 @@ class GenerateFromPdfView(APIView):
             raise ValidationError({"pdf": "Only .pdf files are accepted."})
 
         try:
-            raw = pdf.read()
-            text = extract_pdf_text(raw)
-        except Exception as exc:
-            raise ValidationError({"pdf": f"Could not read PDF: {exc}"})
+            text = extract_pdf_text(pdf.read())
+        except AIServiceError as exc:
+            raise ValidationError({"pdf": str(exc)})
 
-        if not text or len(text) < 50:
+        if len(text) < 50:
             raise ValidationError({
-                "pdf": "PDF has too little extractable text. Use a text-based PDF."
+                "pdf": "PDF has too little extractable text. Use a text-based PDF, not a scanned image."
             })
 
         try:
-            # This returns a list of dicts with 'question', 'choices', 'explanation'
             questions = generate_quiz_from_text(
                 text=text,
                 question_count=data["question_count"],
                 difficulty=data["difficulty"],
                 title=data["title"],
             )
-        except Exception as exc:
-            return Response(
-                {"detail": f"AI generation failed. Please try again. ({exc})"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        except AIServiceError as exc:
+            # Real, specific error message instead of fake questions
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
-        # Format for the Frontend
-        formatted_questions = []
-        for q in questions:
-            formatted_questions.append({
-                "question_text": q.get("question", "Missing Question"),
-                "explanation": q.get("explanation", ""),
+        formatted_questions = [
+            {
+                "question_text": q["question"],
+                "explanation": q["explanation"],
                 "points": 1,
                 "choices": [
-                    {
-                        "choice_text": c.get("text", "Option"),
-                        "is_correct": c.get("is_correct", False)
-                    }
-                    for c in q.get("choices", [])
-                ]
-            })
+                    {"choice_text": c["text"], "is_correct": c["is_correct"]}
+                    for c in q["choices"]
+                ],
+            }
+            for q in questions
+        ]
 
-        return Response({
-            "title": data["title"],
-            "class_course": str(cls.id),
-            "duration_minutes": data["duration_minutes"],
-            "passing_score": data["passing_score"],
-            "difficulty": data["difficulty"],
-            "source_filename": pdf.name,
-            "questions": formatted_questions,
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "title": data["title"],
+                "class_course": str(cls.id),
+                "duration_minutes": data["duration_minutes"],
+                "passing_score": data["passing_score"],
+                "difficulty": data["difficulty"],
+                "source_filename": pdf.name,
+                "questions": formatted_questions,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 # ===============================================================

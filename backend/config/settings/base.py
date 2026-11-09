@@ -258,6 +258,12 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+# Free AI provider settings (see quizzes/ai_service.py)
+AI_PROVIDER = os.getenv("AI_PROVIDER", "gemini")     
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
+
 # ---------------------------------------------------------------------------
 # Joining code config (classes app)
 # ---------------------------------------------------------------------------
