@@ -21,6 +21,7 @@ import StudentQuizzesPage from "./features/student/pages/StudentQuizzesPage";
 import StudentTakeQuizPage from "./features/student/pages/StudentTakeQuizPage";
 import StudentQuizResultPage from "./features/student/pages/StudentQuizResultPage";
 import RequirePasswordSetup from "./features/auth/RequirePasswordSetup";
+import SetupPasswordPage from "./features/auth/SetupPasswordPage";
 
 // Admin
 import AdminRouteGuard from "./features/admin/components/AdminRouteGuard";
@@ -73,6 +74,7 @@ export default function App() {
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/activate" element={<ActivateAccountPage />} />
+      <Route path="/auth/setup-password" element={<SetupPasswordPage />} />
 
       {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>

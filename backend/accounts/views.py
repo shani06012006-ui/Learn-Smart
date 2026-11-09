@@ -338,10 +338,14 @@ class TeacherStudentCreateView(APIView):
         from institutions.models import Grade
         from classes.services import auto_enroll_student_into_grade
         from .activation import invite_student
+        from .serializers import StudentBriefSerializer
 
         user = request.user
         if user.role not in ("teacher", "admin"):
-            return Response({"detail": "Only teachers or admins can create students."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "Only teachers or admins can create students."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         email = (request.data.get("email") or "").strip().lower()
         first_name = (request.data.get("first_name") or "").strip()
@@ -362,9 +366,43 @@ class TeacherStudentCreateView(APIView):
             except Grade.DoesNotExist:
                 return Response({"detail": "Unknown grade."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if User.objects.filter(email=email).exists():
-            return Response({"detail": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+        # ─── Case 1: Student already exists → resend invite ───
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user is not None:
+            if existing_user.role != User.ROLE_STUDENT:
+                return Response(
+                    {"detail": f"This email belongs to a {existing_user.role}, not a student."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
+            if first_name:
+                existing_user.first_name = first_name
+            if last_name:
+                existing_user.last_name = last_name
+            if grade is not None:
+                existing_user.grade = grade
+            existing_user.must_set_password = True
+            existing_user.save(update_fields=["first_name", "last_name", "grade", "must_set_password", "updated_at"])
+
+            invitation = invite_student(
+                existing_user,
+                issued_by=user,
+                send_email=("email" in send_via),
+                whatsapp_number=phone if "whatsapp" in send_via else None,
+            )
+
+            return Response(
+                {
+                    "created": False,
+                    "resent": True,
+                    "student": StudentBriefSerializer(existing_user).data,
+                    "student_pin": invitation.get("student_pin"),
+                    "invitation": invitation,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # ─── Case 2: New student → create them ───
         student = User.objects.create_user(
             email=email,
             password=None,
@@ -387,7 +425,7 @@ class TeacherStudentCreateView(APIView):
                 import logging
                 logging.getLogger(__name__).exception("auto-enroll failed for %s", student.id)
 
-        # ✅ Issue invite + generate PIN + send email
+        # Issue invite + generate PIN + send email
         invitation = invite_student(
             student,
             issued_by=user,
@@ -407,7 +445,98 @@ class TeacherStudentCreateView(APIView):
             status=status.HTTP_201_CREATED,
         )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# TEACHER: EDIT & DELETE STUDENTS
+# ─────────────────────────────────────────────────────────────────────────────
 
+class TeacherStudentDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self, request, student_id):
+        from accounts.models import User
+        user = request.user
+        if user.role not in ("teacher", "admin"):
+            return None, Response({"detail": "Only teachers or admins can manage students."}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            student = User.objects.get(id=student_id, role=User.ROLE_STUDENT)
+        except User.DoesNotExist:
+            return None, Response({"detail": "Student not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+        if user.role == "teacher" and student.institution_id != user.institution_id:
+            return None, Response({"detail": "Student is not in your institution."}, status=status.HTTP_403_FORBIDDEN)
+            
+        return student, None
+
+    def patch(self, request, student_id):
+        student, err = self.get_object(request, student_id)
+        if err: return err
+
+        from institutions.models import Grade
+        from classes.services import auto_enroll_student_into_grade
+
+        email = (request.data.get("email") or "").strip().lower()
+        first_name = (request.data.get("first_name") or "").strip()
+        last_name = (request.data.get("last_name") or "").strip()
+        grade_id = request.data.get("grade_id")
+
+        if email and email != student.email:
+            if User.objects.filter(email=email).exclude(id=student.id).exists():
+                return Response({"detail": "Another user already uses this email."}, status=status.HTTP_400_BAD_REQUEST)
+            student.email = email
+
+        if first_name: student.first_name = first_name
+        if last_name: student.last_name = last_name
+
+        if grade_id:
+            try:
+                grade = Grade.objects.get(id=grade_id)
+                student.grade = grade
+            except Grade.DoesNotExist:
+                pass
+
+        student.save()
+        
+        # Re-sync enrollments if grade changed
+        if student.grade_id:
+            try:
+                auto_enroll_student_into_grade(student)
+            except Exception:
+                pass
+
+        from .serializers import StudentBriefSerializer
+        return Response(StudentBriefSerializer(student).data, status=status.HTTP_200_OK)
+
+    def delete(self, request, student_id):
+        student, err = self.get_object(request, student_id)
+        if err: return err
+        
+        student.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TeacherRegeneratePinView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, student_id):
+        from accounts.models import User
+        from accounts.services import generate_student_pin
+
+        user = request.user
+        if user.role not in ("teacher", "admin"):
+            return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            student = User.objects.get(id=student_id, role=User.ROLE_STUDENT)
+        except User.DoesNotExist:
+            return Response({"detail": "Student not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.role == "teacher" and student.institution_id != user.institution_id:
+            return Response({"detail": "Student is not in your institution."}, status=status.HTTP_403_FORBIDDEN)
+
+        creds = generate_student_pin(student)
+        return Response({"pin": creds.pin}, status=status.HTTP_200_OK)
+    
 class RequestOTPView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
@@ -495,8 +624,12 @@ class SetupPasswordView(APIView):
             return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            from .activation import complete_activation, ActivationError
+            from .activation import complete_activation, ActivationError, send_password_setup_success_email
+            
             user = complete_activation(token, new_password)
+            
+            send_password_setup_success_email(user)
+            
             return Response({"message": "Password set successfully. You can now log in."}, status=status.HTTP_200_OK)
         except Exception as e:
             from .activation import ActivationError

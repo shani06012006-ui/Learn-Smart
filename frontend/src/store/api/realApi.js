@@ -33,9 +33,6 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       return result;
     }
 
-    // Share one refresh request across simultaneous 401s. Refresh-token
-    // rotation treats reuse as a compromise, so parallel refreshes can revoke
-    // an otherwise valid session.
     if (!refreshPromise) {
       refreshPromise = rawBaseQuery(
         {
@@ -72,37 +69,13 @@ export const realApi = createApi({
   reducerPath: "realApi",
   baseQuery: baseQueryWithReauth,
   tagTypes: [
-    "AdminUser",
-    "AdminStats",
-    "AdminInstitution",
-    "AdminCourse",
-    "AdminGrade",
-    "AdminSession",
-    "AdminEnrollment",
-    "AdminAttendance",
-    "AdminTimetable",
-    "StudentLeave",
-    "TeacherLeave",
-    "MyLeave",
-    "Class",
-    "Enrollment",
-    "Material",
-    "Announcement",
-    "ChatThread",
-    "ChatMessage",
-    "ClassDetail",
-    "ClassRoster",
-    "ClassMaterial",
-    "MaterialList",
-    "ChatMembers",
-    "TeacherChat",
-    "StudentSelf",
-    "StudentQuizzes",
-    "StudentLiveClasses",
-    "StudentAnnouncements",
-    "Quiz",
-    "QuizAttempt",
-    "QuizSubmissions",
+    "AdminUser", "AdminStats", "AdminInstitution", "AdminCourse", "AdminGrade",
+    "AdminSession", "AdminEnrollment", "AdminAttendance", "AdminTimetable",
+    "StudentLeave", "TeacherLeave", "MyLeave", "Class", "Enrollment",
+    "Material", "Announcement", "ChatThread", "ChatMessage", "ClassDetail",
+    "ClassRoster", "ClassMaterial", "MaterialList", "ChatMembers",
+    "TeacherChat", "StudentSelf", "StudentQuizzes", "StudentLiveClasses",
+    "StudentAnnouncements", "Quiz", "QuizAttempt", "QuizSubmissions",
     "Notifications",
   ],
   endpoints: (builder) => ({
@@ -161,13 +134,7 @@ export const realApi = createApi({
         "AdminSections",
       ],
     }),
-    deleteChatMessage: builder.mutation({
-      query: (messageId) => ({
-        url: `/chat/messages/${messageId}/`,
-        method: "DELETE",
-      }),
-      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
-    }),
+    
     // ---- AI Timetable Generator ----
     generateTimetable: builder.mutation({
       query: (body) => ({ url: "/admin/timetable/generate/", method: "POST", body }),
@@ -507,7 +474,19 @@ export const realApi = createApi({
         method: "POST",
         body: { body },
       }),
-        // ---- Admin Chat ----
+      invalidatesTags: (r, e, { id }) => [
+        { type: "TeacherChat", id: `msgs-${id}` },
+        "TeacherChat",
+      ],
+    }),
+    deleteChatMessage: builder.mutation({
+      query: (messageId) => ({
+        url: `/chat/messages/${messageId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
+    }),
+    // ---- Admin Chat ----
     sendAdminChatMessage: builder.mutation({
       query: ({ id, body }) => ({
         url: `/admin/chat/rooms/${id}/send/`,
@@ -519,11 +498,6 @@ export const realApi = createApi({
         "AdminChat",
       ],
     }),  
-      invalidatesTags: (r, e, { id }) => [
-        { type: "TeacherChat", id: `msgs-${id}` },
-        "TeacherChat",
-      ],
-    }),
 
     // ---- Chat thread membership ----
     getChatThreadMembers: builder.query({
@@ -731,6 +705,16 @@ export const realApi = createApi({
         body,
       }),
     }),
+    
+    // ✅ Setup Password Mutation added here
+    setupPassword: builder.mutation({
+      query: (body) => ({
+        url: "/auth/setup-password/",
+        method: "POST",
+        body,
+      }),
+    }),
+
     adminMe: builder.query({
       query: () => "/auth/me/",
       providesTags: ["AdminUser"],
@@ -1297,6 +1281,29 @@ export const realApi = createApi({
         { type: "ClassRoster", id: "LIST" },
       ],
     }),
+    updateTeacherStudent: builder.mutation({
+      query: ({ id, ...body }) => ({
+        url: `/auth/students/${id}/`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: [{ type: "AdminUser", id: "STUDENT_LIST" }, "TeacherStudents"],
+    }),
+    deleteTeacherStudent: builder.mutation({
+      query: (id) => ({
+        url: `/auth/students/${id}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "AdminUser", id: "STUDENT_LIST" }, "TeacherStudents"],
+    }),
+    regenerateStudentPin: builder.mutation({
+      query: (id) => ({
+        url: `/auth/students/${id}/regenerate-pin/`,
+        method: "POST",
+      }),
+      invalidatesTags: ["TeacherStudents"],
+    }),
+
     getAdminCourseStudents: builder.query({
       query: (id) => `/admin/courses/${id}/students/`,
       providesTags: (result, error, id) => [
@@ -1478,6 +1485,7 @@ export const realApi = createApi({
   }),
 });
 
+// ✅ Setup Password Hook added to the export list
 export const {
   useAdminLoginMutation,
   useAdminLogoutMutation,
@@ -1532,6 +1540,7 @@ export const {
   useGetStudentMyClassesQuery,
   useGetStudentMeQuery,
   useStudentPinLoginMutation,
+  useSetupPasswordMutation, // <--- ADDED HERE
   useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
   useGetAttendanceSummaryQuery,
@@ -1630,4 +1639,7 @@ export const {
   useApproveTeacherLeaveMutation,
   useRejectTeacherLeaveMutation,
   useCancelTeacherLeaveMutation,
+  useUpdateTeacherStudentMutation,
+  useDeleteTeacherStudentMutation,
+  useRegenerateStudentPinMutation,
 } = realApi;

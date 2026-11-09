@@ -1,6 +1,9 @@
 // frontend/src/features/teacher/pages/TeacherStudentsPage.jsx
-import { useMemo, useState } from "react";
-import { Search, GraduationCap, Users, TrendingUp, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Search, GraduationCap, Users, TrendingUp, Plus, MoreVertical,
+  Edit, Trash2, KeyRound, ShieldOff,
+} from "lucide-react";
 
 import LoadingState from "../../../components/feedback/LoadingState";
 import ErrorState from "../../../components/feedback/ErrorState";
@@ -8,9 +11,12 @@ import { classShortLabel, classLabel } from "../components/classLabel";
 import {
   useGetClassesQuery,
   useGetTeacherStudentsDirectoryQuery,
+  useDeleteTeacherStudentMutation,
+  useRegenerateStudentPinMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 import CreateStudentModal from "../components/CreateStudentModal";
+import EditStudentModal from "../components/EditStudentModal";
 
 function MetricCard({ icon: Icon, label, value, tone = "purple" }) {
   const tones = {
@@ -41,10 +47,60 @@ function initialsOf(name) {
   return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 }
 
+/* ─── Row Dropdown Menu ────────────────────────────────────── */
+function RowMenu({ student, onEdit, onDelete, onRegenerate }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition"
+      >
+        <MoreVertical size={16} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-10 z-50 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+          <button
+            onClick={() => { setOpen(false); onEdit(); }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Edit size={13} /> Edit student
+          </button>
+          <button
+            onClick={() => { setOpen(false); onRegenerate(); }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <KeyRound size={13} /> Regenerate PIN
+          </button>
+          <div className="my-1 h-px bg-slate-100" />
+          <button
+            onClick={() => { setOpen(false); onDelete(); }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
+          >
+            <Trash2 size={13} /> Delete student
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Page ───────────────────────────────────────────── */
 export default function TeacherStudentsPage() {
   const [classId, setClassId] = useState("");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [editStudent, setEditStudent] = useState(null);
 
   const { data: classesData } = useGetClassesQuery();
   const classes = classesData?.results ?? classesData ?? [];
@@ -58,6 +114,9 @@ export default function TeacherStudentsPage() {
 
   const { data, isLoading, isError, error, refetch } =
     useGetTeacherStudentsDirectoryQuery(queryArgs);
+
+  const [deleteStudent] = useDeleteTeacherStudentMutation();
+  const [regeneratePin] = useRegenerateStudentPinMutation();
 
   const students = useMemo(() => {
     if (!data) return [];
@@ -79,6 +138,27 @@ export default function TeacherStudentsPage() {
   }, [students]);
 
   const selectedClass = classes.find((c) => c.id === classId);
+
+  const handleDelete = async (student) => {
+    if (!window.confirm(`Permanently delete "${student.full_name}"? This cannot be undone.`)) return;
+    try {
+      await deleteStudent(student.id).unwrap();
+      refetch();
+    } catch (err) {
+      alert(err?.data?.detail || "Failed to delete student.");
+    }
+  };
+
+  const handleRegenerate = async (student) => {
+    if (!window.confirm(`Regenerate PIN for "${student.full_name}"? Old PIN will stop working.`)) return;
+    try {
+      const res = await regeneratePin(student.id).unwrap();
+      alert(`New PIN: ${res.pin}\n\nShare this with the student.`);
+      refetch();
+    } catch (err) {
+      alert(err?.data?.detail || "Failed to regenerate PIN.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -168,6 +248,7 @@ export default function TeacherStudentsPage() {
                 <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Class</th>
                 <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Class Teacher</th>
                 <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Attendance</th>
+                <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -210,6 +291,14 @@ export default function TeacherStudentsPage() {
                     <td className="px-4 py-3 text-right">
                       <span className={"inline-flex rounded-full px-2.5 py-1 text-xs font-bold " + tone}>{pct}%</span>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <RowMenu
+                        student={s}
+                        onEdit={() => setEditStudent(s)}
+                        onDelete={() => handleDelete(s)}
+                        onRegenerate={() => handleRegenerate(s)}
+                      />
+                    </td>
                   </tr>
                 );
               })}
@@ -223,6 +312,16 @@ export default function TeacherStudentsPage() {
         onClose={() => setShowCreate(false)}
         onCreated={() => {
           setShowCreate(false);
+          refetch();
+        }}
+      />
+
+      <EditStudentModal
+        open={!!editStudent}
+        student={editStudent}
+        onClose={() => setEditStudent(null)}
+        onSaved={() => {
+          setEditStudent(null);
           refetch();
         }}
       />

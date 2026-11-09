@@ -21,11 +21,14 @@ from .views import (
     WsTicketView,
     RequestOTPView,
     VerifyOTPView,
-    SetupPasswordView, 
-    StudentPinLoginView ,
+    SetupPasswordView,
+    StudentPinLoginView,
+    TeacherStudentDetailView,
+    TeacherRegeneratePinView,
 )
 
 urlpatterns = [
+    # Auth
     path("login/", LoginView.as_view(), name="auth-login"),
     path("register/", RegisterView.as_view(), name="auth-register"),
     path("register/verify/", RegisterVerifyView.as_view(), name="auth-register-verify"),
@@ -35,14 +38,23 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="auth-me"),
     path("logout/", LogoutView.as_view(), name="auth-logout"),
     path("ws-ticket/", WsTicketView.as_view(), name="auth-ws-ticket"),
+
+    # Students
     path("students/", StudentListView.as_view(), name="auth-students"),
     path("students/create/", TeacherStudentCreateView.as_view(), name="auth-students-create"),
+    path("students/<uuid:student_id>/", TeacherStudentDetailView.as_view(), name="auth-student-detail"),
+    path("students/<uuid:student_id>/regenerate-pin/", TeacherRegeneratePinView.as_view(), name="auth-student-regenerate-pin"),
+
+    # OTP
     path("request-otp/", RequestOTPView.as_view(), name="auth-request-otp"),
     path("verify-otp/", VerifyOTPView.as_view(), name="auth-verify-otp"),
+
+    # Activation
     path("activation/validate/", ActivationValidateView.as_view(), name="auth-activation-validate"),
     path("activation/complete/", ActivationCompleteView.as_view(), name="auth-activation-complete"),
     path("activation/request/", ActivationRequestView.as_view(), name="auth-activation-request"),
-    
+
+    # Setup Password & PIN
     path("setup-password/", SetupPasswordView.as_view(), name="auth-setup-password"),
     path("student-login/", StudentPinLoginView.as_view(), name="student-pin-login"),
 ]

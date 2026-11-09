@@ -76,6 +76,7 @@ export default function CreateStudentModal({ open, onClose, onCreated }) {
         send_via: form.send_via,
         phone: form.phone,
       }).unwrap();
+      setResult(data)
 
       setResult(data);
     } catch (err) {
@@ -133,13 +134,28 @@ export default function CreateStudentModal({ open, onClose, onCreated }) {
 
         {/* Body */}
         <div className="p-6 overflow-y-auto flex-1">
-          {result ? (
+                    {result ? (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-center gap-3">
-                <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
+              <div className={`rounded-2xl border p-4 flex items-center gap-3 ${
+                result.resent 
+                  ? "bg-amber-50 border-amber-200" 
+                  : "bg-emerald-50 border-emerald-200"
+              }`}>
+                <CheckCircle2 size={24} className={result.resent ? "text-amber-600 shrink-0" : "text-emerald-600 shrink-0"} />
                 <div>
-                  <p className="font-bold text-emerald-900">Student account created successfully</p>
-                  <p className="text-xs text-emerald-700">{result.student?.email || result.email}</p>
+                  <p className={`font-bold ${result.resent ? "text-amber-900" : "text-emerald-900"}`}>
+                    {result.resent 
+                      ? "Student already exists — credentials resent" 
+                      : "Student account created successfully"}
+                  </p>
+                  <p className={`text-xs ${result.resent ? "text-amber-700" : "text-emerald-700"}`}>
+                    {result.student?.email || result.email}
+                  </p>
+                  {result.resent && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      A new PIN was generated and a fresh email was sent.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -281,7 +297,7 @@ export default function CreateStudentModal({ open, onClose, onCreated }) {
         <div className="flex justify-end gap-3 p-6 border-t border-slate-100 bg-slate-50/30 shrink-0">
           {result ? (
             <button onClick={() => { reset(); onCreated?.(); }} className="rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-purple-700">
-              Done
+                Done
             </button>
           ) : (
             <>

@@ -179,25 +179,28 @@ def send_activation_email(user, raw_token, pin_code=None) -> None:
 
     html = (
         '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:480px;'
-        'margin:auto;color:#212d2a">'
+        'margin:auto;color:#212d2a; padding: 20px; border: 1px solid #eaeaea; border-radius: 8px;">'
         f"<p>{escape(greeting)}</p>"
         "<p>Your school has created a Learn Smart account for you.</p>"
     )
+    
     if pin_code:
         html += (
             '<div style="background:#f3e8ff;padding:20px;border-radius:12px;margin:24px 0;text-align:center;">'
             '<p style="margin:0;color:#6b21a8;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">Your Login PIN</p>'
             f'<p style="margin:10px 0 0 0;font-size:36px;font-weight:900;letter-spacing:0.3em;color:#4c1d95;font-family:monospace;">{escape(pin_code)}</p>'
-            f'<p style="margin:12px 0 0 0;color:#7e22ce;font-size:13px;">Use this at <a href="{escape(student_login_url)}" style="color:#7e22ce;font-weight:bold;">{escape(student_login_url)}</a></p>'
+            f'<p style="margin:12px 0 0 0;color:#7e22ce;font-size:13px;">Use this at <a href="{escape(student_login_url)}" style="color:#7e22ce;font-weight:bold;">Student Login Page</a></p>'
             "</div>"
         )
+        
     html += (
-        f'<p style="margin:24px 0"><a href="{escape(url)}" style="background:#2b3a35;'
+        f'<p style="margin:24px 0"><a href="{escape(url)}" style="background:#6b21a8;'
         "color:#fff;text-decoration:none;font-weight:700;padding:13px 26px;"
         'border-radius:999px;display:inline-block">Set your password</a></p>'
         f'<p style="color:#4a635a;font-size:14px">The link works once and expires in '
         f"{hours} hours. After that you can log in any time at "
         f'<a href="{escape(login_url)}">{escape(login_url)}</a>.</p>'
+        '<p style="color:#888;font-size:12px;margin-top:32px;">If you weren\'t expecting this e-mail, you can safely ignore it.</p>'
         "</div>"
     )
 
@@ -205,6 +208,7 @@ def send_activation_email(user, raw_token, pin_code=None) -> None:
         message = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [user.email])
         message.attach_alternative(html, "text/html")
         message.send(fail_silently=False)
+        logger.info(f"Activation email sent successfully to {user.email}")
     except Exception as exc:
         logger.exception("activation.email_failed", extra={"user_id": str(user.pk)})
         raise ActivationEmailError(str(exc)) from exc
@@ -259,9 +263,6 @@ def generate_temp_password(length=10) -> str:
 
 
 def invite_student(user, *, issued_by=None, send_email=True, whatsapp_number=None, mode="activation_link") -> dict:
-    """
-    Issue an invite. Always generates a student PIN. Optionally emails the PIN + link.
-    """
     ttl_hours = int(token_ttl().total_seconds() // 3600)
     raw, row = _mint_token(user, issued_by=issued_by)
     invalidate_activation_tokens(user, keep=row)
@@ -269,7 +270,6 @@ def invite_student(user, *, issued_by=None, send_email=True, whatsapp_number=Non
     activation_url = build_activation_url(raw, user=user)
     login_url = build_login_url()
 
-    # Always generate the PIN
     creds = generate_student_pin(user)
     pin_code = creds.pin
 
@@ -308,15 +308,71 @@ def invite_student(user, *, issued_by=None, send_email=True, whatsapp_number=Non
                 send_activation_email(user, raw, pin_code=pin_code)
             result["email_sent"] = True
         except ActivationEmailError:
-            result["email_error"] = "The e-mail could not be sent. Copy the credentials manually."
-
-    if whatsapp_number:
-        result["whatsapp_url"] = build_whatsapp_url(
-            user, whatsapp_number, activation_url, login_url, pin_code=pin_code,
-        )
-        result["whatsapp_to"] = f"+{whatsapp_number}"
-
+            result["email_error"] = "The e-mail could not be sent."
+            
     return result
+
+
+def send_password_setup_success_email(user) -> None:
+    """
+    Sends a beautifully designed success email after the student
+    has successfully set their password.
+    """
+    login_url = build_login_url()
+    student_login_url = build_student_login_url()
+    name = (user.first_name or "").strip()
+    greeting = f"Hi {name}," if name else "Hi,"
+
+    subject = "🎉 Your Learn Smart password is ready!"
+
+    text = (
+        f"{greeting}\n\n"
+        "Success! Your Learn Smart account is now fully set up.\n\n"
+        "You can now log in using your email and new password.\n\n"
+        f"Login here: {login_url}\n\n"
+        "Or use your PIN for quick access:\n"
+        f"{student_login_url}\n\n"
+        "Welcome aboard!\n- The Learn Smart team\n"
+    )
+
+    html = (
+        '<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:480px;'
+        'margin:auto;color:#212d2a; padding: 30px; border: 1px solid #eaeaea; border-radius: 12px; background: #ffffff;">'
+        
+        '<div style="text-align: center; margin-bottom: 24px;">'
+        '<div style="display: inline-block; background: #10b981; border-radius: 50%; padding: 16px; margin-bottom: 16px;">'
+        '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">'
+        '<polyline points="20 6 9 17 4 12"></polyline>'
+        '</svg>'
+        '</div>'
+        '<h1 style="font-size: 24px; font-weight: 800; color: #0f172a; margin: 0;">You\'re all set!</h1>'
+        '</div>'
+        
+        f"<p style='font-size: 16px;'>{escape(greeting)}</p>"
+        "<p style='font-size: 16px; color: #475569;'>Your Learn Smart password has been successfully created. Your account is now ready to use!</p>"
+        
+        '<div style="text-align: center; margin: 32px 0;">'
+        f'<a href="{escape(login_url)}" style="background: #6366f1; color: white; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 32px; border-radius: 999px; display: inline-block; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">Log in to your account</a>'
+        '</div>'
+        
+        '<div style="background: #f8fafc; border: 1px dashed #cbd5e1; padding: 16px; border-radius: 8px; text-align: center; margin-bottom: 24px;">'
+        '<p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">In a hurry? Use your PIN for quick access:</p>'
+        f'<a href="{escape(student_login_url)}" style="color: #6366f1; font-weight: 700; text-decoration: none; font-size: 16px;">Go to PIN Login Page &rarr;</a>'
+        '</div>'
+
+        '<hr style="border: 0; border-top: 1px solid #eaeaea; margin: 24px 0;" />'
+        '<p style="font-size: 13px; color: #94a3b8; text-align: center;">If you didn\'t request this change, please contact your school administrator immediately.</p>'
+        '<p style="font-size: 13px; color: #94a3b8; text-align: center;">- The Learn Smart Team</p>'
+        "</div>"
+    )
+
+    try:
+        message = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [user.email])
+        message.attach_alternative(html, "text/html")
+        message.send(fail_silently=False)
+        logger.info(f"Success email sent to {user.email}")
+    except Exception as exc:
+        logger.exception("activation.success_email_failed", extra={"user_id": str(user.pk)})
 
 
 def request_new_link(email: str) -> None:
