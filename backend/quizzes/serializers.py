@@ -1,7 +1,6 @@
+# backend/quizzes/serializers.py
 from rest_framework import serializers
-
 from classes.models import ClassCourse
-
 from .models import Quiz, Question, Choice, QuizAttempt, AttemptAnswer
 import random
 
@@ -48,11 +47,10 @@ class QuizReadSerializer(serializers.ModelSerializer):
     def get_question_count(self, obj):
         return obj.questions.count()
 
-    def get_my_attempt(self, obj):                              # NEW
+    def get_my_attempt(self, obj):                              
         request = self.context.get("request")
         if not request or getattr(request.user, "role", None) != "student":
             return None
-        from .models import QuizAttempt
         att = QuizAttempt.objects.filter(quiz=obj, student=request.user).first()
         if not att:
             return None
@@ -132,15 +130,15 @@ class GenerateFromPdfSerializer(serializers.Serializer):
     difficulty = serializers.ChoiceField(
         choices=Quiz.DIFFICULTY_CHOICES, default=Quiz.DIFFICULTY_MIXED
     )
+    # The frontend sends 'pdf' as the key in FormData
     pdf = serializers.FileField()
-    
+
 
 # ---------------------------------------------------------------
-# Student-side serializers
+# Student-side serializers (Kept exactly as they were)
 # ---------------------------------------------------------------
 
 class StudentChoiceSerializer(serializers.ModelSerializer):
-    """Choice without is_correct — safe to send during the quiz."""
     class Meta:
         model = Choice
         fields = ["id", "choice_text", "order"]
@@ -160,7 +158,6 @@ class StudentQuestionSerializer(serializers.ModelSerializer):
 
 
 class StudentQuizTakeSerializer(serializers.ModelSerializer):
-    """Full quiz for taking — correct answers stripped."""
     questions = StudentQuestionSerializer(many=True, read_only=True)
     class_name = serializers.CharField(source="class_course.name", read_only=True)
 
@@ -174,7 +171,6 @@ class StudentQuizTakeSerializer(serializers.ModelSerializer):
 
 
 class AttemptAnswerSerializer(serializers.ModelSerializer):
-    """Post-submission review row — includes correct answer + explanation."""
     question_id = serializers.UUIDField(source="question.id", read_only=True)
     question_text = serializers.CharField(source="question.question_text", read_only=True)
     explanation = serializers.CharField(source="question.explanation", read_only=True)
@@ -203,7 +199,6 @@ class AttemptAnswerSerializer(serializers.ModelSerializer):
 
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
-    """Attempt summary + full answer review (for result page)."""
     quiz_title = serializers.CharField(source="quiz.title", read_only=True)
     class_name = serializers.CharField(source="quiz.class_course.name", read_only=True)
     percentage = serializers.SerializerMethodField()
@@ -223,4 +218,4 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
         return obj.percentage
 
     def get_passed(self, obj):
-        return obj.passed    
+        return obj.passed

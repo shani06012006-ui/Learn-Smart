@@ -1,3 +1,4 @@
+# backend/quizzes/views.py
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -6,35 +7,26 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from datetime import timedelta
+from django.db import transaction
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from .ai_service import extract_pdf_text, generate_quiz_from_text
-from .models import Quiz
+from .models import AttemptAnswer, Choice, Question, Quiz, QuizAttempt
 from .serializers import (
     GenerateFromPdfSerializer,
     QuizReadSerializer,
-    QuizWriteSerializer,StudentQuizTakeSerializer, QuizAttemptSerializer
+    QuizWriteSerializer, 
+    StudentQuizTakeSerializer, 
+    QuizAttemptSerializer
 )
-from datetime import timedelta
-
-from django.db import transaction
-
-from .models import AttemptAnswer, Choice, Question, Quiz, QuizAttempt
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from notifications.service import notify 
 
 
 class QuizViewSet(viewsets.ModelViewSet):
     """
     Teacher-scoped CRUD for quizzes.
-
-    GET    /api/v1/quizzes/                 list (own quizzes)
-    POST   /api/v1/quizzes/                 create (with nested questions/choices)
-    GET    /api/v1/quizzes/<id>/            detail
-    PUT    /api/v1/quizzes/<id>/            full update
-    PATCH  /api/v1/quizzes/<id>/            partial update
-    DELETE /api/v1/quizzes/<id>/            delete
-    POST   /api/v1/quizzes/<id>/publish/    flip is_published=True
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
@@ -124,9 +116,6 @@ class QuizViewSet(viewsets.ModelViewSet):
 
 
 class GenerateFromPdfView(APIView):
-    """
-    POST /api/v1/quizzes/generate-from-pdf/
-    """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -146,7 +135,6 @@ class GenerateFromPdfView(APIView):
         if not pdf.name.lower().endswith(".pdf"):
             raise ValidationError({"pdf": "Only .pdf files are accepted."})
 
-        # 1. Extract Text
         try:
             raw = pdf.read()
             text = extract_pdf_text(raw)
@@ -155,11 +143,11 @@ class GenerateFromPdfView(APIView):
 
         if not text or len(text) < 50:
             raise ValidationError({
-                "pdf": "PDF has too little extractable text. Use a text-based PDF (not scanned images)."
+                "pdf": "PDF has too little extractable text. Use a text-based PDF."
             })
 
-        # 2. Generate Questions via AI
         try:
+            # This returns a list of dicts with 'question', 'choices', 'explanation'
             questions = generate_quiz_from_text(
                 text=text,
                 question_count=data["question_count"],
@@ -167,14 +155,27 @@ class GenerateFromPdfView(APIView):
                 title=data["title"],
             )
         except Exception as exc:
-            import logging
-            logging.getLogger(__name__).error("AI generation failed: %s", exc)
             return Response(
                 {"detail": f"AI generation failed. Please try again. ({exc})"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # 3. Return Data
+        # Format for the Frontend
+        formatted_questions = []
+        for q in questions:
+            formatted_questions.append({
+                "question_text": q.get("question", "Missing Question"),
+                "explanation": q.get("explanation", ""),
+                "points": 1,
+                "choices": [
+                    {
+                        "choice_text": c.get("text", "Option"),
+                        "is_correct": c.get("is_correct", False)
+                    }
+                    for c in q.get("choices", [])
+                ]
+            })
+
         return Response({
             "title": data["title"],
             "class_course": str(cls.id),
@@ -182,26 +183,25 @@ class GenerateFromPdfView(APIView):
             "passing_score": data["passing_score"],
             "difficulty": data["difficulty"],
             "source_filename": pdf.name,
-            "questions": [
-                {
-                    "question_text": q["question"],
-                    "explanation": q["explanation"],
-                    "points": 1,
-                    "choices": [
-                        {"choice_text": c["text"], "is_correct": c["is_correct"]}
-                        for c in q["choices"]
-                    ],
-                }
-                for q in questions
-            ],
+            "questions": formatted_questions,
         }, status=status.HTTP_200_OK)
 
 
+# ===============================================================
+# Student quiz-taking endpoints (Unchanged)
+# ===============================================================
+
+def _is_student(user):
+    return getattr(user, "role", None) == "student"
+
+
+def _student_can_access_quiz(student, quiz):
+    return quiz.class_course.enrollments.filter(
+        student=student, status="active"
+    ).exists()
+
+
 class StudentQuizListView(APIView):
-    """
-    GET /api/v1/student/quizzes/
-    Returns published quizzes for the requesting student's active enrollments.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -227,26 +227,8 @@ class StudentQuizListView(APIView):
             QuizReadSerializer(qs, many=True, context={"request": request}).data
         )
 
-# ===============================================================
-# Student quiz-taking endpoints
-# ===============================================================
-
-def _is_student(user):
-    return getattr(user, "role", None) == "student"
-
-
-def _student_can_access_quiz(student, quiz):
-    """Student must have an active enrollment in the quiz's class."""
-    return quiz.class_course.enrollments.filter(
-        student=student, status="active"
-    ).exists()
-
 
 class StudentStartQuizAttemptView(APIView):
-    """
-    POST /api/v1/student/quizzes/<quiz_id>/start/
-    Creates (or returns existing) attempt + serves quiz WITHOUT is_correct.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, quiz_id):
@@ -271,7 +253,6 @@ class StudentStartQuizAttemptView(APIView):
             quiz=quiz, student=request.user
         )
 
-        # If they already submitted → block re-entry
         if attempt.status == QuizAttempt.STATUS_SUBMITTED:
             return Response(
                 {"detail": "You have already submitted this quiz.",
@@ -279,10 +260,8 @@ class StudentStartQuizAttemptView(APIView):
                 status=400,
             )
 
-        # Enforce time limit server-side
         elapsed = timezone.now() - attempt.started_at
         if elapsed > timedelta(minutes=quiz.duration_minutes):
-            # Auto-submit: mark as submitted with whatever they had (empty)
             attempt.status = QuizAttempt.STATUS_SUBMITTED
             attempt.submitted_at = timezone.now()
             attempt.save(update_fields=["status", "submitted_at", "updated_at"])
@@ -309,11 +288,6 @@ class StudentStartQuizAttemptView(APIView):
 
 
 class StudentSubmitQuizAttemptView(APIView):
-    """
-    POST /api/v1/student/quizzes/<quiz_id>/submit/
-    Body: {"answers": [{"question_id": "...", "choice_id": "..."}, ...]}
-    Scores answers, marks submitted, returns the attempt with full review.
-    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, quiz_id):
@@ -337,17 +311,10 @@ class StudentSubmitQuizAttemptView(APIView):
                 status=400,
             )
 
-        # Enforce time limit
-        elapsed = timezone.now() - attempt.started_at
-        if elapsed > timedelta(minutes=quiz.duration_minutes + 1):
-            # +1 min grace for network jitter; anything beyond is auto-submitted as-is
-            pass  # still accept, but score what they sent
-
         answers = request.data.get("answers") or []
         if not isinstance(answers, list):
             return Response({"detail": "answers must be a list."}, status=400)
 
-        # Build lookup for fast scoring
         questions = list(quiz.questions.prefetch_related("choices"))
         question_by_id = {str(q.id): q for q in questions}
         choice_by_id = {}
@@ -358,9 +325,7 @@ class StudentSubmitQuizAttemptView(APIView):
         total_possible = sum(q.points for q in questions)
 
         with transaction.atomic():
-            # Wipe any previous (partial) answers for idempotency
             attempt.answers.all().delete()
-
             running_score = 0
             for row in answers:
                 qid = str(row.get("question_id", ""))
@@ -383,7 +348,6 @@ class StudentSubmitQuizAttemptView(APIView):
                     points_awarded=points,
                 )
 
-            # Unanswered questions still count against total_possible
             attempt.score = running_score
             attempt.max_score = total_possible
             attempt.status = QuizAttempt.STATUS_SUBMITTED
@@ -397,7 +361,7 @@ class StudentSubmitQuizAttemptView(APIView):
             student_name = request.user.get_full_name() or request.user.email
             notify(
                 user_id=quiz.teacher_id,
-                title=" New Quiz Submission",
+                title="New Quiz Submission",
                 message=f"{student_name} submitted '{quiz.title}'",
                 notification_type="quiz_submit",
             )
@@ -406,11 +370,8 @@ class StudentSubmitQuizAttemptView(APIView):
             QuizAttemptSerializer(attempt, context={"request": request}).data
         )
 
+
 class StudentQuizAttemptResultView(APIView):
-    """
-    GET /api/v1/student/quiz-attempts/<attempt_id>/
-    Full review: score, correct answers, explanations.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, attempt_id):
@@ -430,10 +391,6 @@ class StudentQuizAttemptResultView(APIView):
 
 
 class TeacherQuizSubmissionsView(APIView):
-    """
-    GET /api/v1/quizzes/<quiz_id>/submissions/
-    Teacher views all attempts on their own quiz.
-    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, quiz_id):

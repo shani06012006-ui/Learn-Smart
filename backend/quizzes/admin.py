@@ -1,5 +1,5 @@
+# backend/quizzes/admin.py
 from django.contrib import admin
-
 from .models import Quiz, Question, Choice
 
 

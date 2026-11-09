@@ -1,7 +1,6 @@
+# backend/quizzes/models.py
 import uuid
-
 from django.db import models
-
 from core.models import TimeStampedModel
 
 
@@ -102,11 +101,8 @@ class Choice(TimeStampedModel):
     def __str__(self):
         return self.choice_text[:60]
     
+
 class QuizAttempt(TimeStampedModel):
-    """
-    One student's attempt at one quiz.
-    unique_together enforces "one attempt only" per student per quiz.
-    """
     STATUS_IN_PROGRESS = "in_progress"
     STATUS_SUBMITTED = "submitted"
     STATUS_CHOICES = [
@@ -155,7 +151,6 @@ class QuizAttempt(TimeStampedModel):
 
 
 class AttemptAnswer(TimeStampedModel):
-    """One answer row per question, per attempt."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     attempt = models.ForeignKey(
         QuizAttempt, on_delete=models.CASCADE, related_name="answers"
@@ -178,4 +173,4 @@ class AttemptAnswer(TimeStampedModel):
         indexes = [models.Index(fields=["attempt", "question"])]
 
     def __str__(self):
-        return f"{self.attempt_id} · {self.question_id}"    
+        return f"{self.attempt_id} · {self.question_id}"
