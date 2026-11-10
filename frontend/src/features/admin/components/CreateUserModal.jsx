@@ -5,7 +5,6 @@ import {
   Search,
   User,
   Mail,
-  Lock,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -22,8 +21,6 @@ import { DEFAULT_DELIVERY, deliveryToPayload } from "./inviteDelivery";
 
 const INITIAL = {
   email: "",
-  password: "",
-  confirm_password: "",
   first_name: "",
   last_name: "",
   role: "student",
@@ -37,13 +34,7 @@ const INITIAL = {
 /* ------------------------------------------------------------------ */
 /*  Icon-prefixed input                                                */
 /* ------------------------------------------------------------------ */
-function Field({
-  icon: Icon,
-  label,
-  error,
-  hint,
-  ...props
-}) {
+function Field({ icon: Icon, label, error, hint, ...props }) {
   return (
     <div>
       {label && (
@@ -73,61 +64,8 @@ function Field({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Password strength meter                                            */
-/* ------------------------------------------------------------------ */
-function strengthOf(pw) {
-  if (!pw) return { score: 0, label: "", tone: "" };
-  let s = 0;
-  if (pw.length >= 8) s++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
-  if (/\d/.test(pw)) s++;
-  if (/[^A-Za-z0-9]/.test(pw)) s++;
-  const map = [
-    { label: "Too weak", tone: "bg-rose-500" },
-    { label: "Weak", tone: "bg-rose-500" },
-    { label: "Fair", tone: "bg-amber-500" },
-    { label: "Good", tone: "bg-lime-500" },
-    { label: "Strong", tone: "bg-emerald-500" },
-  ];
-  return { score: s, ...map[s] };
-}
-
-function PasswordStrength({ password }) {
-  const { score, label, tone } = strengthOf(password);
-  if (!password) return null;
-  return (
-    <div className="mt-2">
-      <div className="flex items-center gap-1.5">
-        {[1, 2, 3, 4].map((i) => (
-          <span
-            key={i}
-            className={
-              "h-1.5 flex-1 rounded-full transition-all " +
-              (score >= i ? tone : "bg-slate-200")
-            }
-          />
-        ))}
-      </div>
-      <p className="mt-1 text-[11px] font-semibold text-slate-500">
-        Password strength:{" "}
-        <span
-          className={
-            score <= 1
-              ? "text-rose-600"
-              : score === 2
-              ? "text-amber-600"
-              : score === 3
-              ? "text-lime-600"
-              : "text-emerald-600"
-          }
-        >
-          {label}
-        </span>
-      </p>
-    </div>
-  );
-}
+const DONE_BUTTON =
+  "inline-flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 hover:shadow-md";
 
 /* ------------------------------------------------------------------ */
 /*  Main component                                                     */
@@ -152,8 +90,14 @@ export default function CreateUserModal({
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [teacherSearch, setTeacherSearch] = useState("");
-  // Set after a student is created: holds the response incl. the one-time activation link.
+  // Student created: holds the response incl. the one-time activation link.
   const [created, setCreated] = useState(null);
+  // Teacher created with a new account: { email, emailSent, emailError }.
+  const [teacherCreated, setTeacherCreated] = useState(null);
+  // Teacher email already existed: holds what was reused.
+  const [teacherResult, setTeacherResult] = useState(null);
+
+  const isStudent = form.role === "student";
 
   const handleChange = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -189,6 +133,8 @@ export default function CreateUserModal({
     setFormError(null);
     setTeacherSearch("");
     setCreated(null);
+    setTeacherCreated(null);
+    setTeacherResult(null);
     onClose();
   };
 
@@ -218,14 +164,6 @@ export default function CreateUserModal({
     if (!form.first_name.trim()) errs.first_name = ["Required"];
     if (!form.last_name.trim()) errs.last_name = ["Required"];
     if (!form.email.trim()) errs.email = ["Required"];
-    // Teachers get an admin-chosen password. Students never do: they choose their own
-    // through the one-time activation link that is sent to them.
-    if (form.role === "teacher") {
-      if (!form.password || form.password.length < 8)
-        errs.password = ["At least 8 characters"];
-      if (form.password !== form.confirm_password)
-        errs.confirm_password = ["Passwords do not match"];
-    }
     if (form.role === "student" && form.delivery.whatsapp && !form.delivery.phone.trim())
       errs.phone = ["Enter the WhatsApp number"];
     if (form.role === "student" && !form.grade_id)
@@ -238,6 +176,8 @@ export default function CreateUserModal({
       return;
     }
 
+    // Nobody types a password in this form. Students and teachers both
+    // choose their own through the one-time link the backend emails them.
     const payload = {
       email: form.email.trim().toLowerCase(),
       first_name: form.first_name.trim(),
@@ -250,36 +190,57 @@ export default function CreateUserModal({
       payload.class_ids = [];
       Object.assign(payload, deliveryToPayload(form.delivery)); // { send_via, phone? }
     } else {
-      payload.password = form.password;
       payload.grade_ids = form.grade_ids;
       payload.class_ids = [];
     }
 
     try {
       const data = await createUser(payload).unwrap();
-      // A student comes back with the one-time activation link. Show it (and whether the
-      // e-mail went out) instead of closing: this is the only time the link is visible.
-      if (data?.invitation) setCreated(data);
-      else handleClose();
-    } catch (err) {
-      const detail = err?.data?.error?.detail;
-      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
-        setErrors(detail);
-      } else if (typeof detail === "string") {
-        setFormError(detail);
+
+      if (data?.invitation) {
+        // Student: show the activation link once, plus whether the e-mail went out.
+        setCreated(data);
+      } else if (form.role === "teacher" && data?.existing_account) {
+        // Email already belonged to a teacher: the account was reused, not duplicated.
+        setTeacherResult(data);
+      } else if (form.role === "teacher") {
+        // New teacher: confirm which address got the link, or why it didn't.
+        setTeacherCreated({
+          email: data.email,
+          emailSent: Boolean(data.email_sent),
+          emailError: data.email_error || null,
+        });
       } else {
-        setFormError("Could not create the user.");
+        handleClose();
       }
+    } catch (err) {
+      const body = err?.data || {};
+      const detail = body?.error?.detail ?? body;
+
+      if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+        const fieldErrors = {};
+        for (const [key, value] of Object.entries(detail)) {
+          if (["error", "status_code", "detail", "code"].includes(key)) continue;
+          fieldErrors[key] = Array.isArray(value) ? value : [String(value)];
+        }
+        if (Object.keys(fieldErrors).length) {
+          setErrors(fieldErrors);
+          return;
+        }
+      }
+
+      setFormError(typeof detail === "string" ? detail : "Could not create the user.");
     }
   };
 
-  const isStudent = form.role === "student";
   const sendsLink = form.delivery.email || form.delivery.whatsapp;
   const submitLabel = isStudent
     ? sendsLink
       ? "Create & send link"
       : "Create Student"
     : "Create Teacher";
+
+  /* ---------------- Result screens ---------------- */
 
   if (created) {
     return (
@@ -299,11 +260,7 @@ export default function CreateUserModal({
           ],
         }}
         footer={
-          <button
-            type="button"
-            onClick={handleClose}
-            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 hover:shadow-md"
-          >
+          <button type="button" onClick={handleClose} className={DONE_BUTTON}>
             Done
           </button>
         }
@@ -313,6 +270,97 @@ export default function CreateUserModal({
     );
   }
 
+  if (teacherCreated) {
+    const sent = teacherCreated.emailSent;
+    return (
+      <SplitModal
+        open={open}
+        onClose={handleClose}
+        title={sent ? "Teacher invited" : "Teacher created"}
+        subtitle={teacherCreated.email}
+        leftPanel={{
+          heading: "One step left for them.",
+          subheading:
+            "They open the link in their email, choose a password, and are signed in automatically.",
+          bullets: [
+            "The link works once",
+            "It expires in 30 minutes",
+            "You never see their password",
+          ],
+        }}
+        footer={
+          <button type="button" onClick={handleClose} className={DONE_BUTTON}>
+            Done
+          </button>
+        }
+      >
+        {sent ? (
+          <div className="flex flex-col gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
+            <p className="text-sm font-semibold text-navy-950">
+              Setup link sent to {teacherCreated.email}.
+            </p>
+            <p className="text-xs text-slate-500">
+              If it doesn't arrive, check the spam folder, then use "Resend setup link" from the row menu.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+            <p className="text-sm font-semibold text-navy-950">
+              The teacher was created, but the setup email could not be sent.
+            </p>
+            {teacherCreated.emailError && (
+              <p className="text-xs text-amber-800">{teacherCreated.emailError}</p>
+            )}
+            <p className="text-xs text-slate-500">
+              Once the email settings are fixed, use "Resend setup link" on their row.
+            </p>
+          </div>
+        )}
+      </SplitModal>
+    );
+  }
+
+  if (teacherResult) {
+    const title = teacherResult.reinvited
+      ? "Setup link sent"
+      : teacherResult.reactivated
+      ? "Teacher reactivated"
+      : "Teacher updated";
+
+    return (
+      <SplitModal
+        open={open}
+        onClose={handleClose}
+        title={title}
+        subtitle={teacherResult.full_name || teacherResult.email}
+        leftPanel={{
+          heading: "Already on Learn Smart.",
+          subheading: "We reused the existing account instead of creating a duplicate.",
+          bullets: [
+            "One account per email address",
+            "A new setup link replaces the old one",
+            "New grades are added to existing ones",
+          ],
+        }}
+        footer={
+          <button type="button" onClick={handleClose} className={DONE_BUTTON}>
+            Done
+          </button>
+        }
+      >
+        <div className="flex flex-col gap-3 rounded-2xl border border-purple-100 bg-purple-50/60 p-5">
+          <p className="text-sm font-semibold text-navy-950">{teacherResult.message}</p>
+          <p className="text-xs text-slate-500">
+            {teacherResult.email} · {teacherResult.grades_added} new grade
+            {teacherResult.grades_added === 1 ? "" : "s"} added
+          </p>
+        </div>
+      </SplitModal>
+    );
+  }
+
+  /* ---------------- Form ---------------- */
+
   return (
     <SplitModal
       open={open}
@@ -320,12 +368,10 @@ export default function CreateUserModal({
       title={isStudent ? "Create a Student" : "Create a Teacher"}
       subtitle="Fill in the details below — you can edit everything later."
       leftPanel={{
-        heading: isStudent
-          ? "Welcome a new student."
-          : "Invite a new teacher.",
+        heading: isStudent ? "Welcome a new student." : "Invite a new teacher.",
         subheading: isStudent
           ? "Assign a grade. We send a one-time link so they can choose their own password."
-          : "Assign grades and set credentials — they can sign in right away.",
+          : "Assign grades. We email a one-time link so they can choose their own password.",
         bullets: isStudent
           ? [
               "Fill in name & email",
@@ -335,7 +381,7 @@ export default function CreateUserModal({
           : [
               "Fill in name & email",
               "Assign one or more grades",
-              "Set a strong password",
+              "They set their own password",
             ],
       }}
       footer={
@@ -352,7 +398,7 @@ export default function CreateUserModal({
             type="submit"
             form="admin-create-user-form"
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 hover:shadow-md disabled:opacity-60"
+            className={`${DONE_BUTTON} disabled:opacity-60`}
           >
             {isLoading ? (
               "Creating…"
@@ -388,42 +434,48 @@ export default function CreateUserModal({
           </div>
         )}
 
+        {/* ============ NAME + EMAIL (shared) ============ */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            icon={User}
+            label="First Name"
+            value={form.first_name}
+            onChange={handleChange("first_name")}
+            error={errors.first_name?.[0]}
+            placeholder="Aarav"
+            required
+            autoFocus
+          />
+          <Field
+            icon={User}
+            label="Last Name"
+            value={form.last_name}
+            onChange={handleChange("last_name")}
+            error={errors.last_name?.[0]}
+            placeholder="Sharma"
+            required
+          />
+        </div>
+
+        <Field
+          icon={Mail}
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={handleChange("email")}
+          error={errors.email?.[0]}
+          hint={
+            !isStudent
+              ? "Already a teacher here? We reuse their account and only add the grades you pick."
+              : undefined
+          }
+          placeholder="aarav@example.com"
+          required
+        />
+
         {/* ============ STUDENT LAYOUT ============ */}
         {isStudent && (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field
-                icon={User}
-                label="First Name"
-                value={form.first_name}
-                onChange={handleChange("first_name")}
-                error={errors.first_name?.[0]}
-                placeholder="Aarav"
-                required
-                autoFocus
-              />
-              <Field
-                icon={User}
-                label="Last Name"
-                value={form.last_name}
-                onChange={handleChange("last_name")}
-                error={errors.last_name?.[0]}
-                placeholder="Sharma"
-                required
-              />
-            </div>
-
-            <Field
-              icon={Mail}
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={handleChange("email")}
-              error={errors.email?.[0]}
-              placeholder="aarav@example.com"
-              required
-            />
-
             <InviteDeliveryFields
               value={form.delivery}
               onChange={(delivery) => {
@@ -441,9 +493,7 @@ export default function CreateUserModal({
             />
 
             <div>
-              <label className="block text-xs font-bold text-slate-700">
-                Grade
-              </label>
+              <label className="block text-xs font-bold text-slate-700">Grade</label>
               <select
                 value={form.grade_id}
                 onChange={(e) => {
@@ -464,18 +514,14 @@ export default function CreateUserModal({
                 ))}
               </select>
               {errors.grade_id?.[0] && (
-                <p className="mt-1 text-xs text-coral-600">
-                  {errors.grade_id[0]}
-                </p>
+                <p className="mt-1 text-xs text-coral-600">{errors.grade_id[0]}</p>
               )}
             </div>
 
             {form.grade_id && (
               <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-bold text-slate-700">
-                    Select Teacher(s)
-                  </p>
+                  <p className="text-xs font-bold text-slate-700">Select Teacher(s)</p>
                   <span className="text-[10px] font-semibold text-slate-400">
                     {form.teacher_ids.length} selected
                   </span>
@@ -523,9 +569,7 @@ export default function CreateUserModal({
                                 <p className="truncate text-xs font-medium text-navy-950">
                                   {t.full_name || t.email}
                                 </p>
-                                <p className="truncate text-[10px] text-slate-400">
-                                  {t.email}
-                                </p>
+                                <p className="truncate text-[10px] text-slate-400">{t.email}</p>
                               </div>
                             </button>
                           </li>
@@ -547,79 +591,29 @@ export default function CreateUserModal({
         {/* ============ TEACHER LAYOUT ============ */}
         {!isStudent && (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field
-                icon={User}
-                label="First Name"
-                value={form.first_name}
-                onChange={handleChange("first_name")}
-                error={errors.first_name?.[0]}
-                placeholder="Aarav"
-                required
-                autoFocus
-              />
-              <Field
-                icon={User}
-                label="Last Name"
-                value={form.last_name}
-                onChange={handleChange("last_name")}
-                error={errors.last_name?.[0]}
-                placeholder="Sharma"
-                required
-              />
-            </div>
-
-            <Field
-              icon={Mail}
-              label="Email"
-              type="email"
-              value={form.email}
-              onChange={handleChange("email")}
-              error={errors.email?.[0]}
-              placeholder="aarav@example.com"
-              required
-            />
-
-            <div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field
-                  icon={Lock}
-                  label="Password"
-                  type="password"
-                  value={form.password}
-                  onChange={handleChange("password")}
-                  error={errors.password?.[0]}
-                  placeholder="At least 8 characters"
-                  required
-                />
-                <Field
-                  icon={ShieldCheck}
-                  label="Confirm Password"
-                  type="password"
-                  value={form.confirm_password}
-                  onChange={handleChange("confirm_password")}
-                  error={errors.confirm_password?.[0]}
-                  placeholder="Repeat password"
-                  required
-                />
+            <div className="flex items-start gap-3 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
+              <ShieldCheck size={18} className="mt-0.5 shrink-0 text-purple-600" />
+              <div>
+                <p className="text-xs font-bold text-navy-950">
+                  They will set their own password
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  We email {form.email || "the teacher"} a one-time link that expires in 30 minutes.
+                  You never see or share their password.
+                </p>
               </div>
-              <PasswordStrength password={form.password} />
             </div>
 
-            {/* Class chips */}
+            {/* Grade chips */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700">
-                  Assign grades
-                </label>
+                <label className="text-xs font-bold text-slate-700">Assign grades</label>
                 <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-purple-100">
                   {form.grade_ids.length} selected
                 </span>
               </div>
               {errors.grade_ids?.[0] && (
-                <p className="mb-2 text-xs text-coral-600">
-                  {errors.grade_ids[0]}
-                </p>
+                <p className="mb-2 text-xs text-coral-600">{errors.grade_ids[0]}</p>
               )}
               {grades.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 py-4 text-center text-xs text-slate-400">

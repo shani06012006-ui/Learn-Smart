@@ -1,3 +1,5 @@
+#backend/chat/consumers.py
+
 """
 Chat + Notification WebSocket consumers.
 """

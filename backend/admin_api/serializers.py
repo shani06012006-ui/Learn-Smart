@@ -129,10 +129,13 @@ class InviteDeliverySerializer(serializers.Serializer):
 
 class AdminUserCreateSerializer(serializers.Serializer):
     """
-    Teachers: an admin chooses the password (`password` is required).
-    Students: the admin NEVER chooses a password. Any `password` sent is ignored; the
-    student gets a one-time activation link instead (`send_via` / `phone` say how it
-    is delivered). See accounts/activation.py.
+    Teachers: no password is accepted. The account is created without one, and the
+    teacher receives a one-time setup link (accounts/teacher_onboarding.py) to
+    choose their own password. A non-empty `password` is rejected.
+
+    Students: the admin never chooses a password. `password` is ignored and the
+    student gets a one-time activation link instead (`send_via` / `phone` say how
+    it is delivered). See accounts/activation.py.
     """
 
     email = serializers.EmailField()
@@ -209,27 +212,25 @@ class AdminUserCreateSerializer(serializers.Serializer):
         return list(qs.values_list("id", flat=True))
 
     def validate_email(self, value):
-        value = value.strip().lower()
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
-        return value
+        return value.strip().lower()
 
     def validate(self, attrs):
         if attrs["role"] == User.ROLE_STUDENT:
-            attrs.pop("password", None)  # students choose their own, via the link
+            if User.objects.filter(email=attrs["email"]).exists():
+                raise serializers.ValidationError(
+                    {"email": ["A user with this email already exists."]}
+                )
+            attrs.pop("password", None)
             return _resolve_delivery(attrs)
 
-        password = attrs.get("password") or ""
-        if not password:
-            raise serializers.ValidationError({"password": ["This field is required."]})
-        if len(password) < 8:
+        if (attrs.get("password") or "").strip():
             raise serializers.ValidationError(
-                {"password": ["Ensure this field has at least 8 characters."]}
+                {"password": ["Teachers set their own password from the setup email. Remove this field."]}
             )
-        try:
-            validate_password(password)
-        except DjangoValidationError as e:
-            raise serializers.ValidationError({"password": list(e.messages)})
+        attrs.pop("password", None)
+
+        if not attrs.get("grade_ids"):
+            raise serializers.ValidationError({"grade_ids": ["Pick at least one grade."]})
         return attrs
 
 

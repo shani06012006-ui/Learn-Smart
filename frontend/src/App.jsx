@@ -13,6 +13,7 @@ import StudentTimetablePage from "./features/student/pages/StudentTimetablePage"
 import StudentChatPage from "./features/student/pages/StudentChatPage";
 import RegisterPage from "./features/auth/RegisterPage";
 import ActivateAccountPage from "./features/auth/ActivateAccountPage";
+import TeacherOnboardingPage from "./features/auth/TeacherOnboardingPage";
 import RootRoute from "./routes/RootRoute";
 import StudentJoinClassPage from "./features/student/pages/StudentJoinClassPage";
 import StudentLiveClassesPage from "./features/student/pages/StudentLiveClassesPage";
@@ -69,17 +70,19 @@ export default function App() {
   return (
     <Routes>
       {/* ── Public ─────────────────────────────────────────────── */}
+      {/* Every public route lives here, at the top level. None of them may be
+          placed inside an /admin, /teacher, or /student block. */}
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/activate" element={<ActivateAccountPage />} />
       <Route path="/auth/setup-password" element={<SetupPasswordPage />} />
+      <Route path="/onboarding/teacher" element={<TeacherOnboardingPage />} />
 
       {/* ── Student (protected) ────────────────────────────────── */}
       <Route element={<ProtectedRoute />}>
         <Route element={<RoleRoute allow={["student"]} />}>
-          {/* ✅ The guard wraps the entire student layout */}
           <Route element={<RequirePasswordSetup />}>
             <Route path="/student" element={<StudentLayout />}>
               <Route index element={<StudentProgressPage />} />
@@ -104,25 +107,25 @@ export default function App() {
       <Route element={<AdminRouteGuard />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboardPage />} />
-          <Route path="users"      element={<AdminUsersPage />} />
-          <Route path="users/:id"  element={<AdminUserDetailPage />} />
-          <Route path="teachers"       element={<AdminTeachersPage />} />
-          <Route path="teachers/:id"   element={<AdminTeacherDetailPage />} />
-          <Route path="students"       element={<AdminStudentsPage />} />
-          <Route path="students/:id"   element={<AdminStudentDetailPage />} />
-          <Route path="courses"       element={<AdminCoursesPage />} />
-          <Route path="grades"        element={<AdminGradesPage />} />
+          <Route path="users" element={<AdminUsersPage />} />
+          <Route path="users/:id" element={<AdminUserDetailPage />} />
+          <Route path="teachers" element={<AdminTeachersPage />} />
+          <Route path="teachers/:id" element={<AdminTeacherDetailPage />} />
+          <Route path="students" element={<AdminStudentsPage />} />
+          <Route path="students/:id" element={<AdminStudentDetailPage />} />
+          <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="grades" element={<AdminGradesPage />} />
           <Route path="grades/:gradeId/sections/:sectionId" element={<AdminSectionDetailPage />} />
-          <Route path="grades/:id"    element={<AdminGradeDetailPage />} />
-          <Route path="courses/:id"   element={<AdminCourseDetailPage />} />
-          <Route path="attendance"     element={<AttendancePage />} />
-          <Route path="timetable"      element={<AdminTimetablePage />} />
-          <Route path="sections"       element={<AdminSectionsPage />} />
+          <Route path="grades/:id" element={<AdminGradeDetailPage />} />
+          <Route path="courses/:id" element={<AdminCourseDetailPage />} />
+          <Route path="attendance" element={<AttendancePage />} />
+          <Route path="timetable" element={<AdminTimetablePage />} />
+          <Route path="sections" element={<AdminSectionsPage />} />
           <Route path="timetable/generate" element={<AdminTimetableGeneratorPage />} />
-          <Route path="substitutions"  element={<AdminSubstitutionsPage />} />
-          <Route path="leaves"         element={<AdminLeavesPage />} />
-          <Route path="sessions"       element={<AdminSessionsPage />} />
-          <Route path="messages"       element={<AdminMessagesPage />} />
+          <Route path="substitutions" element={<AdminSubstitutionsPage />} />
+          <Route path="leaves" element={<AdminLeavesPage />} />
+          <Route path="sessions" element={<AdminSessionsPage />} />
+          <Route path="messages" element={<AdminMessagesPage />} />
         </Route>
       </Route>
 

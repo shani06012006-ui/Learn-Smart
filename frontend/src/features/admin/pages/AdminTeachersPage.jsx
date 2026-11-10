@@ -1,9 +1,9 @@
 // frontend/src/features/admin/pages/AdminTeachersPage.jsx
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   Search, UserCog, Plus, Shield, ShieldOff, MoreVertical,
-  Eye, Pencil, Building2, Calendar, X, Trash2,
+  Eye, Pencil, Building2, Calendar, X, Trash2, Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -19,8 +19,8 @@ import ConfirmDialog from "../../../components/ui/ConfirmDialog";
 import {
   useGetAdminUsersQuery,
   useToggleAdminUserActiveMutation,
-  useRemoveAdminUserMutation,
   useHardDeleteAdminUserMutation,
+  useResendTeacherInviteMutation,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -42,7 +42,16 @@ function formatDate(iso) {
 }
 
 /* ── Row dropdown menu ─────────────────────────────────────────── */
-function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, onHardDelete, isToggling }) {
+function RowMenu({
+  teacher,
+  onView,
+  onEdit,
+  onToggle,
+  onDelete,
+  onResend,
+  isToggling,
+  isResending,
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -54,6 +63,13 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, onHardDelete, is
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
+
+  // Close the menu, then run the action. Keeps every item's click handler the same.
+  const run = (action) => (e) => {
+    e.stopPropagation();
+    setOpen(false);
+    action();
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -80,37 +96,40 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, onHardDelete, is
           >
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onView();
-              }}
+              onClick={run(onView)}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-navy-950"
             >
               <Eye size={13} />
               View profile
             </button>
+
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onEdit();
-              }}
+              onClick={run(onEdit)}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-navy-950"
             >
               <Pencil size={13} />
               Edit details
             </button>
+
+            {teacher.must_set_password && (
+              <button
+                type="button"
+                disabled={isResending}
+                onClick={run(onResend)}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-purple-600 transition-colors hover:bg-purple-50 disabled:opacity-50"
+              >
+                <Send size={13} />
+                Resend setup link
+              </button>
+            )}
+
             <div className="my-1 h-px bg-slate-100" />
+
             <button
               type="button"
               disabled={isToggling}
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onToggle();
-              }}
+              onClick={run(onToggle)}
               className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold transition-colors ${
                 teacher.is_active
                   ? "text-amber-600 hover:bg-amber-50"
@@ -125,28 +144,11 @@ function RowMenu({ teacher, onView, onEdit, onToggle, onRemove, onHardDelete, is
 
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onRemove();
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-coral-600 transition-colors hover:bg-coral-50"
-            >
-              <Trash2 size={13} />
-              Remove teacher
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                onHardDelete?.();
-              }}
+              onClick={run(onDelete)}
               className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
             >
               <Trash2 size={13} />
-              Delete permanently
+              Delete teacher
             </button>
           </motion.div>
         )}
@@ -165,9 +167,11 @@ export default function AdminTeachersPage() {
   const [editUser, setEditUser] = useState(null);
 
   const [toggleActive, { isLoading: isToggling }] = useToggleAdminUserActiveMutation();
-  const [removeUser, { isLoading: isRemoving }] = useRemoveAdminUserMutation();
   const [hardDeleteUser, { isLoading: isHardDeleting }] = useHardDeleteAdminUserMutation();
+  const [resendInvite, { isLoading: isResending }] = useResendTeacherInviteMutation();
+
   const [pendingId, setPendingId] = useState(null);
+  const [resendingId, setResendingId] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
   useEffect(() => {
@@ -184,38 +188,15 @@ export default function AdminTeachersPage() {
   const teachers = data?.results || [];
   const count = data?.count || 0;
 
-  // Compute stats from current page (approx — the API supports is_active filter)
+  // Stats are computed from the current page only.
   const activeCount = teachers.filter((t) => t.is_active).length;
   const inactiveCount = teachers.length - activeCount;
 
-  const promptRemove = (teacher) => {
+  const promptDelete = (teacher) => {
     setConfirm({
-      title: `Remove "${teacher.full_name || teacher.email}"?`,
+      title: `Delete "${teacher.full_name || teacher.email}" permanently?`,
       description:
-        "They will lose access to the platform. Their chat history, leaves, and other records are preserved. You can reactivate them later.",
-      confirmLabel: "Remove teacher",
-      tone: "danger",
-      onConfirm: async () => {
-        try {
-          await removeUser(teacher.id).unwrap();
-          setConfirm(null);
-          refetch();
-        } catch (err) {
-          const msg =
-            err?.data?.error?.detail ||
-            err?.data?.detail ||
-            (typeof err === "string" ? err : "Could not remove this teacher.");
-          setConfirm((prev) => prev ? { ...prev, error: msg } : null);
-        }
-      },
-    });
-  };
-
-  const promptHardDelete = (teacher) => {
-    setConfirm({
-      title: `Permanently delete "${teacher.full_name || teacher.email}"?`,
-      description:
-        "This cannot be undone. Their classes, enrollments, attendance, chat history, and all related records will be deleted forever. Consider using 'Remove teacher' instead (it just deactivates them).",
+        "This removes the teacher from the database, along with their classes, enrollments, attendance, and chat history. This cannot be undone.",
       confirmLabel: "Delete permanently",
       tone: "danger",
       onConfirm: async () => {
@@ -227,8 +208,8 @@ export default function AdminTeachersPage() {
           const msg =
             err?.data?.error?.detail ||
             err?.data?.detail ||
-            (typeof err === "string" ? err : "Could not delete this teacher.");
-          setConfirm((prev) => prev ? { ...prev, error: msg } : null);
+            "Could not delete this teacher.";
+          setConfirm((prev) => (prev ? { ...prev, error: msg } : null));
         }
       },
     });
@@ -242,9 +223,25 @@ export default function AdminTeachersPage() {
         is_active: !teacher.is_active,
       }).unwrap();
     } catch {
-      // Silent — the row will reflect the server state on refetch.
+      // Silent: the row reflects the server state on the next refetch.
     } finally {
       setPendingId(null);
+    }
+  };
+
+  const handleResend = async (teacher) => {
+    setResendingId(teacher.id);
+    try {
+      const res = await resendInvite(teacher.id).unwrap();
+      window.alert(
+        res.email_sent
+          ? `Setup link sent to ${teacher.email}.`
+          : `The email to ${teacher.email} could not be sent. Check the Django terminal for the error.`,
+      );
+    } catch (err) {
+      window.alert(extractErrorMessage(err) || "Could not send the setup link.");
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -268,30 +265,14 @@ export default function AdminTeachersPage() {
 
       {/* ── Stats strip ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatMini
-          label="Total teachers"
-          value={count}
-          tone="purple"
-          icon={UserCog}
-        />
-        <StatMini
-          label="Active (this page)"
-          value={activeCount}
-          tone="emerald"
-          icon={Shield}
-        />
-        <StatMini
-          label="Inactive (this page)"
-          value={inactiveCount}
-          tone="coral"
-          icon={ShieldOff}
-        />
+        <StatMini label="Total teachers" value={count} tone="purple" icon={UserCog} />
+        <StatMini label="Active (this page)" value={activeCount} tone="emerald" icon={Shield} />
+        <StatMini label="Inactive (this page)" value={inactiveCount} tone="coral" icon={ShieldOff} />
       </div>
 
       {/* ── Filter bar ─────────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-card">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Status chips */}
           <div className="flex items-center gap-1.5 rounded-full bg-slate-50 p-1">
             {STATUS_CHIPS.map((chip) => {
               const isActive = activeFilter === chip.value;
@@ -312,7 +293,6 @@ export default function AdminTeachersPage() {
             })}
           </div>
 
-          {/* Search */}
           <div className="relative min-w-[14rem] flex-1">
             <Search
               size={14}
@@ -336,7 +316,6 @@ export default function AdminTeachersPage() {
             )}
           </div>
 
-          {/* Count pill */}
           <span className="hidden shrink-0 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 sm:inline-block">
             {count} {count === 1 ? "teacher" : "teachers"}
           </span>
@@ -355,7 +334,6 @@ export default function AdminTeachersPage() {
       {!isLoading && !isError && teachers.length > 0 && (
         <>
           <div className="relative rounded-2xl border border-slate-200 bg-white shadow-card">
-            {/* Table header */}
             <div className="hidden grid-cols-[1.6fr_1fr_auto_auto_auto] items-center gap-4 rounded-t-2xl border-b border-slate-100 bg-slate-50/60 px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 lg:grid">
               <span>Teacher</span>
               <span>Institution</span>
@@ -364,10 +342,10 @@ export default function AdminTeachersPage() {
               <span className="text-right">Actions</span>
             </div>
 
-            {/* Rows */}
             <ul className="divide-y divide-slate-100">
               {teachers.map((t) => {
                 const isPending = pendingId === t.id && isToggling;
+                const isRowResending = resendingId === t.id && isResending;
                 const initials =
                   (t.full_name || t.email || "?")
                     .split(/\s+/)
@@ -375,6 +353,19 @@ export default function AdminTeachersPage() {
                     .map((p) => p[0])
                     .join("")
                     .toUpperCase() || "?";
+
+                const menu = (
+                  <RowMenu
+                    teacher={t}
+                    onView={() => navigate(`/admin/teachers/${t.id}`)}
+                    onEdit={() => setEditUser(t)}
+                    onToggle={() => handleToggle(t)}
+                    onDelete={() => promptDelete(t)}
+                    onResend={() => handleResend(t)}
+                    isToggling={isPending}
+                    isResending={isRowResending}
+                  />
+                );
 
                 return (
                   <li
@@ -390,9 +381,12 @@ export default function AdminTeachersPage() {
                           <p className="truncate text-sm font-bold text-navy-950 transition-colors group-hover:text-purple-500">
                             {t.full_name || "—"}
                           </p>
-                          <p className="truncate text-xs text-slate-400">
-                            {t.email}
-                          </p>
+                          <p className="truncate text-xs text-slate-400">{t.email}</p>
+                          {t.must_set_password && (
+                            <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                              Setup pending
+                            </span>
+                          )}
                           {Array.isArray(t.grade_names) && t.grade_names.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {t.grade_names.slice(0, 3).map((name, i) => (
@@ -415,9 +409,7 @@ export default function AdminTeachersPage() {
 
                       <div className="flex min-w-0 items-center gap-2 text-sm text-slate-600">
                         <Building2 size={13} className="shrink-0 text-slate-300" />
-                        <span className="truncate">
-                          {t.institution?.name || "—"}
-                        </span>
+                        <span className="truncate">{t.institution?.name || "—"}</span>
                       </div>
 
                       <Badge variant={t.is_active ? "success" : "danger"} dot>
@@ -429,17 +421,7 @@ export default function AdminTeachersPage() {
                         {formatDate(t.created_at)}
                       </span>
 
-                      <div className="flex justify-end">
-                        <RowMenu
-                          teacher={t}
-                          onView={() => navigate(`/admin/teachers/${t.id}`)}
-                          onEdit={() => setEditUser(t)}
-                          onToggle={() => handleToggle(t)}
-                          onRemove={() => promptRemove(t)}
-                          onHardDelete={() => promptHardDelete(t)}
-                          isToggling={isPending}
-                        />
-                      </div>
+                      <div className="flex justify-end">{menu}</div>
                     </div>
 
                     {/* Mobile layout */}
@@ -450,25 +432,20 @@ export default function AdminTeachersPage() {
                           <p className="truncate text-sm font-bold text-navy-950">
                             {t.full_name || "—"}
                           </p>
-                          <p className="truncate text-xs text-slate-400">
-                            {t.email}
-                          </p>
+                          <p className="truncate text-xs text-slate-400">{t.email}</p>
                         </div>
-                        <RowMenu
-                          teacher={t}
-                          onView={() => navigate(`/admin/teachers/${t.id}`)}
-                          onEdit={() => setEditUser(t)}
-                          onToggle={() => handleToggle(t)}
-                          onRemove={() => promptRemove(t)}
-                          onHardDelete={() => promptHardDelete(t)}
-                          isToggling={isPending}
-                        />
+                        {menu}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                         <Badge variant={t.is_active ? "success" : "danger"} dot>
                           {t.is_active ? "Active" : "Inactive"}
                         </Badge>
+                        {t.must_set_password && (
+                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                            Setup pending
+                          </span>
+                        )}
                         <span className="flex items-center gap-1.5">
                           <Building2 size={11} className="text-slate-300" />
                           {t.institution?.name || "—"}
@@ -485,12 +462,7 @@ export default function AdminTeachersPage() {
             </ul>
           </div>
 
-          <Pager
-            page={page}
-            count={count}
-            pageSize={PAGE_SIZE}
-            onPageChange={setPage}
-          />
+          <Pager page={page} count={count} pageSize={PAGE_SIZE} onPageChange={setPage} />
         </>
       )}
 
@@ -517,7 +489,7 @@ export default function AdminTeachersPage() {
         description={confirm?.description}
         confirmLabel={confirm?.confirmLabel}
         tone={confirm?.tone}
-        loading={isRemoving || isHardDeleting}
+        loading={isHardDeleting}
         error={confirm?.error}
       />
     </div>
@@ -527,9 +499,9 @@ export default function AdminTeachersPage() {
 /* ── Small stat card ───────────────────────────────────────────── */
 function StatMini({ label, value, tone = "purple", icon: Icon }) {
   const TONE = {
-    purple:  { chip: "bg-purple-50 text-purple-600",  bar: "bg-purple-500" },
+    purple: { chip: "bg-purple-50 text-purple-600", bar: "bg-purple-500" },
     emerald: { chip: "bg-emerald-50 text-emerald-600", bar: "bg-emerald-500" },
-    coral:   { chip: "bg-coral-50 text-coral-600",     bar: "bg-coral-500" },
+    coral: { chip: "bg-coral-50 text-coral-600", bar: "bg-coral-500" },
   };
   const t = TONE[tone];
 

@@ -1,3 +1,5 @@
+#backend/accounts/urls.py
+
 from django.urls import path
 
 from .activation_views import (
@@ -9,6 +11,10 @@ from .registration_views import (
     RegisterResendView,
     RegisterVerifyView,
     RegisterView,
+)
+from .teacher_onboarding_views import (
+    TeacherOnboardingCompleteView,
+    TeacherOnboardingValidateView,
 )
 from .views import (
     GoogleLoginView,
@@ -49,10 +55,14 @@ urlpatterns = [
     path("request-otp/", RequestOTPView.as_view(), name="auth-request-otp"),
     path("verify-otp/", VerifyOTPView.as_view(), name="auth-verify-otp"),
 
-    # Activation
+    # Student activation (unchanged)
     path("activation/validate/", ActivationValidateView.as_view(), name="auth-activation-validate"),
     path("activation/complete/", ActivationCompleteView.as_view(), name="auth-activation-complete"),
     path("activation/request/", ActivationRequestView.as_view(), name="auth-activation-request"),
+
+    # Teacher onboarding (one-time setup link)
+    path("onboarding/teacher/validate/", TeacherOnboardingValidateView.as_view(), name="auth-teacher-onboarding-validate"),
+    path("onboarding/teacher/complete/", TeacherOnboardingCompleteView.as_view(), name="auth-teacher-onboarding-complete"),
 
     # Setup Password & PIN
     path("setup-password/", SetupPasswordView.as_view(), name="auth-setup-password"),

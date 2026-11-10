@@ -1,3 +1,5 @@
+#backend/chat/signals.py
+
 # -*- coding: utf-8 -*-
 """
 Signals to keep chat membership in sync with class enrollments.

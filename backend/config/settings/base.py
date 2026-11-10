@@ -200,6 +200,7 @@ GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
 # e-mail (or WhatsApp message) are built from this so a student always lands on
 # the right host. In dev the Vite server runs on :5173.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+TEACHER_ONBOARDING_TTL_MINUTES = int(os.getenv("TEACHER_ONBOARDING_TTL_MINUTES", "30"))
 # How long a one-time activation link (and the fallback temporary password)
 # stays valid. After this window the invite must be re-sent.
 ACTIVATION_TOKEN_TTL_HOURS = int(os.getenv("ACTIVATION_TOKEN_TTL_HOURS", "48"))
@@ -215,13 +216,13 @@ ACTIVATION_DEFAULT_COUNTRY_CODE = os.getenv("ACTIVATION_DEFAULT_COUNTRY_CODE", "
 # For real delivery set EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 # plus the EMAIL_HOST* variables below (see SIGNUP_SETUP.md).
 # ---------------------------------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
-EMAIL_HOST_USER = "reach.shaniyas@gmail.com"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "reach.shaniyas@gmail.com")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
 DEFAULT_FROM_EMAIL = "Learn Smart <reach.shaniyas@gmail.com>"

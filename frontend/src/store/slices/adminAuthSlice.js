@@ -1,3 +1,5 @@
+//frontend/src/store/slices/adminAuthSlice.js
+
 import { createSlice } from "@reduxjs/toolkit";
 
 import { adminTokenStorage } from "../../utils/adminTokenStorage";

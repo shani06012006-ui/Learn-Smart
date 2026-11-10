@@ -1,5 +1,6 @@
 // frontend/src/features/landing/sections/HorizontalStoryboard.jsx
 // Page order: hero → subjects → feature band → teachers → experts → classes → FAQ
+
 import Panel1Hero from "./Panel1Hero";
 import Panel2Bento from "./Panel2Bento";
 import TrustBand from "./TrustBand";

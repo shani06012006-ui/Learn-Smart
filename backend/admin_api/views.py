@@ -1,4 +1,8 @@
-from notifications.service import notify_all_teachers
+# backend/admin_api/views.py
+from datetime import timedelta
+import logging
+
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -9,13 +13,20 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.activation import invalidate_activation_tokens, invite_student
-from accounts.models import RefreshToken, StudentAttendance, TeacherAttendance, User
+from accounts.models import (
+    RefreshToken,
+    StudentAttendance,
+    TeacherAttendance,
+    TeacherGradeAssignment,
+    User,
+)
+from accounts.teacher_onboarding import invite_teacher_with_result
 from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableEntry
 from institutions.models import Institution
 from leaves.models import StudentLeave, TeacherLeave
+from notifications.service import notify_all_teachers
 
 from .permissions import IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser
-
 from .serializers import (
     AdminCourseReadSerializer,
     AdminCourseWriteSerializer,
@@ -40,6 +51,11 @@ from .serializers import (
     TimetableEntryWriteSerializer,
 )
 
+logger = logging.getLogger(__name__)
+
+PERFORMANCE_COUNTS = {"week": 8, "month": 6, "term": 4}
+
+
 # ═══════════════════════════════════════════════════════════════
 # ATTENDANCE
 # ═══════════════════════════════════════════════════════════════
@@ -52,10 +68,7 @@ class AdminTeacherAttendanceViewSet(viewsets.GenericViewSet):
         qs = TeacherAttendance.objects.all().select_related("teacher", "institution")
 
         date_str = self.request.query_params.get("date")
-        if date_str:
-            qs = qs.filter(date=date_str)
-        else:
-            qs = qs.filter(date=timezone.localdate())
+        qs = qs.filter(date=date_str) if date_str else qs.filter(date=timezone.localdate())
 
         status_filter = self.request.query_params.get("status")
         if status_filter in {TeacherAttendance.STATUS_PRESENT}:
@@ -79,25 +92,21 @@ class AdminTeacherAttendanceViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = TeacherAttendanceSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(TeacherAttendanceSerializer(page, many=True).data)
         return Response(TeacherAttendanceSerializer(qs, many=True).data)
+
 
 class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
     def get_queryset(self):
         user = self.request.user
-        qs = (
-            StudentAttendance.objects.all()
-            .select_related("student", "class_course", "class_course__teacher", "institution")
+        qs = StudentAttendance.objects.all().select_related(
+            "student", "class_course", "class_course__teacher", "institution"
         )
 
         date_str = self.request.query_params.get("date")
-        if date_str:
-            qs = qs.filter(date=date_str)
-        else:
-            qs = qs.filter(date=timezone.localdate())
+        qs = qs.filter(date=date_str) if date_str else qs.filter(date=timezone.localdate())
 
         status_filter = self.request.query_params.get("status")
         if status_filter in {StudentAttendance.STATUS_PRESENT}:
@@ -131,9 +140,9 @@ class AdminStudentAttendanceViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = StudentAttendanceSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(StudentAttendanceSerializer(page, many=True).data)
         return Response(StudentAttendanceSerializer(qs, many=True).data)
+
 
 # ═══════════════════════════════════════════════════════════════
 # ENROLLMENTS
@@ -186,17 +195,19 @@ class AdminEnrollmentViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = AdminEnrollmentSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(AdminEnrollmentSerializer(page, many=True).data)
         return Response(AdminEnrollmentSerializer(qs, many=True).data)
+
 
 # ═══════════════════════════════════════════════════════════════
 # USERS (Admin)
 # ═══════════════════════════════════════════════════════════════
 
 class AdminUserViewSet(viewsets.GenericViewSet):
+    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+
     def _sync_student_grade_enrollments_with_grade(self, user_obj, grade_obj):
-        if getattr(user_obj, "role", None) != "student":
+        if getattr(user_obj, "role", None) != User.ROLE_STUDENT:
             return
         user_obj.grade = grade_obj
         user_obj.save(update_fields=["grade", "updated_at"])
@@ -205,12 +216,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                 from classes.services import auto_enroll_student_into_grade
                 auto_enroll_student_into_grade(user_obj)
             except Exception:
-                import logging
-                logging.getLogger(__name__).exception(
-                    "auto-enroll failed for student %s", user_obj.id
-                )
-
-    permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
+                logger.exception("auto-enroll failed for student %s", user_obj.id)
 
     def _scope_queryset(self, qs):
         user = self.request.user
@@ -231,8 +237,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
 
         active = self.request.query_params.get("is_active")
         if active is not None:
-            active_bool = active.lower() in {"true", "1", "yes"}
-            qs = qs.filter(is_active=active_bool)
+            qs = qs.filter(is_active=active.lower() in {"true", "1", "yes"})
 
         q = self.request.query_params.get("q")
         if q:
@@ -256,20 +261,19 @@ class AdminUserViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = AdminUserSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(AdminUserSerializer(page, many=True).data)
         return Response(AdminUserSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        user = self.get_object()
-        return Response(AdminUserSerializer(user).data)
+        return Response(AdminUserSerializer(self.get_object()).data)
 
     def create(self, request):
         serializer = AdminUserCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        data_in = serializer.validated_data
+        actor = request.user
 
-        user = request.user
-        if user.is_superuser:
+        if actor.is_superuser:
             institution_id = request.data.get("institution_id")
             if institution_id:
                 try:
@@ -282,72 +286,181 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             else:
                 institution = None
         else:
-            institution = user.institution
+            institution = actor.institution
 
-        grade_obj = serializer.validated_data.get("grade_id")
-        is_student = serializer.validated_data["role"] == User.ROLE_STUDENT
+        role = data_in["role"]
+        is_student = role == User.ROLE_STUDENT
 
-        new_user = User.objects.create_user(
-            email=serializer.validated_data["email"],
-            password=None if is_student else serializer.validated_data["password"],
-            first_name=serializer.validated_data.get("first_name", ""),
-            last_name=serializer.validated_data.get("last_name", ""),
-            role=serializer.validated_data["role"],
-            institution=institution,
-            must_set_password=is_student,
-        )
+        # Teacher email already in use: reuse that account instead of failing.
+        if not is_student:
+            existing = User.objects.filter(email=data_in["email"]).first()
+            if existing is not None:
+                return self._handle_existing_teacher(request, existing, data_in, institution)
 
-        if grade_obj is not None and new_user.role == User.ROLE_STUDENT:
-            self._sync_student_grade_enrollments_with_grade(new_user, grade_obj)
+        grade_obj = data_in.get("grade_id")
+        class_ids = data_in.get("class_ids") or []
+        grade_ids = data_in.get("grade_ids") or []
 
-        class_ids = serializer.validated_data.get("class_ids") or []
-        if class_ids:
-            from classes.models import ClassCourse, StudentEnrollment
-            from core.utils import generate_unique_code
-            from django.utils import timezone
+        with transaction.atomic():
+            new_user = User.objects.create_user(
+                email=data_in["email"],
+                password=None,  # nobody sets this; the user sets it via the setup link
+                first_name=data_in.get("first_name", ""),
+                last_name=data_in.get("last_name", ""),
+                role=role,
+                institution=institution,
+                must_set_password=True,
+            )
 
-            classes_qs = ClassCourse.objects.filter(id__in=class_ids)
-            if institution is not None:
-                classes_qs = classes_qs.filter(institution=institution)
+            if is_student and grade_obj is not None:
+                self._sync_student_grade_enrollments_with_grade(new_user, grade_obj)
 
-            if new_user.role == User.ROLE_TEACHER:
-                classes_qs.update(teacher=new_user)
-            elif new_user.role == User.ROLE_STUDENT:
-                for klass in classes_qs:
-                    StudentEnrollment.objects.get_or_create(
-                        student=new_user,
-                        class_course=klass,
-                        defaults={
-                            "joining_code": generate_unique_code(
-                                StudentEnrollment, field_name="joining_code"
-                            ),
-                            "status": StudentEnrollment.STATUS_ACTIVE,
-                            "joined_at": timezone.now(),
-                        },
+            if class_ids:
+                from core.utils import generate_unique_code
+
+                classes_qs = ClassCourse.objects.filter(id__in=class_ids)
+                if institution is not None:
+                    classes_qs = classes_qs.filter(institution=institution)
+
+                if new_user.role == User.ROLE_TEACHER:
+                    classes_qs.update(teacher=new_user)
+                elif new_user.role == User.ROLE_STUDENT:
+                    for klass in classes_qs:
+                        StudentEnrollment.objects.get_or_create(
+                            student=new_user,
+                            class_course=klass,
+                            defaults={
+                                "joining_code": generate_unique_code(
+                                    StudentEnrollment, field_name="joining_code"
+                                ),
+                                "status": StudentEnrollment.STATUS_ACTIVE,
+                                "joined_at": timezone.now(),
+                            },
+                        )
+
+            if not is_student:
+                for gid in grade_ids:
+                    TeacherGradeAssignment.objects.get_or_create(
+                        teacher=new_user,
+                        grade_id=gid,
+                        defaults={"institution": institution or new_user.institution},
                     )
-
-        data = AdminUserSerializer(new_user).data
 
         if is_student:
             from accounts.services import generate_student_pin
+
             try:
-                creds = generate_student_pin(new_user)
-                pin_value = creds.pin
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).exception("PIN generation failed: %s", e)
+                pin_value = generate_student_pin(new_user).pin
+            except Exception:
+                logger.exception("PIN generation failed for %s", new_user.pk)
                 pin_value = None
 
+            data = AdminUserSerializer(new_user).data
             data["invitation"] = invite_student(
                 new_user,
-                issued_by=request.user,
-                send_email=serializer.validated_data["send_email"],
-                whatsapp_number=serializer.validated_data["whatsapp_number"],
+                issued_by=actor,
+                send_email=data_in["send_email"],
+                whatsapp_number=data_in["whatsapp_number"],
             )
             data["invitation"]["student_pin"] = pin_value
             data["student_pin"] = pin_value
+            return Response(data, status=status.HTTP_201_CREATED)
 
+        # Teacher: the setup link is emailed and never returned to the admin.
+        email_sent, email_error = invite_teacher_with_result(new_user, issued_by=actor)
+        data = AdminUserSerializer(new_user).data
+        data["email_sent"] = email_sent
+        data["email_error"] = email_error
         return Response(data, status=status.HTTP_201_CREATED)
+
+    def _handle_existing_teacher(self, request, existing, data_in, institution):
+        actor = request.user
+
+        def refuse(detail, code):
+            return Response(
+                {"error": {"detail": detail, "code": code, "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if existing.role != User.ROLE_TEACHER:
+            return refuse(
+                "This email belongs to a student or admin account and can't be used for a teacher.",
+                "email_taken_other_role",
+            )
+
+        if (
+            not actor.is_superuser
+            and existing.institution_id is not None
+            and existing.institution_id != actor.institution_id
+        ):
+            return refuse(
+                "This email belongs to a teacher in another institution.",
+                "email_taken_other_institution",
+            )
+
+        pending = existing.must_set_password
+        reactivated = not existing.is_active
+        grade_ids = data_in.get("grade_ids") or []
+
+        with transaction.atomic():
+            update_fields = ["updated_at"]
+
+            if existing.institution_id is None and institution is not None:
+                existing.institution = institution
+                update_fields.append("institution")
+
+            if pending:
+                existing.first_name = data_in.get("first_name") or existing.first_name
+                existing.last_name = data_in.get("last_name") or existing.last_name
+                update_fields += ["first_name", "last_name"]
+
+            if reactivated:
+                existing.is_active = True
+                update_fields.append("is_active")
+
+            existing.save(update_fields=update_fields)
+
+            grades_added = 0
+            for gid in grade_ids:
+                _, created = TeacherGradeAssignment.objects.get_or_create(
+                    teacher=existing,
+                    grade_id=gid,
+                    defaults={"institution": existing.institution},
+                )
+                if created:
+                    grades_added += 1
+
+        email_sent = False
+        email_error = None
+        if pending:
+            # Re-issue the setup link. A successful send retires any older link.
+            email_sent, email_error = invite_teacher_with_result(existing, issued_by=actor)
+            if email_sent:
+                message = f"Setup link sent to {existing.email}. Any earlier link no longer works."
+            else:
+                message = (
+                    "The account exists, but the setup email could not be sent. "
+                    f"{email_error} Any earlier link is still valid."
+                )
+        elif reactivated:
+            message = "The account was reactivated and the new grades were added. No email was sent."
+        else:
+            message = (
+                "This teacher already has an account, so no new email was sent. "
+                f"{grades_added} new grade(s) added."
+            )
+
+        body = AdminUserSerializer(existing).data
+        body.update({
+            "existing_account": True,
+            "reinvited": pending,
+            "reactivated": reactivated,
+            "email_sent": email_sent,
+            "email_error": email_error,
+            "grades_added": grades_added,
+            "message": message,
+        })
+        return Response(body, status=status.HTTP_200_OK)
 
     def partial_update(self, request, pk=None):
         user = self.get_object()
@@ -387,7 +500,6 @@ class AdminUserViewSet(viewsets.GenericViewSet):
                 {"error": {"detail": "You cannot remove your own account.", "status_code": 400}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         if user.role != User.ROLE_TEACHER:
             return Response(
                 {"error": {"detail": "This endpoint only removes teachers.", "status_code": 400}},
@@ -470,7 +582,10 @@ class AdminUserViewSet(viewsets.GenericViewSet):
     def classes(self, request, pk=None):
         user = self.get_object()
         if user.role != User.ROLE_TEACHER:
-            return Response({"error": {"detail": "This user is not a teacher.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "This user is not a teacher.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         qs = (
             ClassCourse.objects.filter(teacher=user)
@@ -490,7 +605,10 @@ class AdminUserViewSet(viewsets.GenericViewSet):
     def enrollments(self, request, pk=None):
         user = self.get_object()
         if user.role != User.ROLE_STUDENT:
-            return Response({"error": {"detail": "This user is not a student.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "This user is not a student.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         qs = (
             StudentEnrollment.objects.filter(student=user)
@@ -512,6 +630,7 @@ class AdminUserViewSet(viewsets.GenericViewSet):
             },
         } for e in qs]
         return Response({"results": data, "count": len(data)})
+
 
 class AdminStatsView(APIView):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -541,12 +660,14 @@ class AdminStatsView(APIView):
         enrollments_active = enrollments_qs.filter(status=StudentEnrollment.STATUS_ACTIVE).count()
 
         payload = {
-            **role_counts, **class_counts,
+            **role_counts,
+            **class_counts,
             "enrollments_active": enrollments_active,
             "institution": user.institution,
             "is_superuser_view": user.is_superuser,
         }
         return Response(AdminStatsSerializer(payload).data)
+
 
 class AdminSessionViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -562,12 +683,13 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
             qs = qs.filter(user_id=user_id)
 
         status_filter = self.request.query_params.get("status")
+        now = timezone.now()
         if status_filter == "active":
-            qs = qs.filter(revoked_at__isnull=True, expires_at__gt=timezone.now())
+            qs = qs.filter(revoked_at__isnull=True, expires_at__gt=now)
         elif status_filter == "revoked":
             qs = qs.filter(revoked_at__isnull=False)
         elif status_filter == "expired":
-            qs = qs.filter(revoked_at__isnull=True, expires_at__lte=timezone.now())
+            qs = qs.filter(revoked_at__isnull=True, expires_at__lte=now)
 
         q = self.request.query_params.get("q")
         if q:
@@ -581,9 +703,8 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
 
     def get_object(self):
         pk = self.kwargs["pk"]
-        qs = self.get_queryset()
         try:
-            return qs.get(pk=pk)
+            return self.get_queryset().get(pk=pk)
         except RefreshToken.DoesNotExist:
             raise NotFound("Session not found.")
 
@@ -591,8 +712,7 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = AdminRefreshTokenSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(AdminRefreshTokenSerializer(page, many=True).data)
         return Response(AdminRefreshTokenSerializer(qs, many=True).data)
 
     @action(detail=True, methods=["post"], url_path="revoke")
@@ -606,9 +726,6 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["post"], url_path="purge-stale")
     def purge_stale(self, request):
-        from datetime import timedelta
-        from accounts.models import RefreshToken
-
         user = request.user
         cutoff = timezone.now() - timedelta(days=7)
         qs = RefreshToken.objects.all()
@@ -621,6 +738,7 @@ class AdminSessionViewSet(viewsets.GenericViewSet):
         deleted = qs.count()
         qs.delete()
         return Response({"deleted": deleted}, status=status.HTTP_200_OK)
+
 
 # ═══════════════════════════════════════════════════════════════
 # COURSES (Institution Admin)
@@ -636,11 +754,7 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         return qs.filter(institution=user.institution)
 
     def get_queryset(self):
-        qs = (
-            ClassCourse.objects.all()
-            .select_related("teacher", "institution")
-            .order_by("-created_at")
-        )
+        qs = ClassCourse.objects.all().select_related("teacher", "institution").order_by("-created_at")
         qs = self._scope_queryset(qs)
 
         archived = self.request.query_params.get("is_archived")
@@ -659,20 +773,17 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         if q:
             qs = qs.filter(Q(name__icontains=q) | Q(subject__icontains=q))
 
-        qs = qs.annotate(
+        return qs.annotate(
             student_count=Count(
                 "enrollments",
                 filter=Q(enrollments__status=StudentEnrollment.STATUS_ACTIVE),
                 distinct=True,
             )
         )
-        return qs
 
     def get_object(self):
         pk = self.kwargs["pk"]
-        qs = self._scope_queryset(
-            ClassCourse.objects.all().select_related("teacher", "institution")
-        )
+        qs = self._scope_queryset(ClassCourse.objects.all().select_related("teacher", "institution"))
         try:
             return qs.get(pk=pk)
         except ClassCourse.DoesNotExist:
@@ -682,13 +793,11 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = AdminCourseReadSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(AdminCourseReadSerializer(page, many=True).data)
         return Response(AdminCourseReadSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        course = self.get_object()
-        return Response(AdminCourseReadSerializer(course).data)
+        return Response(AdminCourseReadSerializer(self.get_object()).data)
 
     def create(self, request):
         serializer = AdminCourseWriteSerializer(data=request.data)
@@ -697,34 +806,54 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
 
         for field in ("name", "subject", "teacher_id"):
             if field not in data:
-                return Response({"error": {"detail": f"{field} is required.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": {"detail": f"{field} is required.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         user = request.user
         if user.is_superuser:
             institution_id = request.data.get("institution_id")
             if not institution_id:
-                return Response({"error": {"detail": "institution_id is required.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": {"detail": "institution_id is required.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             try:
                 institution = Institution.objects.get(pk=institution_id)
             except Institution.DoesNotExist:
-                return Response({"error": {"detail": "institution_id does not match any institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": {"detail": "institution_id does not match any institution.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         else:
             institution = user.institution
 
         try:
             teacher = User.objects.get(pk=data["teacher_id"])
         except User.DoesNotExist:
-            return Response({"error": {"detail": "teacher_id does not match any user.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "teacher_id does not match any user.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if teacher.role != User.ROLE_TEACHER:
-            return Response({"error": {"detail": "The specified user is not a teacher.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "The specified user is not a teacher.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not user.is_superuser and teacher.institution_id != institution.id:
-            return Response({"error": {"detail": "The specified teacher is not in your institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "The specified teacher is not in your institution.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         course = ClassCourse.objects.create(
-            institution=institution, teacher=teacher,
-            name=data["name"], subject=data["subject"],
+            institution=institution,
+            teacher=teacher,
+            name=data["name"],
+            subject=data["subject"],
             description=data.get("description", ""),
         )
         return Response(AdminCourseReadSerializer(course).data, status=status.HTTP_201_CREATED)
@@ -740,11 +869,13 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
                 setattr(course, field, data[field])
 
         if "teacher_id" in data:
-            from accounts.models import User as _U
             try:
-                course.teacher = _U.objects.get(id=data["teacher_id"])
-            except _U.DoesNotExist:
-                return Response({"error": {"detail": "Teacher not found.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                course.teacher = User.objects.get(id=data["teacher_id"])
+            except User.DoesNotExist:
+                return Response(
+                    {"error": {"detail": "Teacher not found.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if "grade_id" in data:
             course.grade = data["grade_id"]
@@ -753,8 +884,7 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         return Response(AdminCourseReadSerializer(course).data)
 
     def destroy(self, request, pk=None):
-        course = self.get_object()
-        course.soft_delete()
+        self.get_object().soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get", "post"], url_path="students")
@@ -763,7 +893,11 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         if request.method == "POST":
             return self._add_student_to_course(request, course)
 
-        qs = StudentEnrollment.objects.filter(class_course=course).select_related("student").order_by("-created_at")
+        qs = (
+            StudentEnrollment.objects.filter(class_course=course)
+            .select_related("student")
+            .order_by("-created_at")
+        )
         data = [{
             "id": str(e.id), "status": e.status, "joining_code": e.joining_code,
             "joined_at": e.joined_at.isoformat() if e.joined_at else None,
@@ -785,7 +919,10 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
         grade_id = request.data.get("grade_id")
 
         if not email or not first_name or not last_name:
-            return Response({"detail": "email, first_name and last_name are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "email, first_name and last_name are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         grade = None
         if grade_id:
@@ -812,18 +949,28 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
     def student_status(self, request, pk=None, enrollment_id=None):
         course = self.get_object()
         try:
-            enrollment = StudentEnrollment.objects.select_related("student").get(id=enrollment_id, class_course=course)
+            enrollment = StudentEnrollment.objects.select_related("student").get(
+                id=enrollment_id, class_course=course
+            )
         except StudentEnrollment.DoesNotExist:
             return Response({"detail": "Enrollment not found."}, status=status.HTTP_404_NOT_FOUND)
 
         new_status = request.data.get("status")
-        valid = {StudentEnrollment.STATUS_ACTIVE, StudentEnrollment.STATUS_BLOCKED, StudentEnrollment.STATUS_REMOVED}
+        valid = {
+            StudentEnrollment.STATUS_ACTIVE,
+            StudentEnrollment.STATUS_BLOCKED,
+            StudentEnrollment.STATUS_REMOVED,
+        }
         if new_status not in valid:
-            return Response({"detail": f"status must be one of {sorted(valid)}."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": f"status must be one of {sorted(valid)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         enrollment.status = new_status
         enrollment.save(update_fields=["status", "updated_at"])
         return Response({"id": str(enrollment.id), "status": enrollment.status})
+
 
 # ═══════════════════════════════════════════════════════════════
 # TIMETABLE (Admin)
@@ -832,18 +979,10 @@ class InstitutionCourseViewSet(viewsets.GenericViewSet):
 class AdminTimetableViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
-    def _scope_queryset(self, qs):
-        user = self.request.user
-        if user.is_superuser:
-            return qs
-        return qs
-
     def get_queryset(self):
-        qs = (
-            TimetableEntry.objects.all()
-            .select_related("class_course", "class_course__teacher", "teacher", "institution")
+        qs = TimetableEntry.objects.all().select_related(
+            "class_course", "class_course__teacher", "teacher", "institution"
         )
-        qs = self._scope_queryset(qs)
 
         teacher_id = self.request.query_params.get("teacher")
         if teacher_id:
@@ -863,14 +1002,12 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
                 pass
 
         institution_id = self.request.query_params.get("institution")
-        user = self.request.user
-        if institution_id and user.is_superuser:
+        if institution_id and self.request.user.is_superuser:
             qs = qs.filter(institution_id=institution_id)
 
         active_param = self.request.query_params.get("active")
         if active_param is not None:
-            active_bool = active_param.lower() in {"true", "1", "yes"}
-            qs = qs.filter(is_active=active_bool)
+            qs = qs.filter(is_active=active_param.lower() in {"true", "1", "yes"})
         else:
             qs = qs.filter(is_active=True)
 
@@ -878,9 +1015,8 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
 
     def get_object(self):
         pk = self.kwargs["pk"]
-        qs = self._scope_queryset(TimetableEntry.objects.all())
         try:
-            return qs.get(pk=pk)
+            return TimetableEntry.objects.get(pk=pk)
         except TimetableEntry.DoesNotExist:
             raise NotFound("Timetable entry not found.")
 
@@ -888,16 +1024,15 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = TimetableEntryReadSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(TimetableEntryReadSerializer(page, many=True).data)
         return Response(TimetableEntryReadSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        entry = self.get_object()
-        return Response(TimetableEntryReadSerializer(entry).data)
+        return Response(TimetableEntryReadSerializer(self.get_object()).data)
 
     def create(self, request):
         from classes.services import materialize_upcoming_sessions
+
         serializer = TimetableEntryWriteSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -906,17 +1041,27 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         user = request.user
 
         if not user.is_superuser and course.institution_id != user.institution_id:
-            return Response({"error": {"detail": "Class is not in your institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Class is not in your institution.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer.check_conflicts(
-            course=course, day=data["day_of_week"], start=data["start_time"],
-            end=data["end_time"], room=data.get("room", ""),
+            course=course,
+            day=data["day_of_week"],
+            start=data["start_time"],
+            end=data["end_time"],
+            room=data.get("room", ""),
         )
 
         entry = TimetableEntry.objects.create(
-            institution=course.institution, class_course=course, teacher=course.teacher,
-            day_of_week=data["day_of_week"], start_time=data["start_time"],
-            end_time=data["end_time"], room=data.get("room", ""),
+            institution=course.institution,
+            class_course=course,
+            teacher=course.teacher,
+            day_of_week=data["day_of_week"],
+            start_time=data["start_time"],
+            end_time=data["end_time"],
+            room=data.get("room", ""),
             is_active=data.get("is_active", True),
         )
         materialize_upcoming_sessions(entry)
@@ -924,8 +1069,11 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
 
     def partial_update(self, request, pk=None):
         from classes.services import regenerate_future_sessions
+
         entry = self.get_object()
-        serializer = TimetableEntryWriteSerializer(data=request.data, partial=True, context={"request": request})
+        serializer = TimetableEntryWriteSerializer(
+            data=request.data, partial=True, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
@@ -937,13 +1085,26 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
         new_active = data.get("is_active", entry.is_active)
 
         if new_end <= new_start:
-            return Response({"error": {"detail": "End time must be after start time.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "End time must be after start time.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user = request.user
         if not user.is_superuser and new_course.institution_id != user.institution_id:
-            return Response({"error": {"detail": "Class is not in your institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Class is not in your institution.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        serializer.check_conflicts(course=new_course, day=new_day, start=new_start, end=new_end, room=new_room, exclude_id=entry.id)
+        serializer.check_conflicts(
+            course=new_course,
+            day=new_day,
+            start=new_start,
+            end=new_end,
+            room=new_room,
+            exclude_id=entry.id,
+        )
 
         entry.class_course = new_course
         entry.teacher = new_course.teacher
@@ -961,6 +1122,7 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         from classes.services import cancel_future_sessions
+
         entry = self.get_object()
         if entry.is_active:
             entry.is_active = False
@@ -968,17 +1130,17 @@ class AdminTimetableViewSet(viewsets.GenericViewSet):
             cancel_future_sessions(entry)
         return Response(TimetableEntryReadSerializer(entry).data)
 
+
 class TimetableView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        qs = (
-            TimetableEntry.objects.all()
-            .select_related("class_course", "class_course__teacher", "teacher", "institution")
+        qs = TimetableEntry.objects.all().select_related(
+            "class_course", "class_course__teacher", "teacher", "institution"
         )
 
-        if user.role == "teacher":
+        if user.role == User.ROLE_TEACHER:
             only_mine = (request.query_params.get("mine") or "").lower() in {"1", "true", "yes"}
             if only_mine:
                 qs = qs.filter(Q(teacher=user) | Q(class_course__teacher=user))
@@ -990,13 +1152,18 @@ class TimetableView(APIView):
             class_param = request.query_params.get("class_id")
             if class_param:
                 qs = qs.filter(class_course_id=class_param)
-        elif user.role == "student":
+
+        elif user.role == User.ROLE_STUDENT:
             enrolled_class_ids = StudentEnrollment.objects.filter(
                 student=user, status=StudentEnrollment.STATUS_ACTIVE,
             ).values_list("class_course_id", flat=True)
             qs = qs.filter(class_course_id__in=enrolled_class_ids, institution=user.institution)
+
         else:
-            return Response({"detail": "Use /admin/timetable/ for admin access."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "Use /admin/timetable/ for admin access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         day = request.query_params.get("day")
         if day is not None:
@@ -1009,17 +1176,25 @@ class TimetableView(APIView):
 
         active_param = request.query_params.get("active")
         if active_param is not None:
-            active_bool = active_param.lower() in {"true", "1", "yes"}
-            qs = qs.filter(is_active=active_bool)
+            qs = qs.filter(is_active=active_param.lower() in {"true", "1", "yes"})
         else:
             qs = qs.filter(is_active=True)
 
         qs = qs.order_by("day_of_week", "start_time")
         return Response(TimetableEntryReadSerializer(qs, many=True).data)
 
+
 # ═══════════════════════════════════════════════════════════════
 # LIVE CLASSES
 # ═══════════════════════════════════════════════════════════════
+
+LIVE_STATUSES = {
+    LiveClass.STATUS_UPCOMING,
+    LiveClass.STATUS_LIVE,
+    LiveClass.STATUS_COMPLETED,
+    LiveClass.STATUS_CANCELLED,
+}
+
 
 class AdminLiveClassViewSet(viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
@@ -1031,9 +1206,8 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         return qs.filter(institution=user.institution)
 
     def get_queryset(self):
-        qs = (
-            LiveClass.objects.all()
-            .select_related("timetable_entry", "class_course", "class_course__teacher", "teacher", "institution")
+        qs = LiveClass.objects.all().select_related(
+            "timetable_entry", "class_course", "class_course__teacher", "teacher", "institution"
         )
         qs = self._scope_queryset(qs)
 
@@ -1057,16 +1231,14 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         if to_str:
             qs = qs.filter(scheduled_start__lte=to_str)
 
-        status_filter = self.request.query_params.get("status")
-
         institution_id = self.request.query_params.get("institution")
-        user = self.request.user
-        if institution_id and user.is_superuser:
+        if institution_id and self.request.user.is_superuser:
             qs = qs.filter(institution_id=institution_id)
 
         qs = qs.order_by("-scheduled_start")
 
-        if status_filter in {LiveClass.STATUS_UPCOMING, LiveClass.STATUS_LIVE, LiveClass.STATUS_COMPLETED, LiveClass.STATUS_CANCELLED}:
+        status_filter = self.request.query_params.get("status")
+        if status_filter in LIVE_STATUSES:
             ids = [row.id for row in qs if row.computed_status() == status_filter]
             qs = qs.filter(id__in=ids)
 
@@ -1084,13 +1256,11 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = LiveClassReadSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(LiveClassReadSerializer(page, many=True).data)
         return Response(LiveClassReadSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        obj = self.get_object()
-        return Response(LiveClassReadSerializer(obj).data)
+        return Response(LiveClassReadSerializer(self.get_object()).data)
 
     def create(self, request):
         serializer = LiveClassWriteSerializer(data=request.data)
@@ -1100,17 +1270,21 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
         course = data["_course"]
         user = request.user
 
-        if not user.is_superuser and user.role not in ["admin", "teacher"]:
+        if not user.is_superuser and user.role not in [User.ROLE_ADMIN, User.ROLE_TEACHER]:
             return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
 
         live_class = LiveClass.objects.create(
-            timetable_entry=None, class_course=course, teacher=course.teacher,
-            institution=course.institution, scheduled_date=data["scheduled_date"],
-            scheduled_start=data["scheduled_start"], scheduled_end=data["scheduled_end"],
-            room=data.get("room", ""), meeting_url=data.get("meeting_url", ""),
+            timetable_entry=None,
+            class_course=course,
+            teacher=course.teacher,
+            institution=course.institution,
+            scheduled_date=data["scheduled_date"],
+            scheduled_start=data["scheduled_start"],
+            scheduled_end=data["scheduled_end"],
+            room=data.get("room", ""),
+            meeting_url=data.get("meeting_url", ""),
             stored_status=LiveClass.STATUS_UPCOMING,
         )
-
         return Response(LiveClassReadSerializer(live_class).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
@@ -1122,7 +1296,6 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
             if field in serializer.validated_data:
                 setattr(obj, field, serializer.validated_data[field])
         obj.save()
-
         return Response(LiveClassReadSerializer(obj).data)
 
     @action(detail=True, methods=["post"], url_path="cancel")
@@ -1133,25 +1306,28 @@ class AdminLiveClassViewSet(viewsets.GenericViewSet):
             obj.save(update_fields=["stored_status", "updated_at"])
         return Response(LiveClassReadSerializer(obj).data)
 
+
 class RoleAwareLiveClassView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        qs = (
-            LiveClass.objects.all()
-            .select_related("timetable_entry", "class_course", "class_course__teacher", "teacher", "institution")
+        qs = LiveClass.objects.all().select_related(
+            "timetable_entry", "class_course", "class_course__teacher", "teacher", "institution"
         )
 
-        if user.role == "teacher":
+        if user.role == User.ROLE_TEACHER:
             qs = qs.filter(teacher=user)
-        elif user.role == "student":
+        elif user.role == User.ROLE_STUDENT:
             enrolled_class_ids = StudentEnrollment.objects.filter(
                 student=user, status=StudentEnrollment.STATUS_ACTIVE,
             ).values_list("class_course_id", flat=True)
             qs = qs.filter(class_course_id__in=enrolled_class_ids)
         else:
-            return Response({"detail": "Use /admin/live-classes/ for admin access."}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {"detail": "Use /admin/live-classes/ for admin access."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         class_id = request.query_params.get("class_id")
         if class_id:
@@ -1168,17 +1344,39 @@ class RoleAwareLiveClassView(APIView):
         qs = qs.order_by("scheduled_start")
 
         status_filter = request.query_params.get("status")
-        if status_filter in {LiveClass.STATUS_UPCOMING, LiveClass.STATUS_LIVE, LiveClass.STATUS_COMPLETED, LiveClass.STATUS_CANCELLED}:
+        if status_filter in LIVE_STATUSES:
             ids = [row.id for row in qs if row.computed_status() == status_filter]
             qs = qs.filter(id__in=ids)
 
         return Response(LiveClassReadSerializer(qs, many=True).data)
 
+
 # ═══════════════════════════════════════════════════════════════
 # LEAVES
 # ═══════════════════════════════════════════════════════════════
 
-class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
+class _LeaveReviewMixin:
+    """Approve / reject / cancel share the same flow for both leave types."""
+
+    def _review(self, request, leave, new_status, pending_status, verb):
+        if leave.status != pending_status:
+            return Response(
+                {"error": {"detail": f"Only pending leaves can be {verb}.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = LeaveReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        leave.status = new_status
+        leave.reviewed_at = timezone.now()
+        leave.reviewer = request.user
+        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
+        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        return leave
+
+
+class AdminStudentLeaveViewSet(_LeaveReviewMixin, viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
     def _scope_queryset(self, qs):
@@ -1188,15 +1386,26 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         return qs.filter(institution=user.institution)
 
     def get_queryset(self):
-        qs = StudentLeave.objects.all().select_related("student", "institution", "reviewer")
-        qs = self._scope_queryset(qs)
+        qs = self._scope_queryset(
+            StudentLeave.objects.all().select_related("student", "institution", "reviewer")
+        )
 
         status_filter = self.request.query_params.get("status")
-        if status_filter in {StudentLeave.STATUS_PENDING, StudentLeave.STATUS_APPROVED, StudentLeave.STATUS_REJECTED, StudentLeave.STATUS_CANCELLED}:
+        if status_filter in {
+            StudentLeave.STATUS_PENDING,
+            StudentLeave.STATUS_APPROVED,
+            StudentLeave.STATUS_REJECTED,
+            StudentLeave.STATUS_CANCELLED,
+        }:
             qs = qs.filter(status=status_filter)
 
         leave_type = self.request.query_params.get("leave_type")
-        if leave_type in {StudentLeave.LEAVE_SICK, StudentLeave.LEAVE_CASUAL, StudentLeave.LEAVE_VACATION, StudentLeave.LEAVE_OTHER}:
+        if leave_type in {
+            StudentLeave.LEAVE_SICK,
+            StudentLeave.LEAVE_CASUAL,
+            StudentLeave.LEAVE_VACATION,
+            StudentLeave.LEAVE_OTHER,
+        }:
             qs = qs.filter(leave_type=leave_type)
 
         student_id = self.request.query_params.get("student_id")
@@ -1212,8 +1421,7 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
             qs = qs.filter(end_date__lte=to_str)
 
         institution_id = self.request.query_params.get("institution")
-        user = self.request.user
-        if institution_id and user.is_superuser:
+        if institution_id and self.request.user.is_superuser:
             qs = qs.filter(institution_id=institution_id)
 
         q = self.request.query_params.get("q")
@@ -1239,13 +1447,11 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = StudentLeaveReadSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(StudentLeaveReadSerializer(page, many=True).data)
         return Response(StudentLeaveReadSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        obj = self.get_object()
-        return Response(StudentLeaveReadSerializer(obj).data)
+        return Response(StudentLeaveReadSerializer(self.get_object()).data)
 
     def create(self, request):
         serializer = StudentLeaveWriteSerializer(data=request.data)
@@ -1253,31 +1459,42 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         data = serializer.validated_data
 
         user = request.user
+        student = getattr(serializer, "_student", None)
+        if student is None:
+            return Response(
+                {"error": {"detail": "student_id is required.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if user.is_superuser:
-            student = getattr(serializer, "_student", None)
-            if student is None:
-                return Response({"error": {"detail": "student_id is required.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
             institution = student.institution
         else:
-            student = getattr(serializer, "_student", None)
-            if student is None:
-                return Response({"error": {"detail": "student_id is required.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
             if student.institution_id != user.institution_id:
-                return Response({"error": {"detail": "Student is not in your institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": {"detail": "Student is not in your institution.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             institution = user.institution
 
         serializer.check_overlap(StudentLeave, "student", student.id, data["start_date"], data["end_date"])
 
         leave = StudentLeave.objects.create(
-            institution=institution, student=student, leave_type=data["leave_type"],
-            start_date=data["start_date"], end_date=data["end_date"], reason=data.get("reason", ""),
+            institution=institution,
+            student=student,
+            leave_type=data["leave_type"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            reason=data.get("reason", ""),
         )
         return Response(StudentLeaveReadSerializer(leave).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
         leave = self.get_object()
         if leave.status != StudentLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = StudentLeaveWriteSerializer(data=request.data, partial=True, instance=leave)
         serializer.is_valid(raise_exception=True)
@@ -1295,41 +1512,28 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
-        leave = self.get_object()
-        if leave.status != StudentLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be approved.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = LeaveReviewSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        leave.status = StudentLeave.STATUS_APPROVED
-        leave.reviewed_at = timezone.now()
-        leave.reviewer = request.user
-        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
-        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        leave = self._review(request, self.get_object(), StudentLeave.STATUS_APPROVED,
+                             StudentLeave.STATUS_PENDING, "approved")
+        if isinstance(leave, Response):
+            return leave
         return Response(StudentLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
-        leave = self.get_object()
-        if leave.status != StudentLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be rejected.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = LeaveReviewSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        leave.status = StudentLeave.STATUS_REJECTED
-        leave.reviewed_at = timezone.now()
-        leave.reviewer = request.user
-        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
-        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        leave = self._review(request, self.get_object(), StudentLeave.STATUS_REJECTED,
+                             StudentLeave.STATUS_PENDING, "rejected")
+        if isinstance(leave, Response):
+            return leave
         return Response(StudentLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
         leave = self.get_object()
         if leave.status == StudentLeave.STATUS_CANCELLED:
-            return Response({"error": {"detail": "Leave is already cancelled.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Leave is already cancelled.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = LeaveReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1341,7 +1545,8 @@ class AdminStudentLeaveViewSet(viewsets.GenericViewSet):
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
         return Response(StudentLeaveReadSerializer(leave).data)
 
-class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
+
+class AdminTeacherLeaveViewSet(_LeaveReviewMixin, viewsets.GenericViewSet):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
     def _scope_queryset(self, qs):
@@ -1351,15 +1556,26 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         return qs.filter(institution=user.institution)
 
     def get_queryset(self):
-        qs = TeacherLeave.objects.all().select_related("teacher", "institution", "reviewer")
-        qs = self._scope_queryset(qs)
+        qs = self._scope_queryset(
+            TeacherLeave.objects.all().select_related("teacher", "institution", "reviewer")
+        )
 
         status_filter = self.request.query_params.get("status")
-        if status_filter in {TeacherLeave.STATUS_PENDING, TeacherLeave.STATUS_APPROVED, TeacherLeave.STATUS_REJECTED, TeacherLeave.STATUS_CANCELLED}:
+        if status_filter in {
+            TeacherLeave.STATUS_PENDING,
+            TeacherLeave.STATUS_APPROVED,
+            TeacherLeave.STATUS_REJECTED,
+            TeacherLeave.STATUS_CANCELLED,
+        }:
             qs = qs.filter(status=status_filter)
 
         leave_type = self.request.query_params.get("leave_type")
-        if leave_type in {TeacherLeave.LEAVE_SICK, TeacherLeave.LEAVE_CASUAL, TeacherLeave.LEAVE_VACATION, TeacherLeave.LEAVE_OTHER}:
+        if leave_type in {
+            TeacherLeave.LEAVE_SICK,
+            TeacherLeave.LEAVE_CASUAL,
+            TeacherLeave.LEAVE_VACATION,
+            TeacherLeave.LEAVE_OTHER,
+        }:
             qs = qs.filter(leave_type=leave_type)
 
         teacher_id = self.request.query_params.get("teacher_id")
@@ -1375,8 +1591,7 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
             qs = qs.filter(end_date__lte=to_str)
 
         institution_id = self.request.query_params.get("institution")
-        user = self.request.user
-        if institution_id and user.is_superuser:
+        if institution_id and self.request.user.is_superuser:
             qs = qs.filter(institution_id=institution_id)
 
         q = self.request.query_params.get("q")
@@ -1402,13 +1617,11 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         qs = self.get_queryset()
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = TeacherLeaveReadSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(TeacherLeaveReadSerializer(page, many=True).data)
         return Response(TeacherLeaveReadSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
-        obj = self.get_object()
-        return Response(TeacherLeaveReadSerializer(obj).data)
+        return Response(TeacherLeaveReadSerializer(self.get_object()).data)
 
     def create(self, request):
         serializer = TeacherLeaveWriteSerializer(data=request.data)
@@ -1418,27 +1631,40 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         user = request.user
         teacher = getattr(serializer, "_teacher", None)
         if teacher is None:
-            return Response({"error": {"detail": "teacher_id is required.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "teacher_id is required.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if user.is_superuser:
             institution = teacher.institution
         else:
             if teacher.institution_id != user.institution_id:
-                return Response({"error": {"detail": "Teacher is not in your institution.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"error": {"detail": "Teacher is not in your institution.", "status_code": 400}},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             institution = user.institution
 
         serializer.check_overlap(TeacherLeave, "teacher", teacher.id, data["start_date"], data["end_date"])
 
         leave = TeacherLeave.objects.create(
-            institution=institution, teacher=teacher, leave_type=data["leave_type"],
-            start_date=data["start_date"], end_date=data["end_date"], reason=data.get("reason", ""),
+            institution=institution,
+            teacher=teacher,
+            leave_type=data["leave_type"],
+            start_date=data["start_date"],
+            end_date=data["end_date"],
+            reason=data.get("reason", ""),
         )
         return Response(TeacherLeaveReadSerializer(leave).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, pk=None):
         leave = self.get_object()
         if leave.status != TeacherLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Only pending leaves can be edited.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = TeacherLeaveWriteSerializer(data=request.data, partial=True, instance=leave)
         serializer.is_valid(raise_exception=True)
@@ -1456,41 +1682,28 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
-        leave = self.get_object()
-        if leave.status != TeacherLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be approved.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = LeaveReviewSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        leave.status = TeacherLeave.STATUS_APPROVED
-        leave.reviewed_at = timezone.now()
-        leave.reviewer = request.user
-        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
-        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        leave = self._review(request, self.get_object(), TeacherLeave.STATUS_APPROVED,
+                             TeacherLeave.STATUS_PENDING, "approved")
+        if isinstance(leave, Response):
+            return leave
         return Response(TeacherLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
-        leave = self.get_object()
-        if leave.status != TeacherLeave.STATUS_PENDING:
-            return Response({"error": {"detail": "Only pending leaves can be rejected.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = LeaveReviewSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        leave.status = TeacherLeave.STATUS_REJECTED
-        leave.reviewed_at = timezone.now()
-        leave.reviewer = request.user
-        leave.admin_remarks = serializer.validated_data.get("admin_remarks", "")
-        leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
+        leave = self._review(request, self.get_object(), TeacherLeave.STATUS_REJECTED,
+                             TeacherLeave.STATUS_PENDING, "rejected")
+        if isinstance(leave, Response):
+            return leave
         return Response(TeacherLeaveReadSerializer(leave).data)
 
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel(self, request, pk=None):
         leave = self.get_object()
         if leave.status == TeacherLeave.STATUS_CANCELLED:
-            return Response({"error": {"detail": "Leave is already cancelled.", "status_code": 400}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": {"detail": "Leave is already cancelled.", "status_code": 400}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = LeaveReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -1502,13 +1715,14 @@ class AdminTeacherLeaveViewSet(viewsets.GenericViewSet):
         leave.save(update_fields=["status", "reviewed_at", "reviewer", "admin_remarks", "updated_at"])
         return Response(TeacherLeaveReadSerializer(leave).data)
 
+
 # ═══════════════════════════════════════════════════════════════
 # PERFORMANCE TREND
 # ═══════════════════════════════════════════════════════════════
 
 def _trend_periods(period, count):
-    from datetime import date, timedelta
     import calendar
+    from datetime import date
 
     today = date.today()
     out = []
@@ -1548,60 +1762,76 @@ def _trend_periods(period, count):
 
     return out
 
+
+def _attendance_timeline(base_qs, period):
+    """Shared by the admin and teacher trend views."""
+    from accounts.models import StudentAttendance
+
+    n = PERFORMANCE_COUNTS[period]
+    windows = _trend_periods(period, n + 1)
+
+    timeline = []
+    for label, start, end in windows:
+        qs = base_qs.filter(date__gte=start, date__lte=end)
+        counts_map = {row["status"]: row["count"] for row in qs.values("status").annotate(count=Count("id"))}
+        total = sum(counts_map.values())
+        present = counts_map.get(StudentAttendance.STATUS_PRESENT, 0)
+        rate = round((present / total) * 100, 1) if total else 0.0
+        timeline.append({
+            "label": label,
+            "start": str(start),
+            "end": str(end),
+            "score": rate,
+            "present": present,
+            "absent": counts_map.get(StudentAttendance.STATUS_ABSENT, 0),
+            "late": counts_map.get(StudentAttendance.STATUS_LATE, 0),
+            "excused": counts_map.get(StudentAttendance.STATUS_EXCUSED, 0),
+            "total": total,
+        })
+
+    current = timeline[-1] if timeline else {"score": 0.0, "label": ""}
+    previous = timeline[-2] if len(timeline) >= 2 else {"score": 0.0, "label": ""}
+
+    current_value = current["score"]
+    previous_value = previous["score"]
+    trend_pct = (
+        round(((current_value - previous_value) / previous_value) * 100, 1)
+        if previous_value > 0 else 0.0
+    )
+    direction = "up" if trend_pct >= 2 else "down" if trend_pct <= -2 else "flat"
+
+    return {
+        "period": period,
+        "metric_label": "Attendance Rate",
+        "unit": "%",
+        "direction": direction,
+        "trend_percentage": trend_pct,
+        "current_value": current_value,
+        "previous_value": previous_value,
+        "current_label": current["label"],
+        "previous_label": previous["label"],
+        "timeline": timeline[-n:] if len(timeline) > n else timeline,
+    }
+
+
+def _requested_period(request):
+    period = (request.query_params.get("period") or "month").lower()
+    return period if period in PERFORMANCE_COUNTS else "month"
+
+
 class PerformanceTrendView(APIView):
     permission_classes = [IsInstitutionAdmin, RequiresInstitutionUnlessSuperuser]
 
     def get(self, request):
-        from datetime import date, timedelta
         from accounts.models import StudentAttendance
-
-        period = (request.query_params.get("period") or "month").lower()
-        if period not in ("week", "month", "term"):
-            period = "month"
-
-        counts = {"week": 8, "month": 6, "term": 4}
-        n = counts[period]
-        windows = _trend_periods(period, n + 1)
 
         user = request.user
         base_qs = StudentAttendance.objects.all()
         if not user.is_superuser:
             base_qs = base_qs.filter(class_course__institution=user.institution)
 
-        timeline = []
-        for (label, start, end) in windows:
-            qs = base_qs.filter(date__gte=start, date__lte=end)
-            agg = qs.values("status").annotate(count=Count("id"))
-            counts_map = {row["status"]: row["count"] for row in agg}
-            total = sum(counts_map.values())
-            present = counts_map.get(StudentAttendance.STATUS_PRESENT, 0)
-            rate = round((present / total) * 100, 1) if total else 0.0
-            timeline.append({
-                "label": label, "start": str(start), "end": str(end),
-                "score": rate, "present": present,
-                "absent": counts_map.get(StudentAttendance.STATUS_ABSENT, 0),
-                "late": counts_map.get(StudentAttendance.STATUS_LATE, 0),
-                "excused": counts_map.get(StudentAttendance.STATUS_EXCUSED, 0),
-                "total": total,
-            })
+        return Response(_attendance_timeline(base_qs, _requested_period(request)))
 
-        current = timeline[-1] if timeline else {"score": 0.0, "label": ""}
-        previous = timeline[-2] if len(timeline) >= 2 else {"score": 0.0, "label": ""}
-
-        current_value = current["score"]
-        previous_value = previous["score"]
-        trend_pct = round(((current_value - previous_value) / previous_value) * 100, 1) if previous_value > 0 else 0.0
-
-        direction = "up" if trend_pct >= 2 else "down" if trend_pct <= -2 else "flat"
-        visible = timeline[-n:] if len(timeline) > n else timeline
-
-        return Response({
-            "period": period, "metric_label": "Attendance Rate", "unit": "%",
-            "direction": direction, "trend_percentage": trend_pct,
-            "current_value": current_value, "previous_value": previous_value,
-            "current_label": current["label"], "previous_label": previous["label"],
-            "timeline": visible,
-        })
 
 class TeacherPerformanceTrendView(APIView):
     permission_classes = [IsAuthenticated]
@@ -1610,50 +1840,8 @@ class TeacherPerformanceTrendView(APIView):
         from accounts.models import StudentAttendance
 
         user = request.user
-        if getattr(user, "role", None) != "teacher":
+        if getattr(user, "role", None) != User.ROLE_TEACHER:
             return Response({"detail": "Teacher access only."}, status=status.HTTP_403_FORBIDDEN)
 
-        period = (request.query_params.get("period") or "month").lower()
-        if period not in ("week", "month", "term"):
-            period = "month"
-
-        counts = {"week": 8, "month": 6, "term": 4}
-        n = counts[period]
-        windows = _trend_periods(period, n + 1)
-
         base_qs = StudentAttendance.objects.filter(class_course__teacher=user)
-
-        timeline = []
-        for (label, start, end) in windows:
-            qs = base_qs.filter(date__gte=start, date__lte=end)
-            agg = qs.values("status").annotate(count=Count("id"))
-            counts_map = {row["status"]: row["count"] for row in agg}
-            total = sum(counts_map.values())
-            present = counts_map.get(StudentAttendance.STATUS_PRESENT, 0)
-            rate = round((present / total) * 100, 1) if total else 0.0
-            timeline.append({
-                "label": label, "start": str(start), "end": str(end),
-                "score": rate, "present": present,
-                "absent": counts_map.get(StudentAttendance.STATUS_ABSENT, 0),
-                "late": counts_map.get(StudentAttendance.STATUS_LATE, 0),
-                "excused": counts_map.get(StudentAttendance.STATUS_EXCUSED, 0),
-                "total": total,
-            })
-
-        current = timeline[-1] if timeline else {"score": 0.0, "label": ""}
-        previous = timeline[-2] if len(timeline) >= 2 else {"score": 0.0, "label": ""}
-
-        current_value = current["score"]
-        previous_value = previous["score"]
-        trend_pct = round(((current_value - previous_value) / previous_value) * 100, 1) if previous_value > 0 else 0.0
-
-        direction = "up" if trend_pct >= 2 else "down" if trend_pct <= -2 else "flat"
-        visible = timeline[-n:] if len(timeline) > n else timeline
-
-        return Response({
-            "period": period, "metric_label": "Attendance Rate", "unit": "%",
-            "direction": direction, "trend_percentage": trend_pct,
-            "current_value": current_value, "previous_value": previous_value,
-            "current_label": current["label"], "previous_label": previous["label"],
-            "timeline": visible,
-        })
+        return Response(_attendance_timeline(base_qs, _requested_period(request)))

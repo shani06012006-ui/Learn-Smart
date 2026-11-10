@@ -1,4 +1,6 @@
-﻿// Cross-tab synchronization for the mock data layer.
+﻿//frontend/src/mocks/crossTabSync.js
+
+// Cross-tab synchronization for the mock data layer.
 //
 // Every write to the mock data modules (chat messages, notifications, etc.)
 // funnels through this module so that:

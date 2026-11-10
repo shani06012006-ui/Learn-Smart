@@ -1,4 +1,5 @@
-﻿
+﻿//frontend/src/mocks/dispatcher.js
+
 import { findUserById, findUserByEmail, addUser, updateUser, serializeUser } from "./data/users";
 import {
   issueTokenPair,

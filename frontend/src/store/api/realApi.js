@@ -1,3 +1,5 @@
+// frontend/src/store/api/realApi.js
+
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
 import {
@@ -331,11 +333,11 @@ export const realApi = createApi({
     }),
     generateQuizFromPdf: builder.mutation({
       query: (formData) => ({
-    url: "quizzes/generate-from-pdf/",
-    method: "POST",
-    body: formData,
-  }),
-}),
+        url: "quizzes/generate-from-pdf/",
+        method: "POST",
+        body: formData,
+      }),
+    }),
     publishQuiz: builder.mutation({
       query: (id) => ({
         url: `/quizzes/${id}/publish/`,
@@ -485,6 +487,17 @@ export const realApi = createApi({
       }),
       invalidatesTags: [{ type: "ChatMessage", id: "teacher-group" }],
     }),
+
+    // ---- Admin/Tenant Chat Management ----
+    createChatGroup: builder.mutation({
+      query: (body) => ({
+        url: "/chat/threads/",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["TeacherChat"],
+    }),
+    
     // ---- Admin Chat ----
     sendAdminChatMessage: builder.mutation({
       query: ({ id, body }) => ({
@@ -1481,6 +1494,28 @@ export const realApi = createApi({
         { type: "TeacherLeave", id: "LIST" },
       ],
     }),
+        // ---- Teacher onboarding (one-time setup link) ----
+    validateTeacherOnboarding: builder.mutation({
+      query: (body) => ({
+        url: "/auth/onboarding/teacher/validate/",
+        method: "POST",
+        body,
+      }),
+    }),
+    completeTeacherOnboarding: builder.mutation({
+      query: (body) => ({
+        url: "/auth/onboarding/teacher/complete/",
+        method: "POST",
+        body,
+      }),
+    }),
+    resendTeacherInvite: builder.mutation({
+      query: (id) => ({
+        url: `/admin/teachers/${id}/resend-invite/`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, id) => [{ type: "AdminUser", id }],
+    }),
   }),
 });
 
@@ -1526,6 +1561,7 @@ export const {
   useRemoveChatThreadMemberMutation,
   useAddChatThreadMemberMutation,
   useGetChatThreadMembersQuery,
+  useCreateChatGroupMutation,
   useGetStudentMyMaterialsQuery,
   useGetStudentMyTimetableQuery,
   useCreateStudentDmMutation,
@@ -1539,7 +1575,7 @@ export const {
   useGetStudentMyClassesQuery,
   useGetStudentMeQuery,
   useStudentPinLoginMutation,
-  useSetupPasswordMutation, // <--- ADDED HERE
+  useSetupPasswordMutation,
   useHardDeleteAdminUserMutation,
   useGetTeacherStudentsQuery,
   useGetAttendanceSummaryQuery,
@@ -1641,4 +1677,7 @@ export const {
   useUpdateTeacherStudentMutation,
   useDeleteTeacherStudentMutation,
   useRegenerateStudentPinMutation,
+  useValidateTeacherOnboardingMutation,
+  useCompleteTeacherOnboardingMutation,
+  useResendTeacherInviteMutation,
 } = realApi;

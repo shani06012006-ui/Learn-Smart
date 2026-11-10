@@ -7,6 +7,8 @@
 // any write, state is persisted to localStorage and a change ping is
 // broadcast to other tabs of the same browser. See ../crossTabSync.js.
 
+//frontend/src/mocks/data/chat.js
+
 import { findUserById, users as allUsers } from "./users";
 import { findClassById, classesForStudent } from "./classes";
 import { addNotification } from "./notifications";

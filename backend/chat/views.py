@@ -31,18 +31,14 @@ from .serializers import (
     ReactionToggleSerializer,
     TeacherGroupThreadSerializer,
     ThreadMemberReadSerializer,
+    ThreadCreateSerializer,ThreadReadSerializer,
 )
 
 # ─────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────
 
-# NOTE: This set uses real Unicode codepoints.
-#   U+1F44D  👍  thumbs up
-#   U+2764 U+FE0F  ❤️  red heart with VS16
-#   U+2705   ✅  check mark
-#   U+1F389  🎉  party popper
-#   U+1F440  👀  eyes
+    
 ALLOWED_REACTIONS = {
     "\U0001F44D",          # thumbs up
     "\u2764\uFE0F",        # red heart + variation selector
@@ -147,6 +143,34 @@ class TeacherGroupThreadView(APIView):
 # ─────────────────────────────────────────────────────────
 # Messages
 # ─────────────────────────────────────────────────────────
+
+class AdminCreateGroupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if getattr(request.user, "role", None) not in ["admin", "teacher"]:
+            return Response({"detail": "Only admins and teachers can create groups."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not request.user.institution_id:
+            return Response({"detail": "You must belong to an institution."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ThreadCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        title = serializer.validated_data.get("title")
+        if not title:
+            return Response({"title": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+
+        thread = Thread.objects.create(
+            institution=request.user.institution,
+            kind=Thread.KIND_GROUP,
+            class_course=None, 
+            title=title,
+            created_by=request.user,
+        )
+        ThreadMember.objects.create(thread=thread, user=request.user)
+
+        return Response(ThreadReadSerializer(thread, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 class TeacherGroupMessagesView(APIView):
     """
