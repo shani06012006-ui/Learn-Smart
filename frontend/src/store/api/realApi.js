@@ -78,7 +78,7 @@ export const realApi = createApi({
     "ClassRoster", "ClassMaterial", "MaterialList", "ChatMembers",
     "TeacherChat", "StudentSelf", "StudentQuizzes", "StudentLiveClasses",
     "StudentAnnouncements", "Quiz", "QuizAttempt", "QuizSubmissions",
-    "Notifications",
+    "Notifications", "ChatGroups", "ChatGroupMessages", "ChatRooms", "ChatRoomMessages",
   ],
   endpoints: (builder) => ({
 
@@ -460,6 +460,52 @@ export const realApi = createApi({
       }),
     }),
 
+    // ---- Teacher chat CRUD ----
+    getChatRooms: builder.query({
+      query: () => "/chat/rooms/",
+      providesTags: [{ type: "ChatRooms", id: "LIST" }],
+    }),
+    createChatRoom: builder.mutation({
+      query: (body) => ({ url: "/chat/rooms/", method: "POST", body }),
+      invalidatesTags: [{ type: "ChatRooms", id: "LIST" }],
+    }),
+    updateChatRoom: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/chat/rooms/${id}/`, method: "PATCH", body }),
+      invalidatesTags: [{ type: "ChatRooms", id: "LIST" }],
+    }),
+    deleteChatRoom: builder.mutation({
+      query: (id) => ({ url: `/chat/rooms/${id}/`, method: "DELETE" }),
+      invalidatesTags: [{ type: "ChatRooms", id: "LIST" }],
+    }),
+    leaveChatRoom: builder.mutation({
+      query: (id) => ({ url: `/chat/rooms/${id}/leave/`, method: "POST" }),
+      invalidatesTags: [{ type: "ChatRooms", id: "LIST" }],
+    }),
+    addChatRoomMembers: builder.mutation({
+      query: ({ id, user_ids }) => ({ url: `/chat/rooms/${id}/members/`, method: "POST", body: { user_ids } }),
+      invalidatesTags: ["ChatRooms", "ChatMembers"],
+    }),
+    removeChatRoomMember: builder.mutation({
+      query: ({ id, userId }) => ({ url: `/chat/rooms/${id}/members/${userId}/`, method: "DELETE" }),
+      invalidatesTags: ["ChatRooms", "ChatMembers"],
+    }),
+    getChatRoomMessages: builder.query({
+      query: (id) => `/chat/rooms/${id}/messages/`,
+      providesTags: (_r, _e, id) => [{ type: "ChatRoomMessages", id }],
+    }),
+    sendChatRoomMessage: builder.mutation({
+      query: ({ id, body }) => ({ url: `/chat/rooms/${id}/messages/`, method: "POST", body: { body } }),
+      invalidatesTags: ["ChatRoomMessages", "ChatRooms"],
+    }),
+    editChatMessage: builder.mutation({
+      query: ({ id, body }) => ({ url: `/chat/messages/${id}/`, method: "PATCH", body: { body } }),
+      invalidatesTags: ["ChatRoomMessages"],
+    }),
+    deleteOwnChatMessage: builder.mutation({
+      query: (id) => ({ url: `/chat/messages/${id}/`, method: "DELETE" }),
+      invalidatesTags: ["ChatRoomMessages", "ChatRooms"],
+    }),    
+
     // ---- Teacher chat ----
     getTeacherChatRooms: builder.query({
       query: () => `/teacher/chat/rooms/`,
@@ -490,13 +536,35 @@ export const realApi = createApi({
 
     // ---- Admin/Tenant Chat Management ----
     createChatGroup: builder.mutation({
-      query: (body) => ({
-        url: "/chat/threads/",
-        method: "POST",
-        body,
-      }),
-      invalidatesTags: ["TeacherChat"],
+      query: (body) => ({ url: "/chat/groups/", method: "POST", body }),
+      invalidatesTags: [{ type: "ChatGroups", id: "LIST" }, "TeacherChat"],
     }),
+
+    getChatGroups: builder.query({
+      query: () => "/chat/groups/",
+      providesTags: (result) => [
+        ...(result?.results || []).map((g) => ({ type: "ChatGroups", id: g.id })),
+        { type: "ChatGroups", id: "LIST" },
+      ],
+    }),
+
+    getChatGroupMessages: builder.query({
+      query: (id) => `/chat/groups/${id}/messages/`,
+      providesTags: (_r, _e, id) => [{ type: "ChatGroupMessages", id }],
+    }),
+
+    sendChatGroupMessage: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `/chat/groups/${id}/messages/`,
+        method: "POST",
+        body: { body },
+      }),
+
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "ChatGroupMessages", id },
+        { type: "ChatGroups", id: "LIST" },
+      ],
+    }),    
     
     // ---- Admin Chat ----
     sendAdminChatMessage: builder.mutation({
@@ -1558,10 +1626,24 @@ export const {
   useGetTeacherChatMessagesQuery,
   useGetTeacherChatRoomsQuery,
   useGetChatThreadAvailableMembersQuery,
+  useGetChatRoomsQuery,
+  useCreateChatRoomMutation,
+  useUpdateChatRoomMutation,
+  useDeleteChatRoomMutation,
+  useLeaveChatRoomMutation,
+  useAddChatRoomMembersMutation,
+  useRemoveChatRoomMemberMutation,
+  useGetChatRoomMessagesQuery,
+  useSendChatRoomMessageMutation,
+  useEditChatMessageMutation,
+  useDeleteOwnChatMessageMutation,
   useRemoveChatThreadMemberMutation,
   useAddChatThreadMemberMutation,
   useGetChatThreadMembersQuery,
   useCreateChatGroupMutation,
+  useGetChatGroupsQuery,
+  useGetChatGroupMessagesQuery,
+  useSendChatGroupMessageMutation,  
   useGetStudentMyMaterialsQuery,
   useGetStudentMyTimetableQuery,
   useCreateStudentDmMutation,

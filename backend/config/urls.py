@@ -48,6 +48,14 @@ urlpatterns = [
          name="admin-teacher-resend-invite"),
 
     # ============================================================
+    # Admin Attendance (Explicit routes)
+    # ============================================================
+    path("api/v1/admin/attendance/", AttendanceViewSet.as_view({"get": "list"}), name="admin-attendance-list"),
+    path("api/v1/admin/attendance/mark/", AttendanceViewSet.as_view({"post": "mark"}), name="admin-attendance-mark"),
+    path("api/v1/admin/attendance/stats/", AttendanceViewSet.as_view({"get": "stats"}), name="admin-attendance-stats"),
+    path("api/v1/admin/attendance/summary/", AttendanceViewSet.as_view({"get": "summary"}), name="admin-attendance-summary"),
+
+    # ============================================================
     # Auth and accounts (each app included once)
     # ============================================================
     path("api/v1/auth/", include("accounts.urls")),
@@ -132,17 +140,16 @@ urlpatterns = [
          name="teacher-quiz-submissions"),
 
     # ============================================================
-    # Top-level attendance
+    # Top-level attendance (General)
     # ============================================================
     path("api/v1/attendance/", AttendanceViewSet.as_view({"get": "list"}), name="attendance-list"),
-    path("api/v1/attendance/bulk-save/", AttendanceViewSet.as_view({"post": "bulk_save"}),
-         name="attendance-bulk-save"),
+    path("api/v1/attendance/bulk-save/", AttendanceViewSet.as_view({"post": "bulk_save"}), name="attendance-bulk-save"),
 
     # ============================================================
     # Router-based apps (each included once, last)
     # ============================================================
-    path("api/v1/admin/", include("admin_api.urls")),
-    path("api/v1/admin/", include("attendance.urls")),
+    # Removed the duplicate path("api/v1/admin/", include("admin_api.urls"))
+    path("api/v1/admin/", include("admin_api.urls")), 
     path("api/v1/", include("classes.urls")),
     path("api/v1/", include("institutions.urls")),
     path("api/v1/chat/", include("chat.urls")),

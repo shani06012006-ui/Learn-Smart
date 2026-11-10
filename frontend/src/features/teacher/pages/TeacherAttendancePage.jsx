@@ -1,4 +1,5 @@
 // frontend/src/features/teacher/pages/TeacherAttendancePage.jsx
+
 import { useMemo, useState } from "react";
 import {
   Check, X, Clock, AlertCircle, Save, Eraser, GraduationCap, Lock, CheckCircle2,

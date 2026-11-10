@@ -1,502 +1,1044 @@
 // frontend/src/features/teacher/pages/TeacherChatPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Search, Send, Plus, Phone, Video, MoreVertical, Paperclip, Smile,
-  MessagesSquare, Loader2, ChevronLeft, X, Image as ImageIcon
+  Check,
+  Loader2,
+  LogOut,
+  MessageCircle,
+  Paperclip,
+  Pencil,
+  Plus,
+  Search,
+  Send,
+  Smile,
+  Sparkles,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
-import { format, isToday, isYesterday } from "date-fns";
-import Peer from "peerjs";
 
-import Avatar from "../../../components/ui/Avatar";
-import CallModal from "../components/chat/CallModal";
 import {
-  useGetTeacherChatRoomsQuery,
-  useGetTeacherChatMessagesQuery,
-  useSendTeacherChatMessageMutation,
+  useAddChatRoomMembersMutation,
+  useAdminMeQuery,
+  useCreateChatRoomMutation,
+  useDeleteChatRoomMutation,
+  useDeleteOwnChatMessageMutation,
+  useEditChatMessageMutation,
+  useGetChatRoomMessagesQuery,
+  useGetChatRoomsQuery,
+  useGetChatThreadMembersQuery,
+  useGetTeacherColleaguesQuery,
+  useGetTeacherStudentsDirectoryQuery,
+  useLeaveChatRoomMutation,
+  useRemoveChatRoomMemberMutation,
+  useSendChatRoomMessageMutation,
+  useToggleMessageReactionMutation,
+  useUpdateChatRoomMutation,
 } from "../../../store/api/realApi";
-import useChatSocket from "../../../hooks/useChatSocket";
-import { useAdminAuth } from "../../../hooks/useAdminAuth";
 
-// --- Helpers ---
+/* ── Pookie palette ────────────────────────────────────────────── */
+
+const PINK = "#FF8FC7";
+const LILAC = "#C9B6FF";
+const MINT = "#A8F0D6";
+const INK = "#4A3B5C";
+const MUTED = "#9C8FAE";
+
+const TONES = [
+  `linear-gradient(135deg, ${PINK}, ${LILAC})`,
+  `linear-gradient(135deg, ${MINT}, #7FD9B9)`,
+  `linear-gradient(135deg, ${LILAC}, #9BD8FF)`,
+  `linear-gradient(135deg, #FFC2DF, ${PINK})`,
+];
+
+const QUICK_REACTIONS = ["👍", "❤️", "✅", "🎉", "👀"];
+const EMOJIS = ["😀", "😍", "🥰", "😊", "😂", "🌸", "✨", "🎀", "📚", "💖", "🙌", "🍀"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const TABS = [
+  { id: "team", label: "TEAM" },
+  { id: "class", label: "CLASS" },
+  { id: "direct", label: "DIRECT" },
+];
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800&display=swap');
+.pk { font-family: 'Nunito', system-ui, sans-serif; color: ${INK}; }
+.pk .pk-display { font-family: 'Baloo 2', system-ui, sans-serif; }
+.pk-scroll::-webkit-scrollbar { width: 6px; }
+.pk-scroll::-webkit-scrollbar-thumb { background: #E9D8FF; border-radius: 99px; }
+.pk-room:hover { background: rgba(255,255,255,.9) !important; }
+.pk-row:hover .pk-row-actions { opacity: 1; }
+.pk-row-actions { opacity: 0; transition: opacity .15s; }
+`;
+
+/* ── helpers ───────────────────────────────────────────────────── */
+
+const toneFor = (seed = "") =>
+  TONES[[...String(seed)].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length];
+
+const listOf = (d) => (Array.isArray(d) ? d : d?.results ?? []);
+
+function initialsOf(name) {
+  const parts = (name || "").split(" ").filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
 function fmtTime(iso) {
   if (!iso) return "";
-  return format(new Date(iso), "h:mm a");
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
+
 function dayLabel(iso) {
-  if (!iso) return "";
   const d = new Date(iso);
-  if (isToday(d)) return "Today";
-  if (isYesterday(d)) return "Yesterday";
-  return format(d, "EEEE, MMM d");
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "TODAY";
+  if (d.toDateString() === yesterday.toDateString()) return "YESTERDAY";
+  return d.toLocaleDateString([], { day: "numeric", month: "short" }).toUpperCase();
 }
 
-const EMOJI_LIST = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😊", "🙌", "💡", "✅", "📚", "✨"];
+function firstError(data) {
+  if (!data) return "";
+  if (typeof data.detail === "string") return data.detail;
+  for (const v of Object.values(data)) {
+    if (Array.isArray(v) && v.length) return String(v[0]);
+    if (typeof v === "string") return v;
+  }
+  return "";
+}
 
-export default function TeacherChatPage() {
-  const { user: me } = useAdminAuth();
-  
-  const { data: roomsData, isLoading: roomsLoading, refetch: refetchRooms } = useGetTeacherChatRoomsQuery();
-  const allRooms = roomsData?.results || [];
+const isImageBody = (body) => body.startsWith("![") && body.includes("](");
+const imageSrcOf = (body) => body.substring(body.indexOf("](") + 2, body.length - 1);
+const previewOf = (body) => (isImageBody(body) ? "📷 Photo" : body);
+const tabOf = (r) => (r.kind === "dm" ? "direct" : r.class_id ? "class" : "team");
+const person = (p, role) => ({
+  id: p.id,
+  name: p.full_name || p.name || p.email || "Unknown",
+  email: p.email || "",
+  role,
+});
 
-  const [activeRoomId, setActiveRoomId] = useState(null);
-  const [activeTab, setActiveTab] = useState("team");
-  const [search, setSearch] = useState("");
-  const [draft, setDraft] = useState("");
-  const [previewOverride, setPreviewOverride] = useState({});
-  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
-  
-  // UI state for Emoji Picker & Attachments
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const fileInputRef = useRef(null);
-  const [optimisticMessages, setOptimisticMessages] = useState([]);
+/* ── small pieces ──────────────────────────────────────────────── */
 
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const emojiPickerRef = useRef(null);
-
-  const { lastMessage, typingUsers, sendTyping } = useChatSocket(activeRoomId);
-  
-  const { data: messagesData, isLoading: msgsLoading, refetch: refetchMessages } = 
-    useGetTeacherChatMessagesQuery(activeRoomId, { skip: !activeRoomId });
-    
-  const [sendMessage] = useSendTeacherChatMessageMutation();
-
-  // --- WebRTC State ---
-  const [peer, setPeer] = useState(null);
-  const [call, setCall] = useState(null);
-  const [callState, setCallState] = useState({ isOpen: false, type: "audio", status: "idle", remoteUser: null });
-  const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-
-  // Initialize PeerJS
-  useEffect(() => {
-    if (!me?.id) return;
-    const newPeer = new Peer(me.id); 
-    newPeer.on("call", (incomingCall) => {
-      setCall(incomingCall);
-      setCallState({
-        isOpen: true,
-        type: incomingCall.metadata?.type || "video",
-        status: "incoming",
-        remoteUser: incomingCall.metadata?.caller || { name: "Someone" },
-      });
-    });
-    setPeer(newPeer);
-    return () => { newPeer.destroy(); if (localStream) localStream.getTracks().forEach((t) => t.stop()); };
-  }, [me?.id]);
-
-  // Click outside to close emoji picker
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
-        setShowEmojiPicker(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Clear optimistic messages when switching rooms
-  useEffect(() => {
-    setOptimisticMessages([]);
-  }, [activeRoomId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesData?.results?.length, optimisticMessages.length, typingUsers, activeRoomId]);
-
-  // ⬇️ SMART SEARCH & TAB AUTO-SWITCHING ⬇️
-  const handleSearchChange = (e) => {
-    const val = e.target.value;
-    setSearch(val);
-
-    if (val.trim() !== "") {
-      // Find the first room that matches the search globally
-      const match = allRooms.find((r) => {
-        const label = r.kind === "group" ? r.title : r.other_users?.[0]?.name;
-        return (label || "").toLowerCase().includes(val.toLowerCase());
-      });
-
-      // If we found a match, automatically switch the active tab to match it
-      if (match) {
-        if (match.is_archived) {
-          setActiveTab("archived");
-        } else if (match.kind === "group" && match.class_course_id) {
-          setActiveTab("class");
-        } else {
-          setActiveTab("team");
-        }
-      }
-    }
-  };
-
-  const filteredRooms = useMemo(() => {
-    return allRooms.filter((r) => {
-      // 1. Search filter (applied first)
-      const label = r.kind === "group" ? r.title : r.other_users?.[0]?.name;
-      if (search.trim() && !(label || "").toLowerCase().includes(search.toLowerCase())) {
-        return false;
-      }
-
-      // 2. Tab filter (now the active tab has already been auto-updated by handleSearchChange)
-      const isArchived = r.is_archived;
-      const isClass = r.kind === "group" && !!r.class_course_id;
-      const isTeam = r.kind === "group" && !r.class_course_id;
-      
-      if (activeTab === "archived" && !isArchived) return false;
-      if (activeTab === "class" && (!isClass || isArchived)) return false;
-      if (activeTab === "team" && (!isTeam || isArchived)) return false;
-
-      return true;
-    });
-  }, [allRooms, activeTab, search]);
-
-  useEffect(() => {
-    if (filteredRooms.length > 0 && !filteredRooms.find(r => r.id === activeRoomId)) {
-      setActiveRoomId(filteredRooms[0].id);
-    }
-  }, [filteredRooms, activeRoomId]);
-
-  const activeRoom = allRooms.find((r) => r.id === activeRoomId);
-
-  // Merge real messages with optimistic (temp) ones
-  const realMessages = messagesData?.results || [];
-  const messages = useMemo(
-    () => [...realMessages, ...optimisticMessages],
-    [realMessages, optimisticMessages]
+function PkAvatar({ name, seed, size = 40 }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size * 0.36,
+        background: toneFor(seed),
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'Baloo 2', sans-serif",
+        fontWeight: 800,
+        fontSize: size * 0.38,
+        flexShrink: 0,
+        boxShadow: "0 6px 14px -6px rgba(201,182,255,.9)",
+      }}
+    >
+      {initialsOf(name)}
+    </div>
   );
+}
 
-  const handleInputChange = (e) => {
-    setDraft(e.target.value);
-    if (!sendTyping) return;
-    sendTyping(true);
-    clearTimeout(window.typingTimer);
-    window.typingTimer = setTimeout(() => sendTyping(false), 2000);
-  };
+function Notice({ notice }) {
+  return (
+    <AnimatePresence>
+      {notice && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 10 }}
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 200,
+            padding: "10px 16px",
+            borderRadius: 16,
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#fff",
+            background: notice.tone === "error" ? "#F26B9A" : "#7C6A9E",
+            boxShadow: "0 16px 36px -12px rgba(124,106,158,.5)",
+          }}
+        >
+          {notice.text}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
-  const handleSend = async (e) => {
-    e?.preventDefault?.();
-    const body = draft.trim();
-    if (!body || !activeRoomId) return;
-
-    const tempId = `temp-${Date.now()}`;
-    const optimistic = {
-      id: tempId,
-      body,
-      sender: { id: me?.id, name: me?.full_name || me?.first_name || "You" },
-      created_at: new Date().toISOString(),
-      _optimistic: true,
-    };
-
-    setOptimisticMessages((prev) => [...prev, optimistic]);
-    setPreviewOverride((p) => ({ ...p, [activeRoomId]: body }));
-    setDraft("");
-    setShowEmojiPicker(false);
-    sendTyping(false);
-
-    try {
-      await sendMessage({ id: activeRoomId, body }).unwrap();
-      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
-      refetchMessages();
-      refetchRooms();
-      setPreviewOverride((p) => {
-        const n = { ...p };
-        delete n[activeRoomId];
-        return n;
-      });
-    } catch (err) {
-      setOptimisticMessages((prev) => prev.filter((m) => m.id !== tempId));
-      setDraft(body);
-      setPreviewOverride((p) => {
-        const n = { ...p };
-        delete n[activeRoomId];
-        return n;
-      });
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const base64String = event.target.result;
-      const body = `![${file.name}](${base64String})`;
-      
-      setPreviewOverride((p) => ({ ...p, [activeRoomId]: `📷 Sent an image` }));
-      
-      try {
-        await sendMessage({ id: activeRoomId, body }).unwrap();
-        refetchMessages();
-        refetchRooms();
-        setPreviewOverride((p) => {
-          const n = { ...p };
-          delete n[activeRoomId];
-          return n;
-        });
-      } catch {}
-    };
-    reader.readAsDataURL(file);
-    e.target.value = null;
-  };
-
-  const addEmoji = (emoji) => {
-    setDraft((d) => d + emoji);
-    inputRef.current?.focus();
-  };
-
-  const startCall = async (type) => {
-    const targetUser = activeRoom?.other_users?.[0];
-    if (!targetUser) return alert("You can only call users in a Direct Message for now.");
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
-      setLocalStream(stream);
-      setCallState({ isOpen: true, type, status: "calling", remoteUser: targetUser });
-
-      await sendMessage({ id: activeRoomId, body: `📞 Started a ${type} call`, is_system: true }).unwrap();
-      const newCall = peer.call(targetUser.id, stream, { metadata: { type, caller: { name: me.full_name, id: me.id } } });
-      setCall(newCall);
-      newCall.on("stream", (remote) => { setRemoteStream(remote); setCallState((s) => ({ ...s, status: "connected" })); });
-      newCall.on("close", endCall);
-    } catch (err) { alert("Could not access media devices."); endCall(); }
-  };
-
-  const handleAcceptCall = async () => {
-    if (!call) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callState.type === "video" });
-    setLocalStream(stream);
-    call.answer(stream);
-    setCallState((s) => ({ ...s, status: "connected" }));
-    call.on("stream", (remote) => setRemoteStream(remote));
-  };
-
-  const endCall = () => {
-    if (call) call.close();
-    if (localStream) localStream.getTracks().forEach((t) => t.stop());
-    if (remoteStream) remoteStream.getTracks().forEach((t) => t.stop());
-    setLocalStream(null); setRemoteStream(null); setCall(null);
-    setCallState({ isOpen: false, type: "audio", status: "idle", remoteUser: null });
-  };
+function RoomItem({ room, active, onClick }) {
+  const sub =
+    room.kind === "dm" && !room.last_message
+      ? "Say hello 🌸"
+      : room.last_message
+        ? `${room.last_message.sender_name ? room.last_message.sender_name + ": " : ""}${previewOf(room.last_message.body)}`
+        : `${room.member_count} members`;
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-white relative">
-      
-      {/* 1. Chat List */}
-      <aside className={`flex-col border-r border-slate-100 bg-white w-full md:w-80 shrink-0 ${isMobileChatOpen ? "hidden md:flex" : "flex"}`}>
-        <div className="p-4 shrink-0">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search} 
-              onChange={handleSearchChange} // ⬅️ Using the new smart handler
-              placeholder="Search people or groups"
-              className="w-full rounded-xl border-none bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:ring-2 focus:ring-purple-100"
+    <button
+      type="button"
+      onClick={onClick}
+      className="pk-room"
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: 12,
+        borderRadius: 20,
+        border: "none",
+        textAlign: "left",
+        cursor: "pointer",
+        background: active ? "#fff" : "transparent",
+        boxShadow: active ? "0 10px 24px -14px rgba(255,143,199,.6)" : "none",
+      }}
+    >
+      <PkAvatar name={room.title} seed={room.id} size={44} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+          <span
+            className="pk-display"
+            style={{
+              fontWeight: 700,
+              fontSize: 15,
+              color: active ? "#7A4FD6" : INK,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {room.title}
+          </span>
+          {room.last_message && (
+            <span style={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap" }}>
+              {fmtTime(room.last_message.created_at)}
+            </span>
+          )}
+        </div>
+        <span
+          style={{
+            display: "block",
+            marginTop: 2,
+            fontSize: 12.5,
+            color: MUTED,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {sub}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function Bubble({ m, mine, editing, onStartEdit, onEditChange, onSaveEdit, onCancelEdit, onDelete, onReact }) {
+  if (m.system) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <span style={{ padding: "5px 14px", borderRadius: 99, background: "#EFE6FF", color: "#7A4FD6", fontSize: 12, fontWeight: 700 }}>
+          {m.body}
+        </span>
+      </div>
+    );
+  }
+
+  const image = isImageBody(m.body);
+  const canEdit = mine && !image;
+
+  return (
+    <div className="pk-row" style={{ display: "flex", gap: 10, flexDirection: mine ? "row-reverse" : "row", alignItems: "flex-end" }}>
+      {!mine && <PkAvatar name={m.senderName} seed={m.senderId} size={34} />}
+
+      <div style={{ maxWidth: "68%", display: "flex", flexDirection: "column", alignItems: mine ? "flex-end" : "flex-start" }}>
+        {!mine && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 4, marginLeft: 4 }}>
+            {m.senderName}
+          </span>
+        )}
+
+        {editing ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "min(440px, 100%)" }}>
+            <textarea
+              value={editing.text}
+              onChange={(e) => onEditChange(e.target.value)}
+              rows={2}
+              style={{ borderRadius: 18, border: `1.5px solid ${LILAC}`, padding: "10px 14px", fontFamily: "inherit", fontSize: 14, outline: "none", resize: "vertical", color: INK }}
             />
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              <button type="button" onClick={onCancelEdit} style={{ padding: "6px 12px", borderRadius: 99, border: "1.5px solid #EFE6FF", background: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", color: MUTED }}>
+                Cancel
+              </button>
+              <button type="button" onClick={onSaveEdit} style={{ padding: "6px 12px", borderRadius: 99, border: "none", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
+                <Check size={12} style={{ verticalAlign: "-2px" }} /> Save
+              </button>
+            </div>
           </div>
+        ) : (
+          <div
+            style={{
+              padding: image ? 6 : "11px 16px",
+              borderRadius: mine ? "22px 22px 6px 22px" : "22px 22px 22px 6px",
+              background: mine ? `linear-gradient(135deg, ${PINK}, ${LILAC})` : "#fff",
+              color: mine ? "#fff" : INK,
+              border: mine ? "none" : `1.5px solid ${MINT}`,
+              boxShadow: mine ? "0 10px 22px -12px rgba(255,143,199,.8)" : "0 6px 16px -12px rgba(74,59,92,.25)",
+              fontSize: 14.5,
+              lineHeight: 1.5,
+              wordBreak: "break-word",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {image ? (
+              <img src={imageSrcOf(m.body)} alt="attachment" style={{ maxWidth: 260, borderRadius: 16, display: "block" }} />
+            ) : (
+              m.body
+            )}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 6, alignItems: "center" }}>
+          {m.reactions.map((r) => (
+            <button
+              key={r.emoji}
+              type="button"
+              onClick={() => onReact(m.id, r.emoji)}
+              title={r.users.map((u) => u.full_name).join(", ")}
+              style={{ padding: "2px 9px", borderRadius: 99, border: `1.5px solid ${r.reacted_by_me ? LILAC : "#EFE6FF"}`, background: r.reacted_by_me ? "#F4EEFF" : "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+            >
+              {r.emoji} {r.count}
+            </button>
+          ))}
+          {QUICK_REACTIONS.filter((e) => !m.reactions.some((r) => r.emoji === e)).map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => onReact(m.id, e)}
+              className="pk-row-actions"
+              style={{ padding: "1px 6px", borderRadius: 99, border: "none", background: "transparent", cursor: "pointer", fontSize: 13 }}
+            >
+              {e}
+            </button>
+          ))}
+          {mine && !editing && (
+            <span className="pk-row-actions" style={{ display: "flex", gap: 4 }}>
+              {canEdit && (
+                <button type="button" title="Edit" onClick={onStartEdit} style={{ border: "none", background: "#F7F2FF", borderRadius: 99, padding: 5, cursor: "pointer", color: "#7A4FD6" }}>
+                  <Pencil size={12} />
+                </button>
+              )}
+              <button type="button" title="Delete" onClick={onDelete} style={{ border: "none", background: "#FFF0F6", borderRadius: 99, padding: 5, cursor: "pointer", color: "#E0508A" }}>
+                <Trash2 size={12} />
+              </button>
+            </span>
+          )}
         </div>
 
-        <div className="flex px-4 pb-2 shrink-0">
-          <div className="flex w-full rounded-xl bg-slate-50 p-1">
-            {["team", "class", "archived"].map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={"flex-1 rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all " +
-                  (activeTab === tab ? "bg-white text-navy-950 shadow-sm" : "text-slate-500 hover:text-navy-950")}>
-                {tab}
+        <span style={{ fontSize: 11, color: MUTED, marginTop: 4, marginLeft: 4, marginRight: 4 }}>
+          {m.edited ? "edited · " : ""}
+          {fmtTime(m.at)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function EmptyCanvas({ text }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: MUTED, textAlign: "center", padding: 24 }}>
+      <span style={{ width: 64, height: 64, borderRadius: 24, background: "#F4EEFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Sparkles size={26} color="#B08CF0" />
+      </span>
+      <p className="pk-display" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: INK }}>{text}</p>
+    </div>
+  );
+}
+
+/* ── new chat modal (create DM or group) ───────────────────────── */
+
+function NewChatModal({ open, onClose, people, onSubmit, busy }) {
+  const [mode, setMode] = useState("dm");
+  const [title, setTitle] = useState("");
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState({});
+
+  useEffect(() => {
+    if (!open) {
+      setMode("dm");
+      setTitle("");
+      setQ("");
+      setPicked({});
+    }
+  }, [open]);
+
+  const filtered = people.filter((p) =>
+    `${p.name} ${p.email}`.toLowerCase().includes(q.trim().toLowerCase()),
+  );
+
+  const toggle = (p) => {
+    if (mode === "dm") return onSubmit({ kind: "dm", participant_id: p.id });
+    setPicked((prev) => {
+      const next = { ...prev };
+      if (next[p.id]) delete next[p.id];
+      else next[p.id] = p;
+      return next;
+    });
+  };
+
+  const pickedList = Object.values(picked);
+  const canCreateGroup = mode === "group" && title.trim() && pickedList.length > 0;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          style={{ position: "fixed", inset: 0, zIndex: 110, background: "rgba(74,59,92,.3)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            className="pk"
+            style={{ width: "100%", maxWidth: 480, maxHeight: "86vh", display: "flex", flexDirection: "column", borderRadius: 28, background: "#fff", overflow: "hidden", boxShadow: "0 30px 60px -20px rgba(124,106,158,.5)" }}
+          >
+            <div style={{ padding: "18px 22px", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, opacity: 0.85 }}>NEW CHAT</p>
+                <h3 className="pk-display" style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Start something fun</h3>
+              </div>
+              <button type="button" onClick={onClose} style={{ border: "none", background: "rgba(255,255,255,.25)", borderRadius: 12, padding: 8, cursor: "pointer", color: "#fff" }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12, overflow: "hidden", flex: 1 }}>
+              <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 99, background: "#F4EEFF" }}>
+                {[
+                  { id: "dm", label: "Direct message" },
+                  { id: "group", label: "Group" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setMode(t.id)}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: 99, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, background: mode === t.id ? "#fff" : "transparent", color: mode === t.id ? "#7A4FD6" : MUTED }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {mode === "group" && (
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Group name, e.g. Physics Helpers"
+                  style={{ height: 42, borderRadius: 99, border: "1.5px solid #EFE6FF", padding: "0 16px", fontFamily: "inherit", fontSize: 14, outline: "none", color: INK }}
+                />
+              )}
+
+              <div style={{ position: "relative" }}>
+                <Search size={15} color={MUTED} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search teachers and students"
+                  style={{ width: "100%", height: 40, borderRadius: 99, border: "1.5px solid #EFE6FF", padding: "0 14px 0 38px", fontFamily: "inherit", fontSize: 13.5, outline: "none", color: INK, boxSizing: "border-box" }}
+                />
+              </div>
+
+              <div className="pk-scroll" style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 4, minHeight: 120, maxHeight: 260 }}>
+                {filtered.length === 0 && <p style={{ textAlign: "center", color: MUTED, fontSize: 13, margin: "20px 0" }}>No one found.</p>}
+                {filtered.map((p) => {
+                  const checked = !!picked[p.id];
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => toggle(p)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 16, border: "none", cursor: "pointer", textAlign: "left", background: checked ? "#F4EEFF" : "transparent" }}
+                    >
+                      {mode === "group" && (
+                        <span style={{ width: 20, height: 20, borderRadius: 7, border: `2px solid ${checked ? "#B08CF0" : "#D9CCF5"}`, background: checked ? "#B08CF0" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 }}>
+                          {checked && <Check size={12} />}
+                        </span>
+                      )}
+                      <PkAvatar name={p.name} seed={p.id} size={34} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
+                        <p style={{ margin: 0, fontSize: 11.5, color: MUTED }}>{p.role === "teacher" ? "Teacher" : "Student"}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {mode === "group" && (
+              <div style={{ padding: "14px 18px", borderTop: "1px solid #F3E8FF", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12.5, color: MUTED, fontWeight: 700 }}>{pickedList.length} picked</span>
+                <button
+                  type="button"
+                  disabled={!canCreateGroup || busy}
+                  onClick={() => onSubmit({ kind: "group", title: title.trim(), member_ids: pickedList.map((p) => p.id) })}
+                  style={{ padding: "10px 20px", borderRadius: 99, border: "none", cursor: "pointer", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", fontWeight: 800, opacity: canCreateGroup && !busy ? 1 : 0.5 }}
+                >
+                  {busy ? "Creating…" : "Create group"}
+                </button>
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ── room panel (members, rename, leave, delete) ───────────────── */
+
+function RoomPanel({ open, onClose, room, me, members, loading, candidates, onRename, onAdd, onRemove, onLeave, onDelete }) {
+  const [name, setName] = useState("");
+  useEffect(() => setName(room?.title ?? ""), [room?.id, room?.title]);
+
+  return (
+    <AnimatePresence>
+      {open && room && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            style={{ position: "fixed", inset: 0, background: "rgba(74,59,92,.25)", zIndex: 90 }}
+          />
+          <motion.aside
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="pk"
+            style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "min(370px, 100%)", zIndex: 100, background: "#fff", boxShadow: "-20px 0 50px -20px rgba(201,182,255,.6)", display: "flex", flexDirection: "column" }}
+          >
+            <div style={{ padding: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid #F3E8FF" }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: "#B08CF0" }}>CHAT INFO</p>
+                <h3 className="pk-display" style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{room.title}</h3>
+              </div>
+              <button type="button" onClick={onClose} style={{ border: "none", background: "#F7F2FF", borderRadius: 12, padding: 8, cursor: "pointer" }}>
+                <X size={16} color={INK} />
+              </button>
+            </div>
+
+            <div className="pk-scroll" style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+              {room.can_manage && (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={{ flex: 1, minWidth: 0, height: 38, borderRadius: 99, border: "1.5px solid #EFE6FF", padding: "0 14px", fontFamily: "inherit", fontSize: 13.5, outline: "none", color: INK }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!name.trim() || name.trim() === room.title}
+                    onClick={() => onRename(name.trim())}
+                    style={{ padding: "0 14px", borderRadius: 99, border: "none", cursor: "pointer", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", fontWeight: 800, fontSize: 12.5, opacity: name.trim() && name.trim() !== room.title ? 1 : 0.5 }}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+
+              <div>
+                <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: MUTED }}>
+                  MEMBERS · {members.length}
+                </p>
+                {loading && <Loader2 className="animate-spin" color={LILAC} style={{ margin: "20px auto", display: "block" }} />}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {members.map((m) => {
+                    const isSelf = m.id === me?.id;
+                    const isCreator = m.id === room.created_by_id;
+                    return (
+                      <div key={m.id} className="pk-row" style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 16, background: "#FFFBFE" }}>
+                        <PkAvatar name={m.name} seed={m.id} size={34} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ margin: 0, fontWeight: 700, fontSize: 13.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {m.name}{isSelf ? " (you)" : ""}
+                          </p>
+                          <p style={{ margin: 0, fontSize: 11, color: MUTED }}>
+                            {isCreator ? "Creator" : m.role === "admin" ? "Admin" : m.role === "teacher" ? "Teacher" : "Student"}
+                          </p>
+                        </div>
+                        {room.can_manage && !isSelf && !isCreator && (
+                          <button type="button" title="Remove" onClick={() => onRemove(m.id, m.name)} style={{ border: "none", background: "#FFF0F6", borderRadius: 99, padding: 6, cursor: "pointer", color: "#E0508A" }}>
+                            <UserMinus size={13} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {room.can_manage && candidates.length > 0 && (
+                <div>
+                  <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 800, letterSpacing: 1.2, color: MUTED }}>ADD PEOPLE</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+                    {candidates.map((p) => (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, borderRadius: 16 }}>
+                        <PkAvatar name={p.name} seed={p.id} size={30} />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
+                        <button type="button" title="Add" onClick={() => onAdd(p.id)} style={{ border: "none", background: "#F4EEFF", borderRadius: 99, padding: 6, cursor: "pointer", color: "#7A4FD6" }}>
+                          <UserPlus size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: 16, borderTop: "1px solid #F3E8FF", display: "flex", flexDirection: "column", gap: 8 }}>
+              {room.can_leave && (
+                <button type="button" onClick={onLeave} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 11, borderRadius: 99, border: "1.5px solid #EFE6FF", background: "#fff", cursor: "pointer", fontWeight: 800, color: MUTED }}>
+                  <LogOut size={14} /> Leave chat
+                </button>
+              )}
+              {room.can_manage && (
+                <button type="button" onClick={onDelete} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 11, borderRadius: 99, border: "none", background: "#FFF0F6", cursor: "pointer", fontWeight: 800, color: "#E0508A" }}>
+                  <Trash2 size={14} /> Delete group
+                </button>
+              )}
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ── page ──────────────────────────────────────────────────────── */
+
+export default function TeacherChatPage() {
+  const { data: me } = useAdminMeQuery();
+
+  const roomsQ = useGetChatRoomsQuery(undefined, { pollingInterval: 15000 });
+  const rooms = useMemo(() => roomsQ.data?.results ?? [], [roomsQ.data]);
+
+  const colleaguesQ = useGetTeacherColleaguesQuery();
+  const studentsQ = useGetTeacherStudentsDirectoryQuery({});
+  const people = useMemo(() => {
+    const teachers = listOf(colleaguesQ.data).map((p) => person(p, "teacher"));
+    const students = listOf(studentsQ.data).map((p) => person(p, "student"));
+    return [...teachers, ...students].filter((p) => p.id && p.id !== me?.id);
+  }, [colleaguesQ.data, studentsQ.data, me?.id]);
+
+  const [tab, setTab] = useState("team");
+  const [sel, setSel] = useState(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // { id, text }
+  const [notice, setNotice] = useState(null);
+
+  const bottomRef = useRef(null);
+  const fileRef = useRef(null);
+  const emojiRef = useRef(null);
+  const noticeTimer = useRef(null);
+
+  const tabRooms = useMemo(() => rooms.filter((r) => tabOf(r) === tab), [rooms, tab]);
+
+  useEffect(() => {
+    if (!tabRooms.some((r) => r.id === sel)) setSel(tabRooms[0]?.id ?? null);
+  }, [tabRooms, sel]);
+
+  const activeRoom = rooms.find((r) => r.id === sel) || null;
+
+  const msgQ = useGetChatRoomMessagesQuery(sel, { skip: !sel, pollingInterval: 5000 });
+  const messages = useMemo(
+    () =>
+      (msgQ.data?.results ?? []).map((m) => ({
+        id: m.id,
+        body: m.body,
+        at: m.created_at,
+        edited: !!m.edited_at,
+        senderId: m.sender?.id,
+        senderName: m.sender?.full_name || m.sender?.email || "Unknown",
+        system: m.kind === "system",
+        reactions: m.reactions || [],
+      })),
+    [msgQ.data],
+  );
+
+  const membersQ = useGetChatThreadMembersQuery(sel, { skip: !sel });
+  const memberList = useMemo(
+    () =>
+      (membersQ.data?.results ?? []).map((m) => ({
+        id: m.user.id,
+        name: m.user.full_name || m.user.email,
+        role: m.user.role,
+      })),
+    [membersQ.data],
+  );
+  const memberIds = useMemo(() => new Set(memberList.map((m) => m.id)), [memberList]);
+  const candidates = useMemo(() => people.filter((p) => !memberIds.has(p.id)), [people, memberIds]);
+
+  const [sendRoomMessage] = useSendChatRoomMessageMutation();
+  const [editMessage] = useEditChatMessageMutation();
+  const [deleteMessage] = useDeleteOwnChatMessageMutation();
+  const [toggleReaction] = useToggleMessageReactionMutation();
+  const [createRoom, { isLoading: creating }] = useCreateChatRoomMutation();
+  const [updateRoom] = useUpdateChatRoomMutation();
+  const [deleteRoom] = useDeleteChatRoomMutation();
+  const [leaveRoom] = useLeaveChatRoomMutation();
+  const [addMembers] = useAddChatRoomMembersMutation();
+  const [removeMember] = useRemoveChatRoomMemberMutation();
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, sel]);
+
+  useEffect(() => {
+    const close = (e) => {
+      if (emojiRef.current && !emojiRef.current.contains(e.target)) setEmojiOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const flash = (text, tone = "ok") => {
+    setNotice({ text, tone });
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 2600);
+  };
+
+  // Run a mutation, show a toast on failure, and return the result (or undefined).
+  async function run(fn, okText) {
+    try {
+      const result = await fn();
+      if (okText) flash(okText);
+      return result ?? true;
+    } catch (err) {
+      flash(firstError(err?.data) || "Something went wrong.", "error");
+      return undefined;
+    }
+  }
+
+  /* ── messages: create, edit, delete, react ─────────────────── */
+
+  async function handleSend(e) {
+    e.preventDefault();
+    const body = draft.trim();
+    if (!body || !activeRoom?.can_post) return;
+    setDraft("");
+    setEmojiOpen(false);
+    setSending(true);
+    const ok = await run(() => sendRoomMessage({ id: sel, body }).unwrap());
+    setSending(false);
+    if (!ok) setDraft(body);
+  }
+
+  function handleFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !activeRoom?.can_post) return;
+    if (file.size > MAX_IMAGE_BYTES) return flash("Images must be under 5 MB.", "error");
+    const reader = new FileReader();
+    reader.onload = (ev) =>
+      run(() => sendRoomMessage({ id: sel, body: `![${file.name}](${ev.target.result})` }).unwrap());
+    reader.readAsDataURL(file);
+  }
+
+  async function saveEdit() {
+    if (!editing || !editing.text.trim()) return;
+    const { id, text } = editing;
+    setEditing(null);
+    await run(() => editMessage({ id, body: text.trim() }).unwrap(), "Message updated.");
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Delete this message? This cannot be undone.")) return;
+    await run(() => deleteMessage(id).unwrap(), "Message deleted.");
+  }
+
+  async function handleReact(messageId, emoji) {
+    await run(() => toggleReaction({ messageId, emoji }).unwrap());
+    msgQ.refetch();
+  }
+
+  /* ── rooms: create, rename, members, leave, delete ─────────── */
+
+  async function handleCreate(payload) {
+    const room = await run(() => createRoom(payload).unwrap(), "Chat created 🌸");
+    if (!room || room === true) return;
+    await roomsQ.refetch();
+    setTab(tabOf(room));
+    setSel(room.id);
+    setNewOpen(false);
+  }
+
+  async function handleRename(title) {
+    await run(() => updateRoom({ id: sel, title }).unwrap(), "Renamed ✨");
+  }
+
+  async function handleAdd(userId) {
+    await run(() => addMembers({ id: sel, user_ids: [userId] }).unwrap(), "Added 🎀");
+  }
+
+  async function handleRemove(userId, name) {
+    if (!window.confirm(`Remove ${name} from this group?`)) return;
+    await run(() => removeMember({ id: sel, userId }).unwrap(), `${name} removed.`);
+  }
+
+  async function handleLeave() {
+    if (!window.confirm("Leave this chat? You can't rejoin unless someone adds you back.")) return;
+    const ok = await run(() => leaveRoom(sel).unwrap(), "You left the chat.");
+    if (ok) {
+      setPanelOpen(false);
+      setSel(null);
+    }
+  }
+
+  async function handleDeleteRoom() {
+    if (!window.confirm(`Delete "${activeRoom.title}" for everyone? Its messages will be lost.`)) return;
+    const ok = await run(() => deleteRoom(sel).unwrap(), "Group deleted.");
+    if (ok) {
+      setPanelOpen(false);
+      setSel(null);
+    }
+  }
+
+  /* ── render ────────────────────────────────────────────────── */
+
+  const headerSub = activeRoom
+    ? activeRoom.kind === "dm"
+      ? "Direct message"
+      : `${activeRoom.member_count} members${activeRoom.can_post ? "" : " · Read only"}`
+    : "";
+
+  return (
+    <div className="pk" style={{ height: "calc(100vh - 7rem)", minHeight: 520, padding: 4 }}>
+      <style>{CSS}</style>
+
+      <div
+        style={{
+          height: "100%",
+          display: "flex",
+          borderRadius: 32,
+          overflow: "hidden",
+          background: "radial-gradient(circle at 0% 0%, #FFE3F1 0, transparent 38%), radial-gradient(circle at 100% 100%, #E9DEFF 0, transparent 40%), #FFF8F3",
+          border: "1px solid #F3E8FF",
+          boxShadow: "0 30px 60px -30px rgba(201,182,255,.7)",
+        }}
+      >
+        {/* ── left: list ─────────────────────────────────────── */}
+        <aside style={{ width: 330, flexShrink: 0, display: "flex", flexDirection: "column", padding: 18, gap: 14, borderRight: "1px solid #F3E8FF", background: "rgba(255,255,255,.55)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800, letterSpacing: 1.4, color: "#B08CF0" }}>INBOX</p>
+              <h2 className="pk-display" style={{ margin: "2px 0 0", fontSize: 24, fontWeight: 800 }}>Messages</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNewOpen(true)}
+              title="New chat"
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 99, border: "none", cursor: "pointer", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", fontWeight: 800, fontSize: 12.5, boxShadow: "0 10px 20px -12px rgba(255,143,199,.9)" }}
+            >
+              <Plus size={14} /> New
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 99, background: "#F4EEFF" }}>
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                style={{ flex: 1, padding: "8px 0", borderRadius: 99, border: "none", cursor: "pointer", fontSize: 11.5, fontWeight: 800, letterSpacing: 0.6, background: tab === t.id ? "#fff" : "transparent", color: tab === t.id ? "#7A4FD6" : MUTED, boxShadow: tab === t.id ? "0 6px 14px -8px rgba(201,182,255,.9)" : "none" }}
+              >
+                {t.label}
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
-          {roomsLoading ? (
-            <div className="flex justify-center py-10"><Loader2 className="animate-spin text-purple-400" /></div>
-          ) : filteredRooms.length === 0 ? (
-            <p className="py-10 text-center text-xs text-slate-400">No chats found.</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {filteredRooms.map((r) => {
-                const isActive = r.id === activeRoomId;
-                const label = r.kind === "group" ? r.title : r.other_users?.[0]?.name;
-                const preview = previewOverride[r.id] || r.last_message?.body;
-                const time = r.last_message ? fmtTime(r.last_message.created_at) : "";
-                return (
-                  <li key={r.id}>
-                    <button onClick={() => { setActiveRoomId(r.id); setIsMobileChatOpen(true); }}
-                      className={"flex w-full items-center gap-3 rounded-xl p-3 text-left transition " +
-                        (isActive ? "bg-purple-50" : "hover:bg-slate-50")}>
-                      <div className="relative">
-                        <Avatar userId={r.id} initials={label?.[0] || "?"} size="md" />
-                        {r.kind === "dm" && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between">
-                          <p className={"truncate text-sm " + (isActive ? "font-bold text-purple-900" : "font-semibold text-slate-700")}>{label}</p>
-                          <span className="shrink-0 text-[10px] text-slate-400">{time}</span>
-                        </div>
-                        <p className="truncate text-xs text-slate-500 mt-0.5">{preview || "No messages yet"}</p>
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-        
-      </aside>
-
-      {/* 2. Active Chat */}
-      {activeRoomId ? (
-        <section className={`flex flex-1 flex-col bg-slate-50/50 ${isMobileChatOpen ? "flex" : "hidden md:flex"}`}>
-          <header className="flex h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 md:px-6">
-            <div className="flex items-center gap-3 md:gap-4">
-              <button onClick={() => setIsMobileChatOpen(false)} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-navy-950">
-                <ChevronLeft size={20} />
-              </button>
-              <Avatar userId={activeRoom.id} initials={activeRoom.title?.[0] || "?"} size="md" />
-              <div>
-                <h2 className="font-display text-base md:text-lg font-extrabold text-navy-950">
-                  {activeRoom.kind === "group" ? activeRoom.title : activeRoom.other_users?.[0]?.name}
-                </h2>
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Online
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 md:gap-2">
-              {/* <button onClick={() => startCall("audio")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><Phone size={18} /></button> */}
-              {/* <button onClick={() => startCall("video")} className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl hidden sm:block"><Video size={18} /></button> */}
-              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-xl"><MoreVertical size={18} /></button>
-            </div>
-          </header>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-            {msgsLoading ? (
-              <div className="flex justify-center py-20"><Loader2 className="animate-spin text-purple-400" /></div>
-            ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-slate-400">
-                <MessagesSquare size={48} className="text-slate-200 mb-4" />
-                <p className="text-sm">Start the conversation!</p>
+          <div className="pk-scroll" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+            {roomsQ.isLoading ? (
+              <Loader2 className="animate-spin" color={LILAC} style={{ margin: "30px auto" }} />
+            ) : tabRooms.length === 0 ? (
+              <div style={{ textAlign: "center", color: MUTED, fontSize: 13, padding: "36px 12px" }}>
+                <MessageCircle size={28} color={LILAC} style={{ margin: "0 auto 8px", display: "block" }} />
+                {tab === "team" && "No team groups yet. Start one with New."}
+                {tab === "class" && "No class chats yet."}
+                {tab === "direct" && "No direct messages yet. Say hi to a colleague!"}
               </div>
             ) : (
-              <ul className="flex flex-col gap-4">
-                {messages.map((m, i) => {
-                  const isMine = m.sender?.id === me?.id;
-                  const showDay = i === 0 || dayLabel(messages[i-1].created_at) !== dayLabel(m.created_at);
-                  
-                  const isImage = m.body.startsWith("![") && m.body.includes("](");
-                  let imgSrc = "";
-                  if (isImage) {
-                    imgSrc = m.body.substring(m.body.indexOf("](") + 2, m.body.length - 1);
-                  }
-
-                  if (m.is_system) {
-                    return (
-                      <li key={m.id} className="my-2 flex justify-center">
-                        <span className="rounded-full bg-slate-200/60 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{m.body}</span>
-                      </li>
-                    );
-                  }
-                  
-                  return (
-                    <li key={m.id} className="flex flex-col">
-                      {showDay && (
-                        <div className="my-4 flex justify-center">
-                          <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 shadow-sm border border-slate-100">{dayLabel(m.created_at)}</span>
-                        </div>
-                      )}
-                      <div className={"flex gap-2 md:gap-3 " + (isMine ? "justify-end" : "justify-start")}>
-                        {!isMine && <Avatar userId={m.sender?.id} initials={m.sender?.name?.[0]} size="sm" />}
-                        <div className={"max-w-[85%] md:max-w-[70%] flex-col " + (isMine ? "items-end" : "items-start")}>
-                          {!isMine && <span className="mb-1 text-[10px] font-bold text-slate-400 px-1">{m.sender?.name}</span>}
-                          
-                          {isImage ? (
-                            <img
-                              src={imgSrc}
-                              alt="attachment"
-                              className={"max-w-full rounded-2xl border border-slate-200 shadow-sm " + (m._optimistic ? "opacity-60" : "")}
-                            />
-                          ) : (
-                            <div className={
-                              "rounded-2xl px-4 py-2.5 text-sm shadow-sm " +
-                              (isMine
-                                ? "rounded-br-sm bg-white border border-slate-100 text-navy-950"
-                                : "rounded-bl-sm bg-purple-600 text-white") +
-                              (m._optimistic ? " opacity-60" : "")
-                            }>
-                              {m.body}
-                            </div>
-                          )}
-                          
-                          <span className={"mt-1 text-[10px] text-slate-400 px-1 " + (isMine ? "text-right" : "text-left")}>
-                            {m._optimistic ? "Sending…" : fmtTime(m.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-                {typingUsers.length > 0 && (
-                  <li className="flex items-center gap-2 px-2 py-2 text-xs font-semibold text-slate-400">
-                    <span className="flex gap-1">
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 delay-75" />
-                      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 delay-150" />
-                    </span>
-                    {typingUsers.join(", ")} is typing...
-                  </li>
-                )}
-                <div ref={messagesEndRef} />
-              </ul>
+              tabRooms.map((room) => (
+                <RoomItem
+                  key={room.id}
+                  room={room}
+                  active={sel === room.id}
+                  onClick={() => {
+                    setSel(room.id);
+                    setPanelOpen(false);
+                    setEditing(null);
+                  }}
+                />
+              ))
             )}
           </div>
+        </aside>
 
-          <div className="shrink-0 border-t border-slate-100 bg-white p-3 md:p-4">
-            <form onSubmit={handleSend} className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 md:p-2 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition relative">
-              <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleFileSelect} />
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-purple-600"><Paperclip size={18} /></button>
-              
-              <input
-                ref={inputRef} value={draft} onChange={handleInputChange}
-                placeholder="Type a message..."
-                className="flex-1 bg-transparent px-2 text-sm text-navy-950 outline-none placeholder:text-slate-400"
-              />
-              
-              <div className="relative" ref={emojiPickerRef}>
-                <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 text-slate-400 hover:text-purple-600"><Smile size={18} /></button>
-                {showEmojiPicker && (
-                  <div className="absolute bottom-12 right-0 z-10 flex w-64 flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                    {EMOJI_LIST.map((emoji) => (
-                      <button key={emoji} type="button" onClick={() => addEmoji(emoji)} className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-slate-100">
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* ── right: conversation ────────────────────────────── */}
+        <section style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          {!activeRoom ? (
+            <EmptyCanvas text="Pick a conversation, or start a new one 🌸" />
+          ) : (
+            <>
+              <header style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 22px", borderBottom: "1px solid #F3E8FF", background: "rgba(255,255,255,.7)" }}>
+                <PkAvatar name={activeRoom.title} seed={activeRoom.id} size={46} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p className="pk-display" style={{ margin: 0, fontSize: 19, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {activeRoom.title}
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12.5, color: MUTED }}>{headerSub}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(true)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 99, border: "1.5px solid #EFE6FF", background: "#fff", fontWeight: 800, fontSize: 12.5, color: "#7A4FD6", cursor: "pointer" }}
+                >
+                  <Users size={15} /> Info
+                </button>
+              </header>
+
+              <div className="pk-scroll" style={{ flex: 1, overflowY: "auto", padding: "22px 26px", display: "flex", flexDirection: "column", gap: 16 }}>
+                {msgQ.isLoading && <Loader2 className="animate-spin" color={LILAC} style={{ margin: "40px auto" }} />}
+                {!msgQ.isLoading && messages.length === 0 && <EmptyCanvas text="No messages yet. Say hello! 🌸" />}
+
+                {messages.map((m, i) => {
+                  const prev = messages[i - 1];
+                  const newDay = !prev || new Date(prev.at).toDateString() !== new Date(m.at).toDateString();
+                  const mine = !!me && m.senderId === me.id;
+                  return (
+                    <div key={m.id} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                      {newDay && (
+                        <div style={{ display: "flex", justifyContent: "center" }}>
+                          <span style={{ padding: "4px 14px", borderRadius: 99, background: "#fff", border: "1px solid #F3E8FF", fontSize: 11, fontWeight: 800, letterSpacing: 1, color: MUTED }}>
+                            {dayLabel(m.at)}
+                          </span>
+                        </div>
+                      )}
+                      <Bubble
+                        m={m}
+                        mine={mine}
+                        editing={editing?.id === m.id ? editing : null}
+                        onStartEdit={() => setEditing({ id: m.id, text: m.body })}
+                        onEditChange={(text) => setEditing((ed) => ({ ...ed, text }))}
+                        onSaveEdit={saveEdit}
+                        onCancelEdit={() => setEditing(null)}
+                        onDelete={() => handleDelete(m.id)}
+                        onReact={handleReact}
+                      />
+                    </div>
+                  );
+                })}
+                <div ref={bottomRef} />
               </div>
 
-              <button type="submit" disabled={!draft.trim()}
-                className="flex h-9 w-9 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-md shadow-purple-500/20 disabled:opacity-50 transition hover:bg-purple-700">
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        </section>
-      ) : (
-        <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-slate-50/50 text-slate-400">
-          <MessagesSquare size={48} className="text-slate-200 mb-4" />
-          <p className="text-sm">Select a chat to start messaging</p>
-        </div>
-      )}
+              <form onSubmit={handleSend} style={{ padding: "12px 20px 18px" }}>
+                {!activeRoom.can_post && (
+                  <p style={{ margin: "0 0 8px", textAlign: "center", fontSize: 12, fontWeight: 700, color: MUTED }}>
+                    Only admins can post in the Teachers Group.
+                  </p>
+                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 8px 6px 6px", borderRadius: 99, background: "#fff", border: "1.5px solid #EFE6FF", boxShadow: "0 12px 28px -18px rgba(201,182,255,.9)" }}>
+                  <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFile} />
+                  <button type="button" disabled={!activeRoom.can_post} onClick={() => fileRef.current?.click()} style={{ border: "none", background: "transparent", padding: 10, borderRadius: 99, cursor: "pointer", color: MUTED }}>
+                    <Paperclip size={18} />
+                  </button>
 
-      <CallModal
-        isOpen={callState.isOpen} callType={callState.type} status={callState.status}
-        remoteStream={remoteStream} localStream={localStream} remoteUser={callState.remoteUser}
-        onAccept={handleAcceptCall} onDecline={endCall} onEnd={endCall}
+                  <input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    disabled={!activeRoom.can_post || sending}
+                    placeholder={activeRoom.can_post ? "Type a message…" : "Read only"}
+                    style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", fontSize: 14.5, fontFamily: "inherit", color: INK, padding: "8px 4px" }}
+                  />
+
+                  <div ref={emojiRef} style={{ position: "relative" }}>
+                    <button type="button" disabled={!activeRoom.can_post} onClick={() => setEmojiOpen((v) => !v)} style={{ border: "none", background: "transparent", padding: 10, borderRadius: 99, cursor: "pointer", color: MUTED }}>
+                      <Smile size={18} />
+                    </button>
+                    <AnimatePresence>
+                      {emojiOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          style={{ position: "absolute", bottom: 52, right: 0, zIndex: 10, width: 232, display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 4, padding: 10, borderRadius: 20, background: "#fff", border: "1px solid #F3E8FF", boxShadow: "0 20px 40px -18px rgba(201,182,255,.9)" }}
+                        >
+                          {EMOJIS.map((em) => (
+                            <button key={em} type="button" onClick={() => setDraft((d) => d + em)} style={{ border: "none", background: "transparent", fontSize: 20, padding: 4, borderRadius: 10, cursor: "pointer" }}>
+                              {em}
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!activeRoom.can_post || sending || !draft.trim()}
+                    style={{ width: 44, height: 44, borderRadius: 99, border: "none", cursor: "pointer", background: `linear-gradient(135deg, ${PINK}, ${LILAC})`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 20px -10px rgba(255,143,199,.9)", opacity: !activeRoom.can_post || !draft.trim() ? 0.5 : 1 }}
+                  >
+                    {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </section>
+      </div>
+
+      <NewChatModal open={newOpen} onClose={() => setNewOpen(false)} people={people} onSubmit={handleCreate} busy={creating} />
+
+      <RoomPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
+        room={activeRoom}
+        me={me}
+        members={memberList}
+        loading={membersQ.isLoading}
+        candidates={candidates}
+        onRename={handleRename}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        onLeave={handleLeave}
+        onDelete={handleDeleteRoom}
       />
+
+      <Notice notice={notice} />
     </div>
   );
 }

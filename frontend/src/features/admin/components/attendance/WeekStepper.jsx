@@ -9,11 +9,10 @@ function toIso(d) {
   return `${y}-${m}-${day}`;
 }
 
-/** Monday of the week containing `d` (week starts Monday). */
 export function mondayOf(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
-  const day = x.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+  const day = x.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   x.setDate(x.getDate() + diff);
   return x;

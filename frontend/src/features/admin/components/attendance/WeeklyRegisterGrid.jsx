@@ -19,9 +19,9 @@ function initialsOf(name, email) {
 export default function WeeklyRegisterGrid({
   loading,
   error,
-  students,           // [{ student_id, name, email, days: [{date, record_id, status}, x5] }]
-  onCellClick,        // (student_id, dayIdx, currentStatus, record_id) => void
-  busyCell,           // "studentId-dayIdx" | null
+  students,
+  onCellClick,
+  busyCell,
   search,
 }) {
   if (loading) {

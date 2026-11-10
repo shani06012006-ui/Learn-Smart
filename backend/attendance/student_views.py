@@ -1,3 +1,5 @@
+#backend/attendance/student_views.py
+
 # -*- coding: utf-8 -*-
 """
 Student self-service endpoints. Safe for PIN-login students.

@@ -54,6 +54,10 @@ class Thread(TimeStampedModel):
         blank=True,
         related_name="created_chat_threads",
     )
+    is_institution_group = models.BooleanField(
+        default=False,
+        help_text="True for the institution-wide Teachers Group. Custom groups are False.",
+    )
 
     class Meta:
         ordering = ["-created_at"]

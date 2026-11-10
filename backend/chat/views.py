@@ -70,6 +70,7 @@ def _get_or_create_teacher_group(institution, created_by=None):
             institution=institution,
             kind=Thread.KIND_GROUP,
             class_course__isnull=True,
+            is_institution_group=True,
         )
         .first()
     )
@@ -88,6 +89,7 @@ def _get_or_create_teacher_group(institution, created_by=None):
             class_course=None,
             title=title,
             created_by=created_by,
+            is_institution_group=True,
         )
         member_ids = (
             institution.users
@@ -651,7 +653,13 @@ class ThreadDeleteView(APIView):
                 {"detail": "Cannot delete the institution group."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
+            
+        if thread.is_institution_group:
+            return Response(
+                {"detail": "Cannot delete the institution group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )            
+            
         # 2. Permission check: Must be admin OR the teacher of this class
         is_admin = getattr(request.user, "role", None) == "admin"
         is_class_teacher = (

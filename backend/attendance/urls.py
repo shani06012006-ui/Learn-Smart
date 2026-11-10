@@ -1,8 +1,13 @@
+# backend/attendance/urls.py
 # -*- coding: utf-8 -*-
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import AttendanceViewSet
 
 router = DefaultRouter()
-router.register("attendance", AttendanceViewSet, basename="admin-attendance")
+# Registers /api/v1/admin/attendance/
+router.register(r"attendance", AttendanceViewSet, basename="admin-attendance")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("", include(router.urls)),
+]
