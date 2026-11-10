@@ -1,3 +1,5 @@
+#backend/chat/models.py
+
 """
 Chat models — threads, memberships, and messages.
 

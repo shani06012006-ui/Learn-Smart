@@ -183,7 +183,11 @@ export default function AdminTeachersPage() {
   if (activeFilter === "active") queryParams.is_active = true;
   if (activeFilter === "inactive") queryParams.is_active = false;
 
-  const { data, isLoading, isError, error, refetch } = useGetAdminUsersQuery(queryParams);
+  const { data, isLoading, isError, error, refetch } = useGetAdminUsersQuery(queryParams, {
+    refetchOnMountOrArgChange: true, // reload when the page opens or filters change
+    refetchOnFocus: true,            // reload when the admin returns to this tab
+    pollingInterval: 20000,          // catch teachers who finish setup in another browser
+  });
 
   const teachers = data?.results || [];
   const count = data?.count || 0;
@@ -469,6 +473,7 @@ export default function AdminTeachersPage() {
       <CreateUserModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        onCreated={() => refetch()}
         defaultRole="teacher"
       />
 

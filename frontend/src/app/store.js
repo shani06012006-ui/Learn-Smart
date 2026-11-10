@@ -1,4 +1,7 @@
+//frontend/src/app/store.js
+
 import { configureStore } from "@reduxjs/toolkit";
+import { setupListeners } from "@reduxjs/toolkit/query";
 
 import { apiSlice } from "../store/api/apiSlice";
 import { realApi } from "../store/api/realApi";
@@ -25,5 +28,9 @@ export const store = configureStore({
       .concat(apiSlice.middleware)
       .concat(realApi.middleware),
 });
+
+// Lets queries that opt in (refetchOnFocus / refetchOnReconnect) react to
+// window focus and network reconnects. Without this, those options do nothing.
+setupListeners(store.dispatch);
 
 if (import.meta.env.DEV) window.store = store;

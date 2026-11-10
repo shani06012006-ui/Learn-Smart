@@ -1,3 +1,5 @@
+#backend/chat/views.py
+
 """
 Chat REST views.
 

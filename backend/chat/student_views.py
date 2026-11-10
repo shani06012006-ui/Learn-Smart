@@ -1,3 +1,5 @@
+#backend/chat/student_views.py
+
 # -*- coding: utf-8 -*-
 """
 Student-facing chat endpoints.

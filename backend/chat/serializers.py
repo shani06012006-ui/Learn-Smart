@@ -1,3 +1,5 @@
+#backend/chat/serializers.py
+
 """
 Chat serializers.
 

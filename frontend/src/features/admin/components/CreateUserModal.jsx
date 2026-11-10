@@ -73,6 +73,7 @@ const DONE_BUTTON =
 export default function CreateUserModal({
   open,
   onClose,
+  onCreated,
   defaultRole = "student",
   allowRoleSwitch = false,
 }) {
@@ -196,7 +197,7 @@ export default function CreateUserModal({
 
     try {
       const data = await createUser(payload).unwrap();
-
+      onCreated?.();
       if (data?.invitation) {
         // Student: show the activation link once, plus whether the e-mail went out.
         setCreated(data);
