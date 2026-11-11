@@ -22,7 +22,7 @@ export default function AdminTopbar() {
         </p>
       </div>
 
-      <Link
+      {/* <Link
         to="/"
         target="_blank"
         rel="noreferrer"
@@ -30,7 +30,7 @@ export default function AdminTopbar() {
       >
         <ExternalLink size={12} />
         View public site
-      </Link>
+      </Link> */}
     </header>
   );
 }

@@ -44,7 +44,7 @@ export default function Navbar({ role = "student" }) {
           {R.label}
         </span>
 
-        <NotificationBell />
+        {/* <NotificationBell /> */}
 
         <button
           type="button"

@@ -1,4 +1,4 @@
-#backend/admin_api/serializers.py
+# backend/admin_api/serializers.py
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -16,8 +16,8 @@ from classes.models import ClassCourse, LiveClass, StudentEnrollment, TimetableE
 from institutions.models import Institution
 from leaves.models import StudentLeave, TeacherLeave
 
-class InstitutionBriefSerializer(serializers.ModelSerializer):
 
+class InstitutionBriefSerializer(serializers.ModelSerializer):
     class Meta:
         model = Institution
         fields = ["id", "name", "slug"]
@@ -503,6 +503,52 @@ class AdminCourseWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError("This field is required.")
         return value
 
+    # ✅ ADDED: Logic to actually create the course
+    def create(self, validated_data):
+        request = self.context["request"]
+        teacher_id = validated_data.pop("teacher_id", None)
+        grade = validated_data.pop("grade_id", None)
+        
+        # Resolve teacher
+        from accounts.models import User
+        teacher = None
+        if teacher_id:
+            try:
+                teacher = User.objects.get(id=teacher_id, role=User.ROLE_TEACHER)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({"teacher_id": "Teacher not found."})
+
+        # Create the ClassCourse
+        course = ClassCourse.objects.create(
+            institution=request.user.institution,
+            teacher=teacher,
+            grade=grade,
+            **validated_data
+        )
+        return course
+
+    # ✅ ADDED: Logic to update the course
+    def update(self, instance, validated_data):
+        teacher_id = validated_data.pop("teacher_id", None)
+        grade = validated_data.pop("grade_id", None)
+
+        if teacher_id:
+            from accounts.models import User
+            try:
+                instance.teacher = User.objects.get(id=teacher_id, role=User.ROLE_TEACHER)
+            except User.DoesNotExist:
+                raise serializers.ValidationError({"teacher_id": "Teacher not found."})
+        
+        if grade is not None:
+            instance.grade = grade
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        instance.save()
+        return instance
+
+
 # ---------------------------------------------------------------- attendance
 
 class AttendanceStudentBriefSerializer(serializers.ModelSerializer):
@@ -609,7 +655,6 @@ class TimetableEntryReadSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
             "updated_at",
-            "section", "section_name"
         ]
         read_only_fields = fields
 
@@ -701,7 +746,7 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
             day=day, start=start, end=end, exclude_id=exclude_id
         )
 
-        # 1. Teacher conflict â€” same teacher already booked in this slot.
+        # 1. Teacher conflict — same teacher already booked in this slot.
         teacher = course.teacher
         if base.filter(teacher=teacher).exists():
             raise serializers.ValidationError(
@@ -709,7 +754,7 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
                 "a class in this time slot."
             )
 
-        # 2. Class conflict â€” the same class already has a slot here.
+        # 2. Class conflict — the same class already has a slot here.
         if base.filter(class_course=course).exists():
             raise serializers.ValidationError(
                 f"{course.name} already has a timetable entry in this time slot."
@@ -721,7 +766,6 @@ class TimetableEntryWriteSerializer(serializers.Serializer):
                 raise serializers.ValidationError(
                     f"Room '{room_clean}' is already booked in this time slot."
                 )
-                
 
 
 # ---------------------------------------------------------------- live classes
@@ -741,7 +785,7 @@ class LiveClassReadSerializer(serializers.ModelSerializer):
     Read representation of a LiveClass session for the admin + role-aware
     views.
 
-    `status` is derived via `computed_status()` â€” not a stored field.
+    `status` is derived via `computed_status()` — not a stored field.
     """
 
     timetable_entry = LiveClassTimetableBriefSerializer(read_only=True)
@@ -971,4 +1015,4 @@ class LeaveReviewSerializer(serializers.Serializer):
 
     admin_remarks = serializers.CharField(
         required=False, allow_blank=True, default=""
-    )    
+    )

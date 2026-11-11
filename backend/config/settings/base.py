@@ -236,10 +236,8 @@ REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [(REDIS_HOST, int(REDIS_PORT))],
-        },
-    },
+        "CONFIG": {"hosts": [("127.0.0.1", 6379)]},
+    }
 }
 
 # ---------------------------------------------------------------------------

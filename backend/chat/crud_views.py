@@ -419,16 +419,11 @@ class MessageDetailView(APIView):
         return msg, None
 
     def patch(self, request, msg_id):
-        denied = _teacher_only(request.user)
-        if denied is not None:
-            return denied
+        if request.user.role not in {"teacher", "admin"}:
+            return _err("Not allowed.", status.HTTP_403_FORBIDDEN)
         msg, err = self._load(request, msg_id)
         if err is not None:
             return err
-        if msg.sender_id != request.user.id:
-            return _err("You can only edit your own messages.", status.HTTP_403_FORBIDDEN)
-        if msg.kind != Message.KIND_USER:
-            return _err("System messages can't be edited.")
 
         write = MessageWriteSerializer(data=request.data)
         write.is_valid(raise_exception=True)

@@ -28,6 +28,7 @@ from quizzes.views import (
     StudentQuizAttemptResultView,
     TeacherQuizSubmissionsView,
 )
+from classes.teacher_class_views import TeacherClassDetailView, TeacherClassListCreateView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -156,6 +157,9 @@ urlpatterns = [
     path("api/v1/leaves/", include("leaves.urls")),
     path("api/v1/quizzes/", include("quizzes.urls")),
     path("api/v1/notifications/", include("notifications.urls")),
+    
+    path("api/v1/teacher/classes/", TeacherClassListCreateView.as_view(), name="teacher-classes"),
+    path("api/v1/teacher/classes/<uuid:pk>/", TeacherClassDetailView.as_view(), name="teacher-class-detail"),
 ]
 
 if settings.DEBUG:

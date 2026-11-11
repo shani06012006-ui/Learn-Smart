@@ -42,8 +42,6 @@ class IsTeacherOnly(IsAuthenticated):
 
 def _resolve_target(request):
     grade_id = request.query_params.get("grade")
-    # section_id is fetched but not used currently
-    section_id = request.query_params.get("section")
     klass_id = (
         request.query_params.get("klass")
         or request.query_params.get("class_course")
@@ -59,7 +57,7 @@ def _resolve_target(request):
     if grade_id:
         try:
             grade = Grade.objects.get(id=grade_id)
-            # We return None for section for now until we know where the Section model is
+            # Section is currently disabled because the Section model doesn't exist
             return grade, None, None, None
         except Grade.DoesNotExist:
             return None, None, None, Response(
@@ -77,7 +75,7 @@ def _resolve_target(request):
         )
 
 def _students_for_grade(grade, section=None):
-    """Fetch active students for a grade."""
+    """Fetch active students for a grade. (Section filtering disabled)."""
     qs = User.objects.filter(
         role=getattr(User, "ROLE_STUDENT", "student"),
         is_active=True,
@@ -379,13 +377,11 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         
-        section_id = request.query_params.get("section") 
-        
-        grade, klass, err = _resolve_target(request)
+        grade, klass, section, err = _resolve_target(request)
         if err:
             return err
 
-        rows = _record_rows(grade, klass, date_str, section=section_id)
+        rows = _record_rows(grade, klass, date_str, section=section)
         
         return Response({
             "grade": str(grade.id) if grade else None,
@@ -465,7 +461,7 @@ class TeacherAttendanceViewSet(viewsets.ViewSet):
     def summary(self, request):
         from_str = request.query_params.get("from")
         to_str = request.query_params.get("to")
-        grade, klass, err = _resolve_target(request)
+        grade, klass, section, err = _resolve_target(request)
         if err:
             return err
 
@@ -538,7 +534,7 @@ class TeacherStudentsViewSet(viewsets.ViewSet):
         all_enrollments = StudentEnrollment.objects.filter(
             student_id__in=student_ids,
             status=StudentEnrollment.STATUS_ACTIVE,
-        ).select_related("student", "class_course", "class_course__teacher", "section")
+        ).select_related("student", "class_course", "class_course__teacher")
 
         enrollment_by_student = {}
         for e in all_enrollments:

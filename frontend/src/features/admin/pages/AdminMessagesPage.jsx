@@ -5,8 +5,10 @@ import {
   Check,
   GraduationCap,
   Loader2,
+  LogOut,
   MessageSquare,
   Paperclip,
+  Pencil,
   Plus,
   Search,
   Send,
@@ -14,31 +16,33 @@ import {
   Smile,
   Trash2,
   UserMinus,
+  UserPlus,
   UserRound,
   Users,
   X,
 } from "lucide-react";
 
 import {
+  useAddChatGroupMembersMutation,
   useAdminMeQuery,
   useCreateChatGroupMutation,
+  useDeleteChatGroupMutation,
   useDeleteChatMessageMutation,
-  useDeleteChatThreadMutation,
+  useEditChatMessageMutation,
   useGetAdminUsersQuery,
+  useGetChatGroupDetailQuery,
   useGetChatGroupMessagesQuery,
   useGetChatGroupsQuery,
-  useGetChatThreadMembersQuery,
-  useRemoveChatThreadMemberMutation,
+  useLeaveChatGroupMutation,
+  useRemoveChatGroupMemberMutation,
   useSendChatGroupMessageMutation,
   useToggleMessageReactionMutation,
+  useUpdateChatGroupMutation,
 } from "../../../store/api/realApi";
-import useChatSocket from "../../../hooks/useChatSocket";
 import Avatar from "../../../components/ui/Avatar";
 
 const QUICK_REACTIONS = ["👍", "❤️", "✅", "🎉", "👀"];
 const EMOJI_PICKER_LIST = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😊", "🙌", "💡", "✅", "📚", "✨"];
-const ROLE_ORDER = { admin: 0, teacher: 1, student: 2 };
-const ROLE_LABEL = { admin: "Admins", teacher: "Teachers", student: "Students" };
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /* ── helpers ───────────────────────────────────────────────────── */
@@ -88,13 +92,11 @@ function Notice({ notice }) {
   );
 }
 
-/* ── room list (left) ──────────────────────────────────────────── */
+/* ── room list ─────────────────────────────────────────────────── */
 
 function RoomList({ rooms, activeId, onSelect, isLoading }) {
   const [q, setQ] = useState("");
-  const visible = rooms.filter((r) =>
-    (r.title || "").toLowerCase().includes(q.trim().toLowerCase()),
-  );
+  const visible = rooms.filter((r) => (r.title || "").toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
@@ -104,10 +106,7 @@ function RoomList({ rooms, activeId, onSelect, isLoading }) {
           <h2 className="font-display text-base font-extrabold text-navy-950">Conversations</h2>
         </div>
         <div className="relative">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -119,14 +118,10 @@ function RoomList({ rooms, activeId, onSelect, isLoading }) {
 
       <ul className="flex-1 space-y-1 overflow-y-auto px-2 pb-4">
         {isLoading &&
-          [0, 1, 2].map((i) => (
-            <li key={i} className="h-14 animate-pulse rounded-xl bg-slate-200/60" />
-          ))}
-
+          [0, 1, 2].map((i) => <li key={i} className="h-14 animate-pulse rounded-xl bg-slate-200/60" />)}
         {!isLoading && visible.length === 0 && (
           <li className="px-3 py-8 text-center text-xs text-slate-400">No conversations match.</li>
         )}
-
         {visible.map((room) => {
           const active = room.id === activeId;
           return (
@@ -163,7 +158,7 @@ function RoomList({ rooms, activeId, onSelect, isLoading }) {
   );
 }
 
-/* ── member avatars in the header ──────────────────────────────── */
+/* ── header avatars ────────────────────────────────────────────── */
 
 function AvatarStack({ members, total, onOpen }) {
   return (
@@ -173,32 +168,24 @@ function AvatarStack({ members, total, onOpen }) {
       className="group flex items-center gap-2 rounded-full py-1 pl-1 pr-3 transition hover:bg-slate-100"
     >
       <div className="flex -space-x-2">
-        {members.slice(0, 5).map((m) => (
-          <span key={m.id} className="rounded-full ring-2 ring-white">
-            <Avatar
-              userId={m.user.id}
-              initials={m.user.initials || initialsOf(m.user.full_name)}
-              size="sm"
-            />
+        {members.slice(0, 5).map((u) => (
+          <span key={u.id} className="rounded-full ring-2 ring-white">
+            <Avatar userId={u.id} initials={u.initials || initialsOf(u.full_name)} size="sm" />
           </span>
         ))}
       </div>
-      <span className="text-xs font-bold text-slate-600 group-hover:text-navy-950">
-        {total} people
-      </span>
+      <span className="text-xs font-bold text-slate-600 group-hover:text-navy-950">{total} people</span>
     </button>
   );
 }
 
-/* ── one message (center) ──────────────────────────────────────── */
+/* ── one message ───────────────────────────────────────────────── */
 
-function MessageBubble({ m, mine, onReact, onDelete }) {
+function MessageBubble({ m, mine, editing, onStartEdit, onEditChange, onSaveEdit, onCancelEdit, onDelete, onReact }) {
   if (m.kind === "system") {
     return (
       <li className="flex justify-center">
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
-          {m.body}
-        </span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">{m.body}</span>
       </li>
     );
   }
@@ -208,39 +195,52 @@ function MessageBubble({ m, mine, onReact, onDelete }) {
   return (
     <li className={`group flex gap-3 ${mine ? "flex-row-reverse" : ""}`}>
       {!mine && (
-        <Avatar
-          userId={m.sender?.id}
-          initials={m.sender?.initials || initialsOf(m.sender?.full_name)}
-          size="sm"
-        />
+        <Avatar userId={m.sender?.id} initials={m.sender?.initials || initialsOf(m.sender?.full_name)} size="sm" />
       )}
 
       <div className={`flex max-w-[70%] flex-col ${mine ? "items-end" : "items-start"}`}>
         <div className={`mb-1 flex items-center gap-2 text-[11px] ${mine ? "flex-row-reverse" : ""}`}>
-          <span className="font-bold text-navy-950">
-            {mine ? "You" : m.sender?.full_name || m.sender?.email}
-          </span>
+          <span className="font-bold text-navy-950">{mine ? "You" : m.sender?.full_name || m.sender?.email}</span>
           {m.sender?.role === "admin" && (
             <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-purple-100">
               Admin
             </span>
           )}
-          <span className="text-slate-400">{fmtTime(m.created_at)}</span>
+          <span className="text-slate-400">{fmtTime(m.created_at)}{m.edited_at ? " · edited" : ""}</span>
         </div>
 
-        <div
-          className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-            mine
-              ? "rounded-tr-md bg-gradient-to-br from-purple-600 to-purple-700 text-white"
-              : "rounded-tl-md bg-white text-slate-700 ring-1 ring-slate-100"
-          }`}
-        >
-          {image ? (
-            <img src={imageSrcOf(m.body)} alt="attachment" className="max-w-xs rounded-xl" />
-          ) : (
-            <p className="whitespace-pre-wrap break-words">{m.body}</p>
-          )}
-        </div>
+        {editing ? (
+          <div className="flex w-full min-w-[260px] flex-col gap-2">
+            <textarea
+              value={editing.text}
+              onChange={(e) => onEditChange(e.target.value)}
+              rows={2}
+              className="rounded-xl border border-purple-300 bg-white px-3 py-2 text-sm outline-none ring-2 ring-purple-100"
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={onCancelEdit} className="rounded-lg px-3 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100">
+                Cancel
+              </button>
+              <button type="button" onClick={onSaveEdit} className="rounded-lg bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700">
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+              mine
+                ? "rounded-tr-md bg-gradient-to-br from-purple-600 to-purple-700 text-white"
+                : "rounded-tl-md bg-white text-slate-700 ring-1 ring-slate-100"
+            }`}
+          >
+            {image ? (
+              <img src={imageSrcOf(m.body)} alt="attachment" className="max-w-xs rounded-xl" />
+            ) : (
+              <p className="whitespace-pre-wrap break-words">{m.body}</p>
+            )}
+          </div>
+        )}
 
         <div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${mine ? "justify-end" : ""}`}>
           {m.reactions?.map((r) => (
@@ -259,7 +259,6 @@ function MessageBubble({ m, mine, onReact, onDelete }) {
               <span className="font-semibold">{r.count}</span>
             </button>
           ))}
-
           {QUICK_REACTIONS.filter((e) => !m.reactions?.some((r) => r.emoji === e)).map((e) => (
             <button
               key={e}
@@ -270,10 +269,19 @@ function MessageBubble({ m, mine, onReact, onDelete }) {
               {e}
             </button>
           ))}
-
+          {mine && !image && !editing && (
+            <button
+              type="button"
+              onClick={onStartEdit}
+              title="Edit message"
+              className="rounded-full p-1 text-slate-300 opacity-0 transition hover:bg-purple-50 hover:text-purple-600 group-hover:opacity-100"
+            >
+              <Pencil size={12} />
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => onDelete(m.id)}
+            onClick={onDelete}
             title="Delete message"
             className="rounded-full p-1 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100"
           >
@@ -309,174 +317,9 @@ function EmptyState({ onCreate }) {
   );
 }
 
-/* ── members drawer ("See all") ────────────────────────────────── */
+/* ── group panel: read, rename, members, delete ────────────────── */
 
-function MembersDrawer({
-  open,
-  onClose,
-  room,
-  members,
-  isLoading,
-  currentUserId,
-  onRemove,
-  onDeleteGroup,
-}) {
-  const [q, setQ] = useState("");
-
-  useEffect(() => {
-    if (!open) setQ("");
-  }, [open]);
-
-  const grouped = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const filtered = members
-      .filter(
-        (m) =>
-          !needle ||
-          (m.user.full_name || "").toLowerCase().includes(needle) ||
-          (m.user.email || "").toLowerCase().includes(needle),
-      )
-      .sort(
-        (a, b) =>
-          (ROLE_ORDER[a.user.role] ?? 9) - (ROLE_ORDER[b.user.role] ?? 9) ||
-          (a.user.full_name || "").localeCompare(b.user.full_name || ""),
-      );
-    return ["admin", "teacher", "student"]
-      .map((role) => ({ role, items: filtered.filter((m) => m.user.role === role) }))
-      .filter((g) => g.items.length);
-  }, [members, q]);
-
-  const canManage = !!room && !room.is_institution_group;
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[90] bg-slate-950/30 backdrop-blur-sm"
-          />
-          <motion.aside
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 260 }}
-            className="fixed inset-y-0 right-0 z-[100] flex w-full max-w-sm flex-col bg-white shadow-elevated-lg"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-purple-600">
-                  Members
-                </p>
-                <h3 className="truncate font-display text-lg font-extrabold text-navy-950">
-                  {room?.title || "Group"}
-                </h3>
-                <p className="text-xs text-slate-400">{members.length} in this conversation</p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-navy-950"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-4 pb-2">
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Search members"
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-4 pb-4">
-              {isLoading && (
-                <div className="flex justify-center py-10">
-                  <Loader2 className="animate-spin text-slate-300" />
-                </div>
-              )}
-
-              {!isLoading && grouped.length === 0 && (
-                <p className="py-10 text-center text-xs text-slate-400">No members match.</p>
-              )}
-
-              {grouped.map((g) => (
-                <div key={g.role} className="mb-4">
-                  <p className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {ROLE_LABEL[g.role]} · {g.items.length}
-                  </p>
-                  <ul className="space-y-1">
-                    {g.items.map((m) => {
-                      const isSelf = m.user.id === currentUserId;
-                      const name = m.user.full_name || m.user.email;
-                      return (
-                        <li
-                          key={m.id}
-                          className="group flex items-center gap-3 rounded-xl p-2 transition hover:bg-slate-50"
-                        >
-                          <Avatar
-                            userId={m.user.id}
-                            initials={m.user.initials || initialsOf(m.user.full_name)}
-                            size="sm"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-navy-950">
-                              {name}
-                              {isSelf && (
-                                <span className="ml-1 text-[10px] font-bold text-purple-600">(you)</span>
-                              )}
-                            </p>
-                            <p className="truncate text-[11px] text-slate-400">{m.user.email}</p>
-                          </div>
-                          {canManage && !isSelf && (
-                            <button
-                              type="button"
-                              onClick={() => onRemove(m.user.id, name)}
-                              title="Remove from group"
-                              className="rounded-lg p-1.5 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
-                            >
-                              <UserMinus size={14} />
-                            </button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
-
-            {canManage && (
-              <div className="border-t border-slate-100 p-4">
-                <button
-                  type="button"
-                  onClick={onDeleteGroup}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
-                >
-                  <Trash2 size={15} />
-                  Delete group
-                </button>
-              </div>
-            )}
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
-/* ── create group modal ────────────────────────────────────────── */
+const ROLE_LABEL = { admin: "Admin", teacher: "Teacher", student: "Student" };
 
 function PersonRow({ u, checked, onToggle }) {
   return (
@@ -496,14 +339,215 @@ function PersonRow({ u, checked, onToggle }) {
       </span>
       <Avatar userId={u.id} initials={initialsOf(u.full_name || u.email)} size="sm" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-navy-950">
-          {u.full_name || u.email}
-        </span>
+        <span className="block truncate text-sm font-semibold text-navy-950">{u.full_name || u.email}</span>
         <span className="block truncate text-[11px] text-slate-400">{u.email}</span>
       </span>
     </button>
   );
 }
+
+function GroupPanel({ open, onClose, room, detail, me, onRename, onAdd, onRemove, onDelete, onLeave, busy }) {
+  const [title, setTitle] = useState("");
+  const [q, setQ] = useState("");
+
+  useEffect(() => setTitle(detail?.title ?? room?.title ?? ""), [detail?.title, room?.title]);
+  useEffect(() => {
+    if (!open) setQ("");
+  }, [open]);
+
+  const canManage = !!detail?.can_manage;
+  const members = detail?.members ?? [];
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
+
+  // Candidates come from the same user lists used by the create modal.
+  const { data: teacherData } = useGetAdminUsersQuery(
+    { role: "teacher", is_active: true, q: q.trim() || undefined },
+    { skip: !open || !canManage },
+  );
+  const { data: studentData } = useGetAdminUsersQuery(
+    { role: "student", is_active: true, q: q.trim() || undefined },
+    { skip: !open || !canManage },
+  );
+  const candidates = [...(teacherData?.results ?? []), ...(studentData?.results ?? [])].filter(
+    (u) => !memberIds.has(u.id),
+  );
+
+  const grouped = ["admin", "teacher", "student"]
+    .map((role) => ({ role, items: members.filter((m) => m.role === role) }))
+    .filter((g) => g.items.length);
+
+  const titleChanged = canManage && title.trim() && title.trim() !== detail?.title;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[90] bg-slate-950/30 backdrop-blur-sm"
+          />
+          <motion.aside
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 260 }}
+            className="fixed inset-y-0 right-0 z-[100] flex w-full max-w-md flex-col bg-white shadow-elevated-lg"
+          >
+            {/* header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-5">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-purple-600">Group</p>
+                {canManage ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="h-9 min-w-0 flex-1 rounded-xl border border-slate-200 px-3 text-sm font-bold text-navy-950 outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+                    />
+                    <button
+                      type="button"
+                      disabled={!titleChanged || busy}
+                      onClick={() => onRename(title.trim())}
+                      className="rounded-xl bg-purple-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-purple-700 disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <h3 className="mt-1 truncate font-display text-lg font-extrabold text-navy-950">
+                    {detail?.title || room?.title}
+                  </h3>
+                )}
+                <p className="mt-1 text-xs text-slate-400">
+                  {members.length} member{members.length === 1 ? "" : "s"}
+                  {detail?.is_institution_group ? " · Institution-wide Teachers Group" : ""}
+                </p>
+              </div>
+              <button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-navy-950">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-6 overflow-y-auto p-5">
+              {/* members */}
+              <section>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Members</p>
+                <div className="space-y-4">
+                  {grouped.map((g) => (
+                    <div key={g.role}>
+                      <p className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {ROLE_LABEL[g.role]}s · {g.items.length}
+                      </p>
+                      <ul className="space-y-1">
+                        {g.items.map((m) => {
+                          const isSelf = m.id === me?.id;
+                          const isCreator = m.id === detail?.created_by_id;
+                          return (
+                            <li key={m.id} className="group flex items-center gap-3 rounded-xl p-2 hover:bg-slate-50">
+                              <Avatar userId={m.id} initials={m.initials || initialsOf(m.full_name)} size="sm" />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-navy-950">
+                                  {m.full_name || m.email}
+                                  {isSelf && <span className="ml-1 text-[10px] font-bold text-purple-600">(you)</span>}
+                                  {isCreator && <span className="ml-1 text-[10px] font-bold text-slate-400">creator</span>}
+                                </p>
+                                <p className="truncate text-[11px] text-slate-400">{m.email}</p>
+                              </div>
+                              {canManage && !isSelf && !isCreator && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRemove(m.id, m.full_name || m.email)}
+                                  title="Remove from group"
+                                  className="rounded-lg p-1.5 text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+                                >
+                                  <UserMinus size={14} />
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* add people */}
+              {canManage && (
+                <section>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Add people</p>
+                  <div className="relative mb-2">
+                    <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={q}
+                      onChange={(e) => setQ(e.target.value)}
+                      placeholder="Search teachers and students"
+                      className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+                    />
+                  </div>
+                  <div className="max-h-56 space-y-1 overflow-y-auto">
+                    {candidates.length === 0 && (
+                      <p className="py-4 text-center text-xs text-slate-400">Everyone is already in this group.</p>
+                    )}
+                    {candidates.map((u) => (
+                      <div key={u.id} className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-slate-50">
+                        <Avatar userId={u.id} initials={initialsOf(u.full_name || u.email)} size="sm" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-navy-950">{u.full_name || u.email}</p>
+                          <p className="truncate text-[11px] text-slate-400">{ROLE_LABEL[u.role] || u.role}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onAdd(u.id)}
+                          title="Add to group"
+                          className="rounded-lg bg-purple-50 p-1.5 text-purple-700 transition hover:bg-purple-100 disabled:opacity-40"
+                        >
+                          <UserPlus size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+
+            {/* footer */}
+            {detail && !detail.is_institution_group && (
+              <div className="space-y-2 border-t border-slate-100 p-4">
+                {detail.can_leave && (
+                  <button
+                    type="button"
+                    onClick={onLeave}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <LogOut size={15} />
+                    Leave group
+                  </button>
+                )}
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-600 transition hover:bg-rose-100"
+                  >
+                    <Trash2 size={15} />
+                    Delete group
+                  </button>
+                )}
+              </div>
+            )}
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ── create group modal ────────────────────────────────────────── */
 
 function PickSection({ label, icon: Icon, items, loading, picked, onToggle }) {
   return (
@@ -517,9 +561,7 @@ function PickSection({ label, icon: Icon, items, loading, picked, onToggle }) {
           <Loader2 size={16} className="animate-spin text-slate-300" />
         </div>
       )}
-      {!loading && items.length === 0 && (
-        <p className="px-1 py-3 text-xs text-slate-400">No {label.toLowerCase()} found.</p>
-      )}
+      {!loading && items.length === 0 && <p className="px-1 py-3 text-xs text-slate-400">No {label.toLowerCase()} found.</p>}
       <div className="space-y-1">
         {items.map((u) => (
           <PersonRow key={u.id} u={u} checked={!!picked[u.id]} onToggle={onToggle} />
@@ -549,7 +591,6 @@ function CreateGroupModal({ open, onClose, onCreated }) {
     { role: "student", is_active: true, q: q || undefined },
     { skip: !open || !wantStudents },
   );
-
   const teachers = teacherData?.results ?? [];
   const students = studentData?.results ?? [];
 
@@ -572,16 +613,13 @@ function CreateGroupModal({ open, onClose, onCreated }) {
     });
 
   const pickedList = Object.values(picked);
-  const pickedTeachers = pickedList.filter((u) => u.role === "teacher").length;
-  const pickedStudents = pickedList.filter((u) => u.role === "student").length;
 
   async function submit() {
     setError("");
     if (!title.trim()) return setError("Give the group a name.");
-    const ids = Object.keys(picked);
-    if (!ids.length) return setError("Pick at least one teacher or student.");
+    if (!pickedList.length) return setError("Pick at least one teacher or student.");
     try {
-      const thread = await createGroup({ title: title.trim(), member_ids: ids }).unwrap();
+      const thread = await createGroup({ title: title.trim(), member_ids: Object.keys(picked) }).unwrap();
       onCreated?.(thread);
       onClose();
     } catch (err) {
@@ -606,24 +644,16 @@ function CreateGroupModal({ open, onClose, onCreated }) {
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
             className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-elevated-lg"
           >
-            {/* header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-purple-600 to-fuchsia-600 px-5 py-4 text-white">
+            <div className="flex items-center justify-between bg-gradient-to-r from-green-900 to-green-900 px-5 py-4 text-white">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-purple-100">
-                  New conversation
-                </p>
-                <h2 className="font-display text-lg font-extrabold">Create a group</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-purple-100">New conversation</p>
+                <h2 className="font-display text-lg font-extrabold text-white">Create a group</h2>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white"
-              >
+              <button type="button" onClick={onClose} className="rounded-xl p-2 text-white/80 transition hover:bg-white/15 hover:text-white">
                 <X size={18} />
               </button>
             </div>
 
-            {/* body */}
             <div className="flex-1 space-y-4 overflow-y-auto p-5">
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-slate-700">Group name</label>
@@ -631,7 +661,7 @@ function CreateGroupModal({ open, onClose, onCreated }) {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Physics Department"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-navy-950 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-navy-950 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
                 />
               </div>
 
@@ -647,7 +677,7 @@ function CreateGroupModal({ open, onClose, onCreated }) {
                       type="button"
                       onClick={() => setTab(t.id)}
                       className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                        tab === t.id ? "bg-white text-purple-700 shadow-sm" : "text-slate-500 hover:text-navy-950"
+                        tab === t.id ? "bg-white text-red-700 shadow-sm" : "text-slate-500 hover:text-green-700"
                       }`}
                     >
                       {t.label}
@@ -655,39 +685,22 @@ function CreateGroupModal({ open, onClose, onCreated }) {
                   ))}
                 </div>
                 <div className="relative min-w-[10rem] flex-1">
-                  <Search
-                    size={13}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
+                  <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by name"
-                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                   />
                 </div>
               </div>
 
               <div className="max-h-60 space-y-4 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/50 p-3">
                 {wantTeachers && (
-                  <PickSection
-                    label="Teachers"
-                    icon={GraduationCap}
-                    items={teachers}
-                    loading={loadingTeachers}
-                    picked={picked}
-                    onToggle={togglePick}
-                  />
+                  <PickSection label="Teachers" icon={GraduationCap} items={teachers} loading={loadingTeachers} picked={picked} onToggle={togglePick} />
                 )}
                 {wantStudents && (
-                  <PickSection
-                    label="Students"
-                    icon={UserRound}
-                    items={students}
-                    loading={loadingStudents}
-                    picked={picked}
-                    onToggle={togglePick}
-                  />
+                  <PickSection label="Students" icon={UserRound} items={students} loading={loadingStudents} picked={picked} onToggle={togglePick} />
                 )}
               </div>
 
@@ -696,14 +709,10 @@ function CreateGroupModal({ open, onClose, onCreated }) {
                   {pickedList.map((u) => (
                     <span
                       key={u.id}
-                      className="inline-flex items-center gap-1 rounded-full bg-purple-50 py-1 pl-2.5 pr-1 text-xs font-semibold text-purple-700 ring-1 ring-purple-100"
+                      className="inline-flex items-center gap-1 rounded-full bg-purple-50 py-1 pl-2.5 pr-1 text-xs font-semibold text-green-700 ring-1 ring-blue-100"
                     >
                       {u.full_name || u.email}
-                      <button
-                        type="button"
-                        onClick={() => togglePick(u)}
-                        className="rounded-full p-0.5 hover:bg-purple-100"
-                      >
+                      <button type="button" onClick={() => togglePick(u)} className="rounded-full p-0.5 hover:bg-purple-100">
                         <X size={11} />
                       </button>
                     </span>
@@ -712,36 +721,21 @@ function CreateGroupModal({ open, onClose, onCreated }) {
               )}
 
               {error && (
-                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-600">
-                  {error}
-                </p>
+                <p className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-semibold text-rose-600">{error}</p>
               )}
             </div>
 
-            {/* footer */}
             <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-              <p className="text-xs text-slate-500">
-                {pickedList.length} selected
-                {pickedList.length > 0 && (
-                  <span className="text-slate-400">
-                    {" "}· {pickedTeachers} teacher{pickedTeachers === 1 ? "" : "s"}, {pickedStudents} student
-                    {pickedStudents === 1 ? "" : "s"}
-                  </span>
-                )}
-              </p>
+              <p className="text-xs text-slate-500">{pickedList.length} selected</p>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100"
-                >
+                <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-bold text-slate-600 transition hover:bg-slate-100">
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={submit}
                   disabled={creating || !title.trim() || pickedList.length === 0}
-                  className="rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 px-5 py-2 text-sm font-bold text-white shadow-purple-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="rounded-xl bg-gradient-to-br from-green-900 to-green-700 px-5 py-2 text-sm font-bold text-white shadow-purple-glow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {creating ? "Creating…" : "Create group"}
                 </button>
@@ -758,18 +752,15 @@ function CreateGroupModal({ open, onClose, onCreated }) {
 
 export default function AdminMessagesPage() {
   const { data: me } = useAdminMeQuery();
-  const {
-    data: groupsData,
-    isLoading: groupsLoading,
-    refetch: refetchGroups,
-  } = useGetChatGroupsQuery();
+  const { data: groupsData, isLoading: groupsLoading, refetch: refetchGroups } = useGetChatGroupsQuery();
   const rooms = useMemo(() => groupsData?.results ?? [], [groupsData]);
 
   const [activeId, setActiveId] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // { id, text }
   const [notice, setNotice] = useState(null);
 
   const bottomRef = useRef(null);
@@ -777,7 +768,6 @@ export default function AdminMessagesPage() {
   const emojiRef = useRef(null);
   const noticeTimer = useRef(null);
 
-  // Keep a valid room selected: the first one by default, or after one is deleted.
   useEffect(() => {
     if (!rooms.length) return;
     if (!rooms.some((r) => r.id === activeId)) setActiveId(rooms[0].id);
@@ -786,6 +776,7 @@ export default function AdminMessagesPage() {
   const activeRoom = rooms.find((r) => r.id === activeId) || null;
   const canPost = !!activeRoom?.can_post;
 
+  const { data: detail, refetch: refetchDetail } = useGetChatGroupDetailQuery(activeId, { skip: !activeId });
   const {
     data: msgData,
     isLoading: msgLoading,
@@ -793,23 +784,16 @@ export default function AdminMessagesPage() {
   } = useGetChatGroupMessagesQuery(activeId, { skip: !activeId, pollingInterval: 6000 });
   const messages = msgData?.results ?? [];
 
-  const {
-    data: membersData,
-    isLoading: membersLoading,
-    refetch: refetchMembers,
-  } = useGetChatThreadMembersQuery(activeId, { skip: !activeId });
-  const members = membersData?.results ?? [];
-
   const [sendMessage, { isLoading: sending }] = useSendChatGroupMessageMutation();
-  const [toggleReaction] = useToggleMessageReactionMutation();
+  const [editMessage] = useEditChatMessageMutation();
   const [deleteMessage] = useDeleteChatMessageMutation();
-  const [removeMember] = useRemoveChatThreadMemberMutation();
-  const [deleteThread] = useDeleteChatThreadMutation();
-
-  useChatSocket(activeId, {
-    onNewMessage: () => refetchMessages(),
-    onMessageUpdate: () => refetchMessages(),
-  });
+  const [toggleReaction] = useToggleMessageReactionMutation();
+  const [createGroup] = useCreateChatGroupMutation();
+  const [renameGroup, { isLoading: renaming }] = useUpdateChatGroupMutation();
+  const [deleteGroup] = useDeleteChatGroupMutation();
+  const [addMembers, { isLoading: adding }] = useAddChatGroupMembersMutation();
+  const [removeMember] = useRemoveChatGroupMemberMutation();
+  const [leaveGroup] = useLeaveChatGroupMutation();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -829,19 +813,29 @@ export default function AdminMessagesPage() {
     noticeTimer.current = setTimeout(() => setNotice(null), 2600);
   };
 
+  // Run a mutation. Shows a toast on failure. Returns the result, or undefined on failure.
+  async function run(fn, okText) {
+    try {
+      const result = await fn();
+      if (okText) flash(okText);
+      return result ?? true;
+    } catch (err) {
+      flash(firstError(err?.data) || "Something went wrong.", "error");
+      return undefined;
+    }
+  }
+
+  /* messages */
+
   async function handleSend(e) {
     e.preventDefault();
     const body = draft.trim();
     if (!body || !canPost) return;
     setDraft("");
     setEmojiOpen(false);
-    try {
-      await sendMessage({ id: activeId, body }).unwrap();
-      refetchMessages();
-    } catch (err) {
-      setDraft(body);
-      flash(firstError(err?.data) || "Message failed to send.", "error");
-    }
+    const ok = await run(() => sendMessage({ id: activeId, body }).unwrap());
+    if (!ok) setDraft(body);
+    refetchMessages();
   }
 
   function handleFile(e) {
@@ -849,110 +843,113 @@ export default function AdminMessagesPage() {
     e.target.value = "";
     if (!file || !canPost) return;
     if (file.size > MAX_IMAGE_BYTES) return flash("Images must be under 5 MB.", "error");
-
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      try {
-        await sendMessage({
-          id: activeId,
-          body: `![${file.name}](${ev.target.result})`,
-        }).unwrap();
-        refetchMessages();
-      } catch {
-        flash("Image upload failed.", "error");
-      }
+      await run(() => sendMessage({ id: activeId, body: `![${file.name}](${ev.target.result})` }).unwrap());
+      refetchMessages();
     };
     reader.readAsDataURL(file);
   }
 
-  async function handleReact(messageId, emoji) {
-    try {
-      await toggleReaction({ messageId, emoji }).unwrap();
-      refetchMessages();
-    } catch {
-      flash("Could not update the reaction.", "error");
-    }
+  async function saveEdit() {
+    if (!editing || !editing.text.trim()) return;
+    const { id, text } = editing;
+    setEditing(null);
+    await run(() => editMessage({ id, body: text.trim() }).unwrap(), "Message updated.");
+    refetchMessages();
   }
 
-  async function handleDelete(messageId) {
+  async function handleDelete(id) {
     if (!window.confirm("Delete this message for everyone? This cannot be undone.")) return;
-    try {
-      await deleteMessage(messageId).unwrap();
-      refetchMessages();
-      flash("Message deleted.");
-    } catch {
-      flash("Failed to delete message.", "error");
-    }
+    await run(() => deleteMessage(id).unwrap(), "Message deleted.");
+    refetchMessages();
   }
 
-  async function handleRemoveMember(userId, name) {
-    if (!window.confirm(`Remove ${name} from this group?`)) return;
-    try {
-      await removeMember({ threadId: activeId, userId }).unwrap();
-      refetchMembers();
-      refetchGroups();
-      flash(`${name} removed.`);
-    } catch (err) {
-      flash(firstError(err?.data) || "Could not remove this member.", "error");
-    }
+  async function handleReact(messageId, emoji) {
+    await run(() => toggleReaction({ messageId, emoji }).unwrap());
+    refetchMessages();
   }
 
-  async function handleDeleteGroup() {
-    if (!activeRoom || activeRoom.is_institution_group) return;
-    if (!window.confirm(`Delete "${activeRoom.title}" for all members? Its messages will be lost.`)) return;
-    try {
-      await deleteThread(activeRoom.id).unwrap();
-      setDrawerOpen(false);
-      setActiveId(null);
-      refetchGroups();
-      flash("Group deleted.");
-    } catch (err) {
-      flash(firstError(err?.data) || "Could not delete the group.", "error");
-    }
-  }
+  /* group: create, read, update, delete, members, leave */
 
   function handleCreated(thread) {
     setActiveId(thread.id);
     refetchGroups();
-    flash(`"${thread.title}" created. It is now in their chats.`);
+    flash(`"${thread.title}" created.`);
+  }
+
+  async function handleRename(title) {
+    const ok = await run(() => renameGroup({ id: activeId, title }).unwrap(), "Group renamed.");
+    if (ok) {
+      refetchGroups();
+      refetchDetail();
+    }
+  }
+
+  async function handleAdd(userId) {
+    const ok = await run(() => addMembers({ id: activeId, user_ids: [userId] }).unwrap(), "Member added.");
+    if (ok) {
+      refetchGroups();
+      refetchDetail();
+      refetchMessages();
+    }
+  }
+
+  async function handleRemove(userId, name) {
+    if (!window.confirm(`Remove ${name} from this group?`)) return;
+    const ok = await run(() => removeMember({ id: activeId, userId }).unwrap(), `${name} removed.`);
+    if (ok) {
+      refetchGroups();
+      refetchDetail();
+      refetchMessages();
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!activeRoom) return;
+    if (!window.confirm(`Delete "${activeRoom.title}" for everyone? Its messages will be lost.`)) return;
+    const ok = await run(() => deleteGroup(activeId).unwrap(), "Group deleted.");
+    if (ok) {
+      setPanelOpen(false);
+      setActiveId(null);
+      refetchGroups();
+    }
+  }
+
+  async function handleLeave() {
+    if (!window.confirm("Leave this group?")) return;
+    const ok = await run(() => leaveGroup(activeId).unwrap(), "You left the group.");
+    if (ok) {
+      setPanelOpen(false);
+      setActiveId(null);
+      refetchGroups();
+    }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">
-            Messages
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Broadcast to your institution and manage groups for teachers and students.
-          </p>
-        </div>
+      <header>
+        <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy-950">Messages</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Broadcast to your institution and manage groups for teachers and students.
+        </p>
       </header>
 
       <div className="flex h-[calc(100vh-13rem)] min-h-[32rem] overflow-hidden rounded-3xl border border-white/80 bg-white/85 shadow-elevated backdrop-blur-xl">
-        <RoomList
-          rooms={rooms}
-          activeId={activeId}
-          onSelect={setActiveId}
-          isLoading={groupsLoading}
-        />
+        <RoomList rooms={rooms} activeId={activeId} onSelect={setActiveId} isLoading={groupsLoading} />
 
         <section className="flex min-w-0 flex-1 flex-col">
           {!activeRoom ? (
             <EmptyState onCreate={() => setCreateOpen(true)} />
           ) : (
             <>
-              {/* header */}
               <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-white/70 px-5 py-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-purple-glow">
                     {activeRoom.is_institution_group ? <ShieldCheck size={18} /> : <Users size={18} />}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate font-display text-base font-extrabold text-navy-950">
-                      {activeRoom.title}
-                    </p>
+                    <p className="truncate font-display text-base font-extrabold text-navy-950">{activeRoom.title}</p>
                     <p className="text-[11px] text-slate-400">
                       {activeRoom.is_institution_group
                         ? "Staff broadcast · teachers can read and react"
@@ -961,12 +958,8 @@ export default function AdminMessagesPage() {
                   </div>
                 </div>
 
-                {members.length > 0 && (
-                  <AvatarStack
-                    members={members}
-                    total={membersData?.count ?? members.length}
-                    onOpen={() => setDrawerOpen(true)}
-                  />
+                {detail?.members?.length > 0 && (
+                  <AvatarStack members={detail.members} total={detail.members.length} onOpen={() => setPanelOpen(true)} />
                 )}
 
                 <div className="flex items-center gap-2">
@@ -980,23 +973,21 @@ export default function AdminMessagesPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDrawerOpen(true)}
+                    onClick={() => setPanelOpen(true)}
                     className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700"
                   >
-                    <Users size={14} />
-                    See all
+                    <Pencil size={14} />
+                    Manage
                   </button>
                 </div>
               </div>
 
-              {/* messages */}
               <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white/40 to-slate-50/70 px-6 py-5">
                 {msgLoading && messages.length === 0 && (
                   <div className="flex justify-center py-10">
                     <Loader2 className="animate-spin text-slate-300" />
                   </div>
                 )}
-
                 {!msgLoading && messages.length === 0 && (
                   <div className="mx-auto max-w-xs py-16 text-center">
                     <p className="text-sm font-semibold text-navy-950">No messages yet</p>
@@ -1010,29 +1001,27 @@ export default function AdminMessagesPage() {
                       key={m.id}
                       m={m}
                       mine={!!me && m.sender?.id === me.id}
+                      editing={editing?.id === m.id ? editing : null}
+                      onStartEdit={() => setEditing({ id: m.id, text: m.body })}
+                      onEditChange={(text) => setEditing((ed) => ({ ...ed, text }))}
+                      onSaveEdit={saveEdit}
+                      onCancelEdit={() => setEditing(null)}
+                      onDelete={() => handleDelete(m.id)}
                       onReact={handleReact}
-                      onDelete={handleDelete}
                     />
                   ))}
                 </ul>
                 <div ref={bottomRef} />
               </div>
 
-              {/* composer */}
               <form onSubmit={handleSend} className="border-t border-slate-100 bg-white/80 px-5 py-3">
                 {!canPost && (
                   <p className="mb-2 text-center text-[11px] font-semibold text-slate-400">
-                    Only admins can post in the teachers group.
+                    You can't post in this group.
                   </p>
                 )}
                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-1.5 shadow-sm focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFile}
-                  />
+                  <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
                   <button
                     type="button"
                     disabled={!canPost}
@@ -1096,21 +1085,20 @@ export default function AdminMessagesPage() {
         </section>
       </div>
 
-      <CreateGroupModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={handleCreated}
-      />
+      <CreateGroupModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={handleCreated} />
 
-      <MembersDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+      <GroupPanel
+        open={panelOpen}
+        onClose={() => setPanelOpen(false)}
         room={activeRoom}
-        members={members}
-        isLoading={membersLoading}
-        currentUserId={me?.id}
-        onRemove={handleRemoveMember}
-        onDeleteGroup={handleDeleteGroup}
+        detail={detail}
+        me={me}
+        busy={renaming || adding}
+        onRename={handleRename}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+        onDelete={handleDeleteGroup}
+        onLeave={handleLeave}
       />
 
       <Notice notice={notice} />

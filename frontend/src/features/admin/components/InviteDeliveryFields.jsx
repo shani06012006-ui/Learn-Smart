@@ -56,13 +56,13 @@ export default function InviteDeliveryFields({ value, onChange, phoneError, disa
           checked={value.email}
           onChange={(v) => set({ email: v })}
         />
-        <Choice
+        {/* <Choice
           icon={MessageCircle}
           label="WhatsApp"
           hint="Opens WhatsApp; you press Send"
           checked={value.whatsapp}
           onChange={(v) => set({ whatsapp: v })}
-        />
+        /> */}
       </div>
 
       {value.whatsapp && (

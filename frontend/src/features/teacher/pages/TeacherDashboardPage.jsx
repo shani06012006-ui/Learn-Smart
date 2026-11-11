@@ -1,3 +1,5 @@
+//src/features/teacher/pages/TeacherDashboardPage.jsx
+
 import { Link } from "react-router-dom";
 import {
   BookOpen,
@@ -16,7 +18,7 @@ import { useAuth } from "../../../hooks/useAuth";
 import {
   useGetClassesQuery,
   useGetTimetableQuery,
-  useGetTeacherLeavesQuery,
+  useGetTeacherStudentLeavesQuery,
 } from "../../../store/api/realApi";
 import { extractErrorMessage } from "../../../utils/apiError";
 
@@ -55,8 +57,9 @@ export default function TeacherDashboardPage() {
   const { data: timetableData, isLoading: timetableLoading } =
     useGetTimetableQuery();
 
+  // Teacher-scoped: pending leave requests from this teacher's students.
   const { data: leavesData, isLoading: leavesLoading } =
-    useGetTeacherLeavesQuery({ status: "pending", page: 1 });
+    useGetTeacherStudentLeavesQuery({ status: "pending", page: 1 });
 
   if (classesLoading) return <LoadingState label="Loading dashboard..." />;
 
@@ -84,10 +87,10 @@ export default function TeacherDashboardPage() {
   const pendingLeaves = leavesData?.count ?? (leavesData?.results ?? []).length;
 
   const displayName =
-    user?.first_name?.trim()
-    || user?.full_name?.trim()
-    || user?.email
-    || "Teacher";
+    user?.first_name?.trim() ||
+    user?.full_name?.trim() ||
+    user?.email ||
+    "Teacher";
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,7 +101,7 @@ export default function TeacherDashboardPage() {
 
         <div className="relative mt-1 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl text-black">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-black sm:text-3xl">
               {getGreeting()}, <span className="text-coral-300">{displayName}</span>!
             </h1>
             <p className="mt-2 max-w-xl text-sm text-black">
@@ -139,7 +142,7 @@ export default function TeacherDashboardPage() {
         />
       </div>
 
-      {/* Student performance trend — scoped to this teacher's classes */}
+      {/* Student performance trend, scoped to this teacher's classes */}
       <PerformanceTrendCard scope="teacher" />
 
       {/* Today's sessions */}
@@ -208,39 +211,43 @@ export default function TeacherDashboardPage() {
 
         {classes.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center">
-            <p className="text-sm font-semibold text-navy-950">
-              No classes yet
-            </p>
+            <p className="text-sm font-semibold text-navy-950">No classes yet</p>
             <p className="mt-1 text-xs text-slate-400">
               Ask your admin to assign you a class.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {classes.slice(0, 6).map((c) => (
-              <Link
-                key={c.id}
-                to={`/teacher/classes/${c.id}`}
-                className="group flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-elevated"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
-                    {c.subject || "Class"}
-                  </span>
-                  <ArrowRight size={14} className="mt-0.5 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-purple-500" />
-                </div>
-                <p className="line-clamp-2 text-sm font-bold text-navy-950">
-                  {c.name}
-                </p>
-                <p className="line-clamp-2 text-[11px] text-slate-500">
-                  {c.description || "No description"}
-                </p>
-                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <GraduationCap size={12} />
-                  {c.student_count} student{c.student_count === 1 ? "" : "s"}
-                </div>
-              </Link>
-            ))}
+            {classes
+              .filter((c) => c.id)
+              .slice(0, 6)
+              .map((c) => (
+                <Link
+                  key={c.id}
+                  to={`/teacher/classes/${c.id}`}
+                  className="group flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-card transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-elevated"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-600 ring-1 ring-purple-100">
+                      {c.subject || "Class"}
+                    </span>
+                    <ArrowRight
+                      size={14}
+                      className="mt-0.5 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-purple-500"
+                    />
+                  </div>
+                  <p className="line-clamp-2 text-sm font-bold text-navy-950">
+                    {c.name}
+                  </p>
+                  <p className="line-clamp-2 text-[11px] text-slate-500">
+                    {c.description || "No description"}
+                  </p>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <GraduationCap size={12} />
+                    {c.student_count} student{c.student_count === 1 ? "" : "s"}
+                  </div>
+                </Link>
+              ))}
           </div>
         )}
       </section>

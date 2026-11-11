@@ -564,7 +564,48 @@ export const realApi = createApi({
         { type: "ChatGroupMessages", id },
         { type: "ChatGroups", id: "LIST" },
       ],
-    }),    
+    }),   
+
+    getChatGroupDetail: builder.query({
+      query: (id) => `/chat/groups/${id}/`,
+      providesTags: (_r, _e, id) => [{ type: "ChatGroups", id }],
+    }),
+    updateChatGroup: builder.mutation({
+      query: ({ id, title }) => ({ url: `/chat/groups/${id}/`, method: "PATCH", body: { title } }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "ChatGroups", id },
+        { type: "ChatGroups", id: "LIST" },
+      ],
+    }),
+    deleteChatGroup: builder.mutation({
+      query: (id) => ({ url: `/chat/groups/${id}/`, method: "DELETE" }),
+      invalidatesTags: [{ type: "ChatGroups", id: "LIST" }],
+    }),
+    addChatGroupMembers: builder.mutation({
+      query: ({ id, user_ids }) => ({
+        url: `/chat/groups/${id}/members/`,
+        method: "POST",
+        body: { user_ids },
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "ChatGroups", id },
+        { type: "ChatGroups", id: "LIST" },
+      ],
+    }),
+    removeChatGroupMember: builder.mutation({
+      query: ({ id, userId }) => ({
+        url: `/chat/groups/${id}/members/${userId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "ChatGroups", id },
+        { type: "ChatGroups", id: "LIST" },
+      ],
+    }),
+    leaveChatGroup: builder.mutation({
+      query: (id) => ({ url: `/chat/groups/${id}/leave/`, method: "POST" }),
+      invalidatesTags: [{ type: "ChatGroups", id: "LIST" }],
+    }),
     
     // ---- Admin Chat ----
     sendAdminChatMessage: builder.mutation({
@@ -634,6 +675,33 @@ export const realApi = createApi({
     }),
 
     // ---- Student chat ----
+    getStudentChatThreadMembers: builder.query({
+      query: (threadId) => `/chat/threads/${threadId}/members/`, // Reusing the generic chat endpoint
+      providesTags: (r, e, id) => [{ type: "ChatMembers", id }],
+    }),
+    editStudentChatMessage: builder.mutation({
+      query: ({ id, body }) => ({
+        url: `/student/chat/messages/${id}/edit/`, // You may need to add this backend endpoint if it doesn't exist
+        method: "PATCH",
+        body: { body },
+      }),
+      invalidatesTags: (r, e, { id }) => [{ type: "StudentChat", id: `msgs-${id}` }],
+    }),
+    deleteStudentChatMessage: builder.mutation({
+      query: (messageId) => ({
+        url: `/chat/messages/${messageId}/`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "StudentChat", id: "LIST" }],
+    }),
+    toggleStudentMessageReaction: builder.mutation({
+      query: ({ messageId, emoji }) => ({
+        url: `/chat/messages/${messageId}/react/`,
+        method: "POST",
+        body: { emoji },
+      }),
+      invalidatesTags: [{ type: "StudentChat", id: "LIST" }],
+    }),
     getStudentChatRooms: builder.query({
       query: () => `/student/chat/rooms/`,
       providesTags: ["StudentChat"],
@@ -1267,6 +1335,26 @@ export const realApi = createApi({
       invalidatesTags: [{ type: "ClassMaterial", id: "LIST" }],
     }),
 
+    getTeacherClasses: builder.query({
+      query: () => "/teacher/classes/",
+      providesTags: [{ type: "Class", id: "LIST" }],
+    }),
+    createTeacherClass: builder.mutation({
+      query: (body) => ({ url: "/teacher/classes/", method: "POST", body }),
+      invalidatesTags: [{ type: "Class", id: "LIST" }],
+    }),
+    updateTeacherClass: builder.mutation({
+      query: ({ id, ...body }) => ({ url: `/teacher/classes/${id}/`, method: "PATCH", body }),
+      invalidatesTags: (_r, _e, { id }) => [
+        { type: "Class", id: "LIST" },
+        { type: "ClassDetail", id },
+      ],
+    }),
+    deleteTeacherClass: builder.mutation({
+      query: (id) => ({ url: `/teacher/classes/${id}/`, method: "DELETE" }),
+      invalidatesTags: [{ type: "Class", id: "LIST" }],
+    }),
+
     // ============================================================
     // Chat — institution teacher group
     // ============================================================
@@ -1587,7 +1675,6 @@ export const realApi = createApi({
   }),
 });
 
-// ✅ Setup Password Hook added to the export list
 export const {
   useAdminLoginMutation,
   useAdminLogoutMutation,
@@ -1641,6 +1728,12 @@ export const {
   useAddChatThreadMemberMutation,
   useGetChatThreadMembersQuery,
   useCreateChatGroupMutation,
+  useGetChatGroupDetailQuery,
+  useUpdateChatGroupMutation,
+  useDeleteChatGroupMutation,
+  useAddChatGroupMembersMutation,
+  useRemoveChatGroupMemberMutation,
+  useLeaveChatGroupMutation,
   useGetChatGroupsQuery,
   useGetChatGroupMessagesQuery,
   useSendChatGroupMessageMutation,  
@@ -1762,4 +1855,12 @@ export const {
   useValidateTeacherOnboardingMutation,
   useCompleteTeacherOnboardingMutation,
   useResendTeacherInviteMutation,
+  useGetTeacherClassesQuery,
+  useCreateTeacherClassMutation,
+  useUpdateTeacherClassMutation,
+  useDeleteTeacherClassMutation,
+  useGetStudentChatThreadMembersQuery,
+  useEditStudentChatMessageMutation,
+  useDeleteStudentChatMessageMutation,
+  useToggleStudentMessageReactionMutation,
 } = realApi;

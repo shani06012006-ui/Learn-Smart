@@ -44,9 +44,9 @@ function fmtTime(iso) {
 
 export default function TeacherAttendancePage() {
   const { user } = useAuth();
-  const [mode, setMode] = useState("class"); // "class" | "grade"
+  const [mode, setMode] = useState("class");
   const [gradeId, setGradeId] = useState("");
-  const [sectionId, setSectionId] = useState(""); // ✅ Section State
+  const [sectionId, setSectionId] = useState("");
   const [classCourseId, setClassCourseId] = useState("");
   const [date, setDate] = useState(todayIso());
   const [draft, setDraft] = useState({});
