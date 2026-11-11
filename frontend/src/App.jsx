@@ -65,6 +65,7 @@ import TeacherLiveClassesPage from "./features/teacher/pages/TeacherLiveClassesP
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
+import TermsPage from "./features/auth/TermsPage";
 
 export default function App() {
   return (
@@ -74,6 +75,7 @@ export default function App() {
           placed inside an /admin, /teacher, or /student block. */}
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/student-login" element={<StudentLoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/activate" element={<ActivateAccountPage />} />

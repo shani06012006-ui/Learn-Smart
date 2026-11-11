@@ -198,7 +198,7 @@ export default function LoginPage() {
       </form>
 
       {/* Footer link */}
-      <p className="mt-6 text-center text-sm text-ink-500">
+      {/* <p className="mt-6 text-center text-sm text-ink-500">
         Don&apos;t have an account?{" "}
         <Link
           to="/register"
@@ -206,7 +206,7 @@ export default function LoginPage() {
         >
           Sign up
         </Link>
-      </p>
+      </p> */}
 
       {/* Student quick-login link */}
       <div className="mt-6 border-t border-ink-100 pt-5">
