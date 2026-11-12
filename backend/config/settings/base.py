@@ -188,7 +188,11 @@ SIMPLE_JWT = {
 # CORS
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS","https://learn-smart-iota.vercel.app", "https://learn-smart-a6ukmxbfa-shani06012006-uis-projects.vercel.app",
+    "CORS_ALLOWED_ORIGINS","https://learn-smart-iota.vercel.app", 
+    "https://learn-smart-a6ukmxbfa-shani06012006-uis-projects.vercel.app", 
+    
+    "https://learn-smart-iota.vercel.app,https://learn-smart-a6ukmxbfa-shani06012006-uis-projects.vercel.app",
+
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")
